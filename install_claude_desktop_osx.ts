@@ -37,12 +37,12 @@ try {
   if (config.hasOwnProperty("mcpServers")) {
     const servers = config["mcpServers"] || {};
 
-    if (servers.hasOwnProperty("tb-dynamic-toolbox")) {
+    if (servers.hasOwnProperty("@tollbit/mcp-toolbox")) {
       console.log(
-        'Found existing "tb-dynamic-toolbox" server configuration. Updating API key'
+        'Found existing "@tollbit/mcp-toolbox" server configuration. Updating API key'
       );
 
-      const existingServer = servers["tb-dynamic-toolbox"];
+      const existingServer = servers["@tollbit/mcp-toolbox"];
       existingServer["args"] = [
         "-y",
         "@tollbit/mcp-toolbox",
@@ -50,9 +50,9 @@ try {
         `${tollbitApiKey}`,
       ];
     } else {
-      console.log("Adding new server configuration for tb-dynamic-toolbox");
+      console.log("Adding new server configuration for @tollbit/mcp-toolbox");
 
-      servers["tb-dynamic-toolbox"] = {
+      servers["@tollbit/mcp-toolbox"] = {
         command: "npx",
         args: ["-y", "@tollbit/mcp-toolbox", "--api-key", `${tollbitApiKey}`],
       };
@@ -60,10 +60,10 @@ try {
     }
   } else {
     console.log(
-      "Adding mcpServers block with tb-dynamic-toolbox configuration"
+      "Adding mcpServers block with @tollbit/mcp-toolbox configuration"
     );
     config["mcpServers"] = {
-      "tb-dynamic-toolbox": {
+      "@tollbit/mcp-toolbox": {
         command: "npx",
         args: ["-y", "@tollbit/mcp-toolbox", "--api-key", `${tollbitApiKey}`],
       },
