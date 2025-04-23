@@ -1,0 +1,22 @@
+{
+  "name": "@tollbit/cli",
+  "version": "1.0.1",
+  "main": "index.js",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/install_claude_desktop_osx.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "claude": "dist/install_claude_desktop_osx.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.3"
+  }
+}
