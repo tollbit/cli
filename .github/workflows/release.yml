@@ -1,0 +1,89 @@
+# Release pipeline DISABLED — restore automatic releases by uncommenting `on.push.tags`
+# below and removing `if: false` from each job.
+name: release
+
+on:
+  workflow_dispatch: {}
+  # push:
+  #   tags:
+  #     - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # Seed tollbit-cli-releases with README + install scripts *before* GoReleaser.
+  # GitHub returns 422 "Repository is empty" when publishing releases to a repo with no commits.
+  sync-public-release:
+    if: false # release pipeline disabled
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tollbit-cli at tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Sync public README and install scripts to tollbit-cli-releases
+        env:
+          RELEASES_GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+        run: bash scripts/ci/sync-install-scripts-to-releases.sh
+
+  goreleaser:
+    if: false # release pipeline disabled
+    needs: sync-public-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Publish releases to https://github.com/tollbit/tollbit-cli-releases (public).
+      # Secret RELEASES_GITHUB_TOKEN: fine-grained PAT (Contents: Read and write on that repo)
+      # or classic PAT with repo scope. GitHub App installation tokens also work.
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+
+  npm-publish:
+    if: false # release pipeline disabled
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Set npm package version from git tag
+        working-directory: npm
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${VERSION}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      # Trusted publishing (OIDC): no NPM_TOKEN secret required once npm trust is configured.
+      - name: Publish npm package
+        working-directory: npm
+        run: npm publish --provenance --access public

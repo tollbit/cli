@@ -1,0 +1,17 @@
+app:
+  name: tollbit
+auth:
+  base_url: https://oauth.tollbit.com
+  retry_on_obo_required: true
+  token_ttl_seconds: 0
+  browser_consent:
+    callback_address: 127.0.0.1:54321
+    timeout: 3m
+    auto_open_browser: true
+agent:
+  default_name: anonymous
+  default_user_agent: ""
+credentials:
+  storage_dir: __default__
+gateway:
+  base_url: https://gateway.tollbit.com

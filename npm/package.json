@@ -1,0 +1,22 @@
+{
+  "name": "@tollbit/tollbit-cli",
+  "version": "0.0.1",
+  "description": "Tollbit CLI wrapper that installs the native tollbit binary",
+  "license": "MIT",
+  "bin": {
+    "tollbit": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "install.js"
+  ],
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

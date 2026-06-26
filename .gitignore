@@ -1,0 +1,42 @@
+# Built binary (local name from README)
+/tollbit
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test & coverage
+*.test
+*.out
+coverage.out
+coverage.html
+*.coverprofile
+profile.cov
+
+# Module / vendor (if used)
+vendor/
+
+# IDE & editor
+.idea/
+*.swp
+*~
+__debug_bin
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets (never commit)
+credentials.json
+.env
+.env.*
+
+# Release / dist (GoReleaser, npm wrapper artifacts, etc.)
+dist/
+
+# Cursor
+.cursor/
+.devContext/
+.claude/
+articles/
