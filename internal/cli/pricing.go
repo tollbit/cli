@@ -1,0 +1,160 @@
+package cli
+
+import (
+	"fmt"
+	"io"
+	"net/url"
+	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/tollbit/tollbit-cli/internal/app"
+	"github.com/tollbit/tollbit-cli/internal/client/tollbit"
+	"github.com/tollbit/tollbit-cli/internal/credentials/agenttoken"
+	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+)
+
+type pricingOptions struct {
+	agentName string
+	userAgent string
+	asJSON    bool
+}
+
+func NewPricingCommand(factory app.Factory) *cobra.Command {
+	return newPricingCommand(factory)
+}
+
+func newPricingCommand(factory app.Factory) *cobra.Command {
+	var opts pricingOptions
+
+	cmd := &cobra.Command{
+		Use:   "pricing <url-1>,<url-2>,...,<url-n>",
+		Short: "Fetch licensing rates for article URLs",
+		Long:  "Fetch licensing rates for one or more article URLs on the TollBit network.",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				return UsageError("pricing requires exactly one comma-separated URL argument")
+			}
+			if strings.TrimSpace(args[0]) == "" {
+				return UsageError("pricing URL argument must not be empty")
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPricing(cmd, factory, opts, args[0])
+		},
+	}
+
+	cmd.Flags().StringVar(&opts.agentName, "agent-name", "", "agent identity name")
+	cmd.Flags().StringVar(&opts.userAgent, "agent-user-agent", "", "agent user agent for request")
+	cmd.Flags().BoolVar(&opts.asJSON, "json", false, "emit raw JSON response")
+
+	return cmd
+}
+
+func runPricing(cmd *cobra.Command, factory app.Factory, opts pricingOptions, urlsArg string) error {
+	urls, err := validatePricingURLs(urlsArg)
+	if err != nil {
+		return err
+	}
+
+	app, err := appForCommand(factory, cmd)
+	if err != nil {
+		return RuntimeError(err)
+	}
+	credentials, err := app.Credentials()
+	if err != nil {
+		return RuntimeError(err)
+	}
+	tollbitClient, err := app.Tollbit()
+	if err != nil {
+		return RuntimeError(err)
+	}
+
+	identityOpts := agenttoken.ResolveIdentityOptions{
+		Name:      flagChangedStr(cmd, "agent-name"),
+		UserAgent: flagChangedStr(cmd, "agent-user-agent"),
+	}
+	identity, err := credentials.ResolveIdentity(cmd.Context(), identityOpts)
+	if err != nil {
+		return RuntimeError(fmt.Errorf("error resolving identity: %w", err))
+	}
+
+	var resp []tollbit.BatchRateResponseV2
+	if app.Config().Auth.RetryOnOBORequired {
+		resp, err = agenttoken.WithOBORetry(cmd, credentials, identity, func(token agent.Token) ([]tollbit.BatchRateResponseV2, error) {
+			return tollbitClient.BatchGetRates(cmd.Context(), urls, token)
+		})
+	} else {
+		token, tokenErr := credentials.GetAgentToken(cmd, identity)
+		if tokenErr != nil {
+			return RuntimeError(fmt.Errorf("error fetching agent token: %w", tokenErr))
+		}
+		resp, err = tollbitClient.BatchGetRates(cmd.Context(), urls, token)
+	}
+	if err != nil {
+		return RuntimeError(fmt.Errorf("error fetching rates: %w", err))
+	}
+
+	if opts.asJSON {
+		return RuntimeError(writeJSON(cmd.OutOrStdout(), resp))
+	}
+	printPricingResults(cmd.OutOrStdout(), resp)
+	return nil
+}
+
+func validatePricingURLs(urlsArg string) ([]string, error) {
+	urls := splitCommaSeparated(urlsArg)
+	if len(urls) == 0 {
+		return nil, UsageError("pricing requires at least one URL")
+	}
+	for _, u := range urls {
+		if err := validateArticleURL(u); err != nil {
+			return nil, UsageError("%s", err.Error())
+		}
+	}
+	return urls, nil
+}
+
+func validateArticleURL(raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid URL %q: %w", raw, err)
+	}
+	if strings.TrimSpace(parsed.Scheme) == "" || strings.TrimSpace(parsed.Host) == "" {
+		return fmt.Errorf("invalid URL %q: scheme and host are required", raw)
+	}
+	return nil
+}
+
+func printPricingResults(w io.Writer, resp []tollbit.BatchRateResponseV2) {
+	for i, item := range resp {
+		if i > 0 {
+			fmt.Fprintln(w)
+		}
+		fmt.Fprintln(w, item.URL)
+		if len(item.Rates) == 0 {
+			fmt.Fprintln(w, "  (no rates)")
+			continue
+		}
+		for _, rate := range item.Rates {
+			line := fmt.Sprintf("  %s · %s", formatPriceMicros(rate.Price.PriceMicros, rate.Price.Currency), rate.License.LicenseType)
+			if msg := strings.TrimSpace(rate.Error); msg != "" {
+				line += " · error: " + msg
+			}
+			fmt.Fprintln(w, line)
+		}
+	}
+}
+
+func formatPriceMicros(micros int64, currency string) string {
+	currency = strings.TrimSpace(currency)
+	if currency == "" {
+		currency = "?"
+	}
+	amount := float64(micros) / 1_000_000
+	s := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.6f", amount), "0"), ".")
+	if s == "" || s == "-" {
+		s = "0"
+	}
+	return currency + " " + s
+}

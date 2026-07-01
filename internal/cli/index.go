@@ -9,7 +9,9 @@ func NewCommandTree(factory app.Factory) *cobra.Command {
 	rootCmd := NewRootCommand(factory)
 	rootCmd.AddCommand(
 		NewAgentCommand(factory),
+		NewContentCommand(factory),
 		NewIdentityCommand(factory),
+		NewPricingCommand(factory),
 		NewSearchCommand(factory),
 		NewGuideCommand(),
 		NewVersionCommand(),

@@ -24,6 +24,7 @@ type (
 
 	Client interface {
 		Search(ctx context.Context, params SearchParams, token agent.Token) (PagedSearchResultResponse, error)
+		BatchGetRates(ctx context.Context, urls []string, token agent.Token) ([]BatchRateResponseV2, error)
 	}
 
 	client struct {
@@ -61,6 +62,38 @@ type (
 	Availability struct {
 		Discoverable   bool `json:"discoverable"`
 		ReadyToLicense bool `json:"readyToLicense"`
+	}
+
+	BatchGetRateRequest struct {
+		URLs []string `json:"urls"`
+	}
+
+	BatchRateResponseV2 struct {
+		URL   string                      `json:"url"`
+		Rates []BatchDeveloperRateResponse `json:"rates"`
+	}
+
+	BatchDeveloperRateResponse struct {
+		Price   RatePriceResponse          `json:"price"`
+		License BatchRateLicenseResponse   `json:"license"`
+		Error   string                     `json:"error"`
+	}
+
+	BatchRateLicenseResponse struct {
+		Cuid         string                  `json:"cuid"`
+		LicenseType  string                  `json:"licenseType"`
+		LicensePath  string                  `json:"licensePath"`
+		Permissions  []RateLicensePermission `json:"permissions"`
+		ValidUntil   string                  `json:"validUntil"`
+	}
+
+	RatePriceResponse struct {
+		PriceMicros int64  `json:"priceMicros"`
+		Currency    string `json:"currency"`
+	}
+
+	RateLicensePermission struct {
+		Name string `json:"name"`
 	}
 
 	requestOption func(*http.Request)
@@ -114,6 +147,19 @@ func (c *client) Search(ctx context.Context, params SearchParams, token agent.To
 	u.RawQuery = q.Encode()
 	var out PagedSearchResultResponse
 	return out, c.doJSON(ctx, http.MethodGet, u.String(), nil, &out, withBearerToken(token.RawToken))
+}
+
+func (c *client) BatchGetRates(ctx context.Context, urls []string, token agent.Token) ([]BatchRateResponseV2, error) {
+	if len(urls) == 0 {
+		return nil, errors.New("at least one URL is required")
+	}
+	if err := requireAgentToken(token); err != nil {
+		return nil, err
+	}
+
+	u := c.resolve("/agents/v1/rates/batch")
+	var out []BatchRateResponseV2
+	return out, c.doJSON(ctx, http.MethodPost, u.String(), BatchGetRateRequest{URLs: urls}, &out, withBearerToken(token.RawToken))
 }
 
 func requireAgentToken(token agent.Token) error {
