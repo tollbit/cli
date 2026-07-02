@@ -9,14 +9,15 @@ func NewContentCommand(factory app.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "content",
 		Short: "Work with publisher content",
-		Long:  "Price, and retrieve publisher content on the TollBit network.",
+		Long:  "Price and fetch licensed publisher content on the TollBit network. Every fetch charges money.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return UsageError("content requires pricing")
+				return UsageError("content requires a subcommand: fetch or pricing")
 			}
 			return UsageError("unknown content command %q", args[0])
 		},
 	}
+	cmd.AddCommand(newFetchCommand(factory))
 	cmd.AddCommand(newPricingCommand(factory))
 	return cmd
 }

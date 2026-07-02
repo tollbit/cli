@@ -159,6 +159,25 @@ func TestRunPricingUsageError(t *testing.T) {
 	})
 }
 
+func TestNormalizeArticleURL(t *testing.T) {
+	got, err := normalizeArticleURL("https://time.com/article/foo/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "https://time.com/article/foo"
+	if got != want {
+		t.Fatalf("normalizeArticleURL() = %q, want %q", got, want)
+	}
+
+	got, err = normalizeArticleURL("https://time.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "https://time.com/" {
+		t.Fatalf("normalizeArticleURL(root) = %q", got)
+	}
+}
+
 func TestFormatPriceMicros(t *testing.T) {
 	tests := []struct {
 		micros   int64
@@ -174,5 +193,83 @@ func TestFormatPriceMicros(t *testing.T) {
 		if got := formatPriceMicros(tc.micros, tc.currency); got != tc.want {
 			t.Fatalf("formatPriceMicros(%d, %q) = %q, want %q", tc.micros, tc.currency, got, tc.want)
 		}
+	}
+}
+
+func TestLicenseDisplayInfo(t *testing.T) {
+	t.Run("on demand summarization", func(t *testing.T) {
+		got := licenseDisplayInfo(tollbit.BatchRateLicenseResponse{LicenseType: licenseTypeOnDemand})
+		if got.label != "Summarization" || got.description == "" || got.licenseURL != "" {
+			t.Fatalf("unexpected display: %#v", got)
+		}
+	})
+
+	t.Run("on demand full display", func(t *testing.T) {
+		got := licenseDisplayInfo(tollbit.BatchRateLicenseResponse{LicenseType: licenseTypeOnDemandFullUse})
+		if got.label != "Full Display" || got.description == "" || got.licenseURL != "" {
+			t.Fatalf("unexpected display: %#v", got)
+		}
+	})
+
+	t.Run("other license uses path", func(t *testing.T) {
+		got := licenseDisplayInfo(tollbit.BatchRateLicenseResponse{
+			LicenseType: "premium",
+			LicensePath: "https://example.com/licenses/premium",
+		})
+		if got.label != "premium" || got.description != "" || got.licenseURL != "https://example.com/licenses/premium" {
+			t.Fatalf("unexpected display: %#v", got)
+		}
+	})
+}
+
+func TestFormatPricingLicenseLabel(t *testing.T) {
+	display := licenseDisplayInfo(tollbit.BatchRateLicenseResponse{LicenseType: licenseTypeOnDemand})
+	got := formatPricingLicenseLabel(tollbit.BatchRateLicenseResponse{LicenseType: licenseTypeOnDemand}, display)
+	if got != "Summarization (ON_DEMAND_LICENSE)" {
+		t.Fatalf("got %q", got)
+	}
+
+	display = licenseDisplayInfo(tollbit.BatchRateLicenseResponse{
+		LicenseType: "premium",
+		LicensePath: "https://example.com/licenses/premium",
+	})
+	got = formatPricingLicenseLabel(tollbit.BatchRateLicenseResponse{LicenseType: "premium"}, display)
+	if got != "premium" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestPrintPricingResultsLicenseDetails(t *testing.T) {
+	var buf bytes.Buffer
+	printPricingResults(&buf, []tollbit.BatchRateResponseV2{{
+		URL: "https://example.com/article",
+		Rates: []tollbit.BatchDeveloperRateResponse{
+			{
+				Price:   tollbit.RatePriceResponse{PriceMicros: 50000, Currency: "USD"},
+				License: tollbit.BatchRateLicenseResponse{LicenseType: licenseTypeOnDemand},
+			},
+			{
+				Price:   tollbit.RatePriceResponse{PriceMicros: 100000, Currency: "USD"},
+				License: tollbit.BatchRateLicenseResponse{LicenseType: licenseTypeOnDemandFullUse},
+			},
+			{
+				Price:   tollbit.RatePriceResponse{PriceMicros: 200000, Currency: "USD"},
+				License: tollbit.BatchRateLicenseResponse{
+					LicenseType: "premium",
+					LicensePath: "https://example.com/licenses/premium",
+				},
+			},
+		},
+	}})
+
+	out := buf.String()
+	if !strings.Contains(out, "Summarization (ON_DEMAND_LICENSE)") || !strings.Contains(out, "summaries and citations") {
+		t.Fatalf("expected summarization detail, got %q", out)
+	}
+	if !strings.Contains(out, "Full Display (ON_DEMAND_FULL_USE_LICENSE)") || !strings.Contains(out, "full article text") {
+		t.Fatalf("expected full display detail, got %q", out)
+	}
+	if !strings.Contains(out, "premium") || !strings.Contains(out, "https://example.com/licenses/premium") {
+		t.Fatalf("expected premium license URL, got %q", out)
 	}
 }

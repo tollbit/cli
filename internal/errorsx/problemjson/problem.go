@@ -13,6 +13,9 @@ const (
 	// ErrorCodeOboRequired means the caller needs an on-behalf-of association
 	// before the operation can proceed.
 	ErrorCodeOboRequired ErrorCode = "obo_required"
+	// ErrorCodeUserAgentNotRegistered means the user agent is not registered for
+	// content access token creation.
+	ErrorCodeUserAgentNotRegistered ErrorCode = "user_agent_not_registered"
 )
 
 // Problem is the CLI-local representation of the ProblemJSON shape returned by
@@ -90,6 +93,12 @@ func (p Problem) DetailOrTitle() string {
 // IsOBORequired reports whether the problem has the obo_required error code.
 func (p Problem) IsOBORequired() bool {
 	return p.Code != nil && *p.Code == ErrorCodeOboRequired
+}
+
+// IsUserAgentNotRegistered reports whether the problem has the
+// user_agent_not_registered error code.
+func (p Problem) IsUserAgentNotRegistered() bool {
+	return p.Code != nil && *p.Code == ErrorCodeUserAgentNotRegistered
 }
 
 // RequiredOBO parses the required.obo.org/user extension returned with
