@@ -9,7 +9,7 @@ func NewContentCommand(factory app.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "content",
 		Short: "Work with publisher content",
-		Long:  "Discover, price, and retrieve publisher content on the TollBit network.",
+		Long:  "Price, and retrieve publisher content on the TollBit network.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return UsageError("content requires pricing")
