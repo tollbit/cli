@@ -19,10 +19,6 @@ type pricingOptions struct {
 	asJSON    bool
 }
 
-func NewPricingCommand(factory app.Factory) *cobra.Command {
-	return newPricingCommand(factory)
-}
-
 func newPricingCommand(factory app.Factory) *cobra.Command {
 	var opts pricingOptions
 

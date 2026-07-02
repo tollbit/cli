@@ -32,6 +32,8 @@ unless --rate-index is set. With --json and multiple rates, --rate-index is requ
 If the configured user agent is not registered for content access, the CLI lists
 available user agents to choose from and saves the selection for future fetches.`
 
+const createUserAgentURL = "https://hack.tollbit.com/my-agents"
+
 type fetchOptions struct {
 	confirm        bool
 	toDisk         string
@@ -40,10 +42,6 @@ type fetchOptions struct {
 	agentName      string
 	userAgent      string
 	asJSON         bool
-}
-
-func NewFetchCommand(factory app.Factory) *cobra.Command {
-	return newFetchCommand(factory)
 }
 
 func newFetchCommand(factory app.Factory) *cobra.Command {
@@ -329,7 +327,7 @@ func resolveRegisteredUserAgent(
 		return identity, listErr
 	}
 	if len(agents) == 0 {
-		return identity, errors.New("no registered user agents available")
+		return identity, noRegisteredUserAgentsError(cmd.ErrOrStderr())
 	}
 
 	selected, selectErr := selectUserAgent(cmd.ErrOrStderr(), cmd.InOrStdin(), agents, opts.userAgentIndex, opts.asJSON)
@@ -450,4 +448,9 @@ func writeFetchToDisk(path string, content tollbit.GetContentResponse, asJSON bo
 func isUserAgentNotRegistered(err error) bool {
 	var problem problemjson.Problem
 	return errors.As(err, &problem) && problem.IsUserAgentNotRegistered()
+}
+
+func noRegisteredUserAgentsError(w io.Writer) error {
+	fmt.Fprintf(w, "No registered user agents found.\nCreate one at %s, then run this command again.\n", createUserAgentURL)
+	return errors.New("no registered user agents available")
 }

@@ -26,9 +26,9 @@ Content workflow (search → pricing → fetch):
 
 ```bash
 tollbit search "climate policy" --size 10
-tollbit pricing https://example.com/article-1,https://example.com/article-2
+tollbit content pricing https://example.com/article-1,https://example.com/article-2
 tollbit content pricing https://example.com/article --json
-tollbit fetch https://example.com/article --confirm --toDisk ./article.md
+tollbit content fetch https://example.com/article --confirm --toDisk ./article.md
 ```
 
 ## Fetch (paid)
@@ -37,17 +37,16 @@ tollbit fetch https://example.com/article --confirm --toDisk ./article.md
 
 ```bash
 # Interactive: shows price, prompts to confirm, prints article body to stdout
-tollbit fetch https://example.com/article
 tollbit content fetch https://example.com/article
 
 # Non-interactive automation (still paid)
-tollbit fetch https://example.com/article --confirm --agent-user-agent MyAgent-User
+tollbit content fetch https://example.com/article --confirm --agent-user-agent MyAgent-User
 
 # Save content to disk
-tollbit fetch https://example.com/article --confirm --toDisk ./article.md
+tollbit content fetch https://example.com/article --confirm --toDisk ./article.md
 
 # Machine-readable output
-tollbit fetch https://example.com/article --confirm --json
+tollbit content fetch https://example.com/article --confirm --json
 ```
 
 Use `--toDisk=<path>` to persist fetched content locally. With `--json`, the full API response is written to stdout (and to disk when `--toDisk` is set).

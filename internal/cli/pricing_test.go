@@ -42,7 +42,7 @@ func TestRunPricingRendersResults(t *testing.T) {
 	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"pricing", "https://example.com/article", "--agent-name", "agent-test"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "pricing", "https://example.com/article", "--agent-name", "agent-test"}, nil, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
@@ -126,7 +126,7 @@ func TestRunPricingJSON(t *testing.T) {
 	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"pricing", "https://example.com/a", "--json"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "pricing", "https://example.com/a", "--json"}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 	}
@@ -144,7 +144,7 @@ func TestRunPricingUsageError(t *testing.T) {
 
 	t.Run("no args", func(t *testing.T) {
 		var stdout, stderr bytes.Buffer
-		code := executeTestCommand([]string{"pricing"}, nil, &stdout, &stderr)
+		code := executeTestCommand([]string{"content", "pricing"}, nil, &stdout, &stderr)
 		if code != 2 {
 			t.Fatalf("expected exit code 2, got %d stderr=%q", code, stderr.String())
 		}
@@ -152,7 +152,7 @@ func TestRunPricingUsageError(t *testing.T) {
 
 	t.Run("invalid url", func(t *testing.T) {
 		var stdout, stderr bytes.Buffer
-		code := executeTestCommand([]string{"pricing", "not-a-url"}, nil, &stdout, &stderr)
+		code := executeTestCommand([]string{"content", "pricing", "not-a-url"}, nil, &stdout, &stderr)
 		if code != 2 {
 			t.Fatalf("expected exit code 2, got %d stderr=%q", code, stderr.String())
 		}

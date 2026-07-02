@@ -40,7 +40,7 @@ func TestRunFetchRendersBody(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	stdin := strings.NewReader("y\n")
-	code := executeTestCommand([]string{"fetch", "https://example.com/article", "--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User"}, stdin, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "fetch", "https://example.com/article", "--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 	}
@@ -77,7 +77,7 @@ func TestRunFetchConfirmSkipsPrompt(t *testing.T) {
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"fetch", "https://example.com/article", "--confirm", "--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "fetch", "https://example.com/article", "--confirm", "--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User"}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 	}
@@ -115,7 +115,7 @@ func TestRunFetchToDisk(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
-		"fetch", "https://example.com/article",
+		"content", "fetch", "https://example.com/article",
 		"--confirm", "--toDisk", outPath,
 		"--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User",
 	}, nil, &stdout, &stderr)
@@ -157,7 +157,7 @@ func TestRunFetchJSON(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
-		"fetch", "https://example.com/article",
+		"content", "fetch", "https://example.com/article",
 		"--confirm", "--json",
 		"--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User",
 	}, nil, &stdout, &stderr)
@@ -197,7 +197,7 @@ func TestRunFetchMultipleRatesRequiresIndexWithJSON(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
-		"fetch", "https://example.com/article",
+		"content", "fetch", "https://example.com/article",
 		"--confirm", "--json",
 		"--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User",
 	}, nil, &stdout, &stderr)
@@ -230,7 +230,7 @@ func TestRunFetchDeclineConfirm(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
-		"fetch", "https://example.com/article",
+		"content", "fetch", "https://example.com/article",
 		"--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User",
 	}, strings.NewReader("n\n"), &stdout, &stderr)
 	if code != 1 {
@@ -287,7 +287,7 @@ func TestRunFetchUserAgentRegistrationRetry(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
-		"fetch", "https://example.com/article",
+		"content", "fetch", "https://example.com/article",
 		"--confirm", "--agent-name", "agent-test", "--agent-user-agent", "Bad-Agent",
 	}, strings.NewReader("1\n"), &stdout, &stderr)
 	if code != 0 {
@@ -346,7 +346,7 @@ func TestRunFetchEmptyUserAgentListsAndRegisters(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
-		"fetch", "https://example.com/article",
+		"content", "fetch", "https://example.com/article",
 		"--confirm", "--agent-name", "agent-test",
 	}, nil, &stdout, &stderr)
 	if code != 0 {
@@ -360,11 +360,56 @@ func TestRunFetchEmptyUserAgentListsAndRegisters(t *testing.T) {
 	}
 }
 
+func TestRunFetchNoRegisteredUserAgents(t *testing.T) {
+	token := testAgentJWT(t)
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
+	}))
+	defer authSrv.Close()
+
+	gatewaySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/agents/v1/rates/batch":
+			_ = json.NewEncoder(w).Encode([]tollbit.BatchRateResponseV2{{
+				URL: "https://example.com/article",
+				Rates: []tollbit.BatchDeveloperRateResponse{{
+					Price:   tollbit.RatePriceResponse{PriceMicros: 50000, Currency: "USD"},
+					License: tollbit.BatchRateLicenseResponse{LicenseType: "standard", Cuid: "lic_1"},
+				}},
+			}})
+		case r.Method == http.MethodGet && r.URL.Path == "/agents/v1/user-agents":
+			_ = json.NewEncoder(w).Encode([]tollbit.UserAgentResponse{})
+		default:
+			t.Fatalf("unexpected gateway request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer gatewaySrv.Close()
+
+	t.Setenv(testAuthBaseURLEnvVar, authSrv.URL)
+	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
+	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
+
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommand([]string{
+		"content", "fetch", "https://example.com/article",
+		"--confirm", "--agent-name", "agent-test",
+	}, nil, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), createUserAgentURL) {
+		t.Fatalf("expected create-user-agent URL in stderr, got %q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "run this command again") {
+		t.Fatalf("expected restart guidance in stderr, got %q", stderr.String())
+	}
+}
+
 func TestRunFetchUsageError(t *testing.T) {
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"fetch"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "fetch"}, nil, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("expected exit code 2, got %d", code)
 	}

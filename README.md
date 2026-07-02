@@ -117,29 +117,21 @@ Environment:
 
 - `TOLLBIT_GATEWAY_BASE_URL` — gateway base URL (default `https://gateway.tollbit.com`)
 
-### Pricing
+### Content
 
-Fetch licensing rates for one or more article URLs:
+Price and fetch licensed publisher content:
 
 ```bash
-./tollbit pricing https://example.com/article-1,https://example.com/article-2
+./tollbit content pricing https://example.com/article-1,https://example.com/article-2
 ./tollbit content pricing https://example.com/article --json
+./tollbit content fetch https://example.com/article
+./tollbit content fetch https://example.com/article --confirm --toDisk ./article.md
+./tollbit content fetch https://example.com/article --confirm --json --rate-index 1
 ```
 
 Known license types show consumer-facing labels (for example `Summarization (ON_DEMAND_LICENSE)`).
 
-### Fetch (paid)
-
-**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost).
-
-```bash
-./tollbit fetch https://example.com/article
-./tollbit content fetch https://example.com/article
-./tollbit fetch https://example.com/article --confirm --toDisk ./article.md
-./tollbit fetch https://example.com/article --confirm --json --rate-index 1
-```
-
-Use `--toDisk=<path>` to save fetched content locally. Set a registered user agent with `identity set --user-agent` or `--agent-user-agent`.
+**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. Set a registered user agent with `identity set --user-agent` or `--agent-user-agent`.
 
 ### Guide
 
