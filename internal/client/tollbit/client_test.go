@@ -104,6 +104,63 @@ func TestSearchRequiresQuery(t *testing.T) {
 	}
 }
 
+func TestBatchGetRates(t *testing.T) {
+	token := validAgentToken(t)
+	urls := []string{"https://example.com/a", "https://example.com/b"}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/agents/v1/rates/batch" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
+			t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
+		}
+		var req BatchGetRateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatal(err)
+		}
+		if len(req.URLs) != 2 || req.URLs[0] != urls[0] || req.URLs[1] != urls[1] {
+			t.Fatalf("unexpected request body: %#v", req)
+		}
+		_ = json.NewEncoder(w).Encode([]BatchRateResponseV2{{
+			URL: urls[0],
+			Rates: []BatchDeveloperRateResponse{{
+				Price:   RatePriceResponse{PriceMicros: 50000, Currency: "USD"},
+				License: BatchRateLicenseResponse{LicenseType: "standard"},
+			}},
+		}})
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Config{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.BatchGetRates(context.Background(), urls, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp) != 1 || resp[0].URL != urls[0] {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	if len(resp[0].Rates) != 1 || resp[0].Rates[0].License.LicenseType != "standard" {
+		t.Fatalf("unexpected rates: %#v", resp[0].Rates)
+	}
+}
+
+func TestBatchGetRatesRequiresURLs(t *testing.T) {
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.BatchGetRates(context.Background(), nil, validAgentToken(t))
+	if err == nil || !strings.Contains(err.Error(), "at least one URL is required") {
+		t.Fatalf("expected URL required error, got %v", err)
+	}
+}
+
 func TestSearchReturnsProblemJSONError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/problem+json")
