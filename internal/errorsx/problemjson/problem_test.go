@@ -74,6 +74,26 @@ func TestParseOBORequiredProblemJSON(t *testing.T) {
 	}
 }
 
+func TestParseUserAgentNotRegisteredProblemJSON(t *testing.T) {
+	code := ErrorCodeUserAgentNotRegistered
+	problem, err := Parse([]byte(`{
+		"type": "about:blank",
+		"title": "Bad Request",
+		"status": 400,
+		"detail": "user agent bad-agent is not registered",
+		"code": "user_agent_not_registered"
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if problem.Code == nil || *problem.Code != code {
+		t.Fatalf("code = %#v", problem.Code)
+	}
+	if !problem.IsUserAgentNotRegistered() {
+		t.Fatal("expected user agent not registered")
+	}
+}
+
 func TestParsePreservesUnknownCode(t *testing.T) {
 	problem, err := Parse([]byte(`{
 		"type": "about:blank",

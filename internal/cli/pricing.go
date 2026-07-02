@@ -19,10 +19,6 @@ type pricingOptions struct {
 	asJSON    bool
 }
 
-func NewPricingCommand(factory app.Factory) *cobra.Command {
-	return newPricingCommand(factory)
-}
-
 func newPricingCommand(factory app.Factory) *cobra.Command {
 	var opts pricingOptions
 
@@ -82,14 +78,14 @@ func runPricing(cmd *cobra.Command, factory app.Factory, opts pricingOptions, ur
 	var resp []tollbit.BatchRateResponseV2
 	if app.Config().Auth.RetryOnOBORequired {
 		resp, err = agenttoken.WithOBORetry(cmd, credentials, identity, func(token agent.Token) ([]tollbit.BatchRateResponseV2, error) {
-			return tollbitClient.BatchGetRates(cmd.Context(), urls, token)
+			return tollbitClient.BatchGetRates(cmd.Context(), urls, token, identity.UserAgent)
 		})
 	} else {
 		token, tokenErr := credentials.GetAgentToken(cmd, identity)
 		if tokenErr != nil {
 			return RuntimeError(fmt.Errorf("error fetching agent token: %w", tokenErr))
 		}
-		resp, err = tollbitClient.BatchGetRates(cmd.Context(), urls, token)
+		resp, err = tollbitClient.BatchGetRates(cmd.Context(), urls, token, identity.UserAgent)
 	}
 	if err != nil {
 		return RuntimeError(fmt.Errorf("error fetching rates: %w", err))
@@ -126,6 +122,23 @@ func validateArticleURL(raw string) error {
 	return nil
 }
 
+// normalizeArticleURL validates and canonicalizes article URLs for TollBit API calls.
+// Trailing slashes on non-root paths are removed so rates, token, and content requests
+// use a consistent URL (content GET routing is sensitive to trailing slashes).
+func normalizeArticleURL(raw string) (string, error) {
+	if err := validateArticleURL(raw); err != nil {
+		return "", err
+	}
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", fmt.Errorf("invalid URL %q: %w", raw, err)
+	}
+	if parsed.Path != "/" && strings.HasSuffix(parsed.Path, "/") {
+		parsed.Path = strings.TrimSuffix(parsed.Path, "/")
+	}
+	return parsed.String(), nil
+}
+
 func printPricingResults(w io.Writer, resp []tollbit.BatchRateResponseV2) {
 	for i, item := range resp {
 		if i > 0 {
@@ -137,13 +150,64 @@ func printPricingResults(w io.Writer, resp []tollbit.BatchRateResponseV2) {
 			continue
 		}
 		for _, rate := range item.Rates {
-			line := fmt.Sprintf("  %s · %s", formatPriceMicros(rate.Price.PriceMicros, rate.Price.Currency), rate.License.LicenseType)
+			display := licenseDisplayInfo(rate.License)
+			label := formatPricingLicenseLabel(rate.License, display)
+			line := fmt.Sprintf("  %s · %s", formatPriceMicros(rate.Price.PriceMicros, rate.Price.Currency), label)
 			if msg := strings.TrimSpace(rate.Error); msg != "" {
 				line += " · error: " + msg
 			}
 			fmt.Fprintln(w, line)
+			if display.description != "" {
+				fmt.Fprintf(w, "    %s\n", display.description)
+			} else if display.licenseURL != "" {
+				fmt.Fprintf(w, "    %s\n", display.licenseURL)
+			}
 		}
 	}
+}
+
+const (
+	licenseTypeOnDemand         = "ON_DEMAND_LICENSE"
+	licenseTypeOnDemandFullUse  = "ON_DEMAND_FULL_USE_LICENSE"
+)
+
+type licenseDisplay struct {
+	label       string
+	description string
+	licenseURL  string
+}
+
+func licenseDisplayInfo(license tollbit.BatchRateLicenseResponse) licenseDisplay {
+	switch strings.TrimSpace(license.LicenseType) {
+	case licenseTypeOnDemand:
+		return licenseDisplay{
+			label:       "Summarization",
+			description: "Access and use this content to create summaries and citations.",
+		}
+	case licenseTypeOnDemandFullUse:
+		return licenseDisplay{
+			label:       "Full Display",
+			description: "Display the full article text for a single request.",
+		}
+	default:
+		return licenseDisplay{
+			label:      license.LicenseType,
+			licenseURL: strings.TrimSpace(license.LicensePath),
+		}
+	}
+}
+
+func formatPricingLicenseLabel(license tollbit.BatchRateLicenseResponse, display licenseDisplay) string {
+	label := display.label
+	if label == "" {
+		return license.LicenseType
+	}
+	if display.description != "" {
+		if licenseType := strings.TrimSpace(license.LicenseType); licenseType != "" {
+			return fmt.Sprintf("%s (%s)", label, licenseType)
+		}
+	}
+	return label
 }
 
 func formatPriceMicros(micros int64, currency string) string {

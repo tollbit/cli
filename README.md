@@ -117,6 +117,22 @@ Environment:
 
 - `TOLLBIT_GATEWAY_BASE_URL` — gateway base URL (default `https://gateway.tollbit.com`)
 
+### Content
+
+Price and fetch licensed publisher content:
+
+```bash
+./tollbit content pricing https://example.com/article-1,https://example.com/article-2
+./tollbit content pricing https://example.com/article --json
+./tollbit content fetch https://example.com/article
+./tollbit content fetch https://example.com/article --confirm --toDisk ./article.md
+./tollbit content fetch https://example.com/article --confirm --json --rate-index 1
+```
+
+Known license types show consumer-facing labels (for example `Summarization (ON_DEMAND_LICENSE)`).
+
+**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. Set a registered user agent with `identity set --user-agent` or `--agent-user-agent`.
+
 ### Guide
 
 Print the built-in agent orientation guide (embedded at build time):
