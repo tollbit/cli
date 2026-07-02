@@ -2,6 +2,7 @@ package globalflags
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/tollbit/tollbit-cli/internal/configuration"
 )
+
+const ShowDevFlagsEnvVar = "TOLLBIT_SHOW_DEV_FLAGS"
 
 const (
 	FlagAuthBaseURL                       = "auth-base-url"
@@ -20,6 +23,17 @@ const (
 	FlagCredentialsStorageDir             = "credentials-storage-dir"
 	FlagGatewayBaseURL                    = "gateway-base-url"
 )
+
+var devFlagNames = []string{
+	FlagAuthBaseURL,
+	FlagGatewayBaseURL,
+	FlagAuthRetryOnOBORequired,
+	FlagAuthTokenTTLSeconds,
+	FlagAuthBrowserConsentCallbackAddress,
+	FlagAuthBrowserConsentTimeout,
+	FlagAuthBrowserConsentAutoOpenBrowser,
+	FlagCredentialsStorageDir,
+}
 
 type configFlagOptions struct {
 	authBaseURL                       string
@@ -56,6 +70,23 @@ func Add(cmd *cobra.Command, config configuration.Config) {
 	flags.DurationVar(&opts.authBrowserConsentTimeout, FlagAuthBrowserConsentTimeout, opts.authBrowserConsentTimeout, "auth browser consent timeout")
 	flags.BoolVar(&opts.authBrowserConsentAutoOpenBrowser, FlagAuthBrowserConsentAutoOpenBrowser, opts.authBrowserConsentAutoOpenBrowser, "automatically open browser for auth consent")
 	flags.StringVar(&opts.credentialsStorageDir, FlagCredentialsStorageDir, opts.credentialsStorageDir, "credential storage directory; __default__ uses the platform default")
+	if !DevFlagsVisible() {
+		for _, name := range devFlagNames {
+			if flag := flags.Lookup(name); flag != nil {
+				flag.Hidden = true
+			}
+		}
+	}
+}
+
+func DevFlagsVisible() bool {
+	value := strings.TrimSpace(os.Getenv(ShowDevFlagsEnvVar))
+	switch strings.ToLower(value) {
+	case "", "0", "false", "no", "off":
+		return false
+	default:
+		return true
+	}
 }
 
 func OverridesFromCommand(cmd *cobra.Command) (configuration.OverrideOptions, error) {
