@@ -18,6 +18,11 @@ const (
 	searchDefaultSize        = 10
 )
 
+const searchLongHelp = `Search content ready to license on the TollBit network.
+
+Use --allowed-only to limit results to publisher properties your account has
+access to. Without it, search spans the full catalog of discoverable content.`
+
 type searchOptions struct {
 	size         int
 	nextToken    string
@@ -34,7 +39,7 @@ func NewSearchCommand(factory app.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   `search "query"`,
 		Short: "Search content ready to license on the TollBit network",
-		Long:  "Search content ready to license on the TollBit network.",
+		Long:  searchLongHelp,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return UsageError(`search requires exactly one query argument`)
@@ -52,7 +57,7 @@ func NewSearchCommand(factory app.Factory) *cobra.Command {
 	cmd.Flags().IntVar(&opts.size, "size", searchDefaultSize, "number of results to return (max 20)")
 	cmd.Flags().StringVar(&opts.nextToken, "next-token", "", "pagination token from a previous search")
 	cmd.Flags().StringVar(&opts.properties, "properties", "", "comma-separated domains to boost (max 20)")
-	cmd.Flags().BoolVar(&opts.allowedOnly, "allowed-only", false, "restrict search to properties the org is allowed to use")
+	cmd.Flags().BoolVar(&opts.allowedOnly, "allowed-only", false, "limit results to properties your account has access to")
 	cmd.Flags().StringVar(&opts.agentName, "agent-name", "", "agent identity name")
 	cmd.Flags().StringVar(&opts.userAgent, "agent-user-agent", "", "agent user agent for request")
 	cmd.Flags().BoolVar(&opts.asJSON, "json", false, "emit raw JSON response")

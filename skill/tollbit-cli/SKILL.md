@@ -20,7 +20,10 @@ Search publisher content:
 ```bash
 tollbit search "climate policy" --size 10
 tollbit search "query" --json
+tollbit search "query" --allowed-only
 ```
+
+Use `--allowed-only` to limit results to publisher properties your account has access to. Without it, search spans the full catalog of discoverable content on the network.
 
 Content workflow (search → pricing → fetch):
 
