@@ -28,7 +28,6 @@ type searchOptions struct {
 	nextToken    string
 	properties   string
 	allowedOnly  bool
-	agentName    string
 	userAgent    string
 	asJSON       bool
 }
@@ -58,8 +57,7 @@ func NewSearchCommand(factory app.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&opts.nextToken, "next-token", "", "pagination token from a previous search")
 	cmd.Flags().StringVar(&opts.properties, "properties", "", "comma-separated domains to boost (max 20)")
 	cmd.Flags().BoolVar(&opts.allowedOnly, "allowed-only", false, "limit results to properties your account has access to")
-	cmd.Flags().StringVar(&opts.agentName, "agent-name", "", "agent identity name")
-	cmd.Flags().StringVar(&opts.userAgent, "agent-user-agent", "", "agent user agent for request")
+	cmd.Flags().StringVar(&opts.userAgent, "user-agent", "", "user agent for request")
 	cmd.Flags().BoolVar(&opts.asJSON, "json", false, "emit raw JSON response")
 
 	return cmd
@@ -92,8 +90,7 @@ func runSearch(cmd *cobra.Command, factory app.Factory, opts searchOptions, quer
 	}
 
 	identityOpts := agenttoken.ResolveIdentityOptions{
-		Name:      flagChangedStr(cmd, "agent-name"),
-		UserAgent: flagChangedStr(cmd, "agent-user-agent"),
+		UserAgent: flagChangedStr(cmd, "user-agent"),
 	}
 	identity, err := credentials.ResolveIdentity(cmd.Context(), identityOpts)
 	if err != nil {

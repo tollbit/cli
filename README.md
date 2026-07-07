@@ -2,7 +2,7 @@
 
 Tollbit's cli is a CLI for Grounding Agents on ready to license content using the TollBit network
 
-Primary workflow: set agent identity → confirm tokens with `agent status` → search content with `search`.
+Primary workflow: `auth login` → confirm with `auth status` → search content with `search`.
 
 ## Install
 
@@ -70,37 +70,31 @@ go build ./cmd/tollbit
 
 Agent credentials are stored under `TOLLBIT_CREDENTIALS_STORAGE_DIR` (default platform path): `agent-identity.json` and `agent-token.jwt`.
 
-For local development, a `.env` file in the current working directory is loaded at startup (existing shell variables are not overwritten). Override the path with `TOLLBIT_ENV_FILE`. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
+For local development, a `.env` file in the current working directory is loaded at startup (existing shell variables are not overwritten). Override the path with `TOLLBIT_ENV_FILE`. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_AGENT_TOKEN`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
 
 ## Commands
 
 Agent? Run `./tollbit guide`.
 
-### Identity
+### Auth
 
-Persist the agent name used when minting identity tokens:
-
-```bash
-./tollbit identity set my-agent
-./tollbit identity get
-./tollbit identity get --json
-./tollbit identity clear
-```
-
-`TOLLBIT_AGENT_DEFAULT_NAME` and `TOLLBIT_AGENT_DEFAULT_USER_AGENT` set fallback identity defaults. Saved identity overrides those defaults; command flags override saved identity.
-
-### Agent authorization
-
-Link a Tollbit user and organization when required:
+Manage your agent profile and authorization token:
 
 ```bash
-./tollbit agent login
-./tollbit agent status
-./tollbit agent status --json
-./tollbit agent logout
+./tollbit auth login --name my-agent --user-agent MyAgent-User
+./tollbit auth status
+./tollbit auth status --json
+./tollbit auth status --check
+./tollbit auth set --name my-agent --user-agent MyAgent-User
+./tollbit auth logout
+./tollbit auth logout --all
 ```
 
-Set `TOLLBIT_AUTH_BROWSER_CONSENT_AUTO_OPEN_BROWSER=false` in headless environments. Confirm readiness with `agent status` before search calls.
+`TOLLBIT_AGENT_DEFAULT_NAME` and `TOLLBIT_AGENT_DEFAULT_USER_AGENT` set fallback profile defaults. Saved profile overrides those defaults. `search` and `content` accept `--user-agent` as a per-request override.
+
+`auth status --check` exits `0` when the token is valid, `1` when invalid/expired, and `2` when missing (no stdout). For CI, inject a token with `TOLLBIT_AGENT_TOKEN` instead of minting interactively.
+
+Set `TOLLBIT_AUTH_BROWSER_CONSENT_AUTO_OPEN_BROWSER=false` in headless environments. Confirm readiness with `auth status` before search calls.
 
 ### Search
 
@@ -131,7 +125,7 @@ Price and fetch licensed publisher content:
 
 Known license types show consumer-facing labels (for example `Summarization (ON_DEMAND_LICENSE)`).
 
-**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. Set a registered user agent with `identity set --user-agent` or `--agent-user-agent`.
+**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. Set a registered user agent with `auth set --user-agent` or `--user-agent` on the fetch command.
 
 ### Guide
 

@@ -1,18 +1,16 @@
 ---
 name: tollbit-cli
 version: 0.0.1
-description: Manage Tollbit agent identity, authorization, content search, pricing, and paid content fetch with the tollbit CLI.
+description: Manage Tollbit agent profile, authorization, content search, pricing, and paid content fetch with the tollbit CLI.
 ---
 
 # Tollbit CLI
 
-Configure agent identity and authorization:
+Configure agent profile and authorization:
 
 ```bash
-tollbit identity set my-agent --user-agent MyAgent-User
-tollbit identity get
-tollbit agent status
-tollbit agent login
+tollbit auth login --name my-agent --user-agent MyAgent-User
+tollbit auth status
 ```
 
 Search publisher content:
@@ -43,7 +41,7 @@ tollbit content fetch https://example.com/article --confirm --toDisk ./article.m
 tollbit content fetch https://example.com/article
 
 # Non-interactive automation (still paid)
-tollbit content fetch https://example.com/article --confirm --agent-user-agent MyAgent-User
+tollbit content fetch https://example.com/article --confirm --user-agent MyAgent-User
 
 # Save content to disk
 tollbit content fetch https://example.com/article --confirm --toDisk ./article.md
@@ -54,7 +52,7 @@ tollbit content fetch https://example.com/article --confirm --json
 
 Use `--toDisk=<path>` to persist fetched content locally. With `--json`, the full API response is written to stdout (and to disk when `--toDisk` is set).
 
-If the configured user agent is not registered, the CLI lists available user agents, prompts you to pick one, and saves it to identity for future fetches.
+If the configured user agent is not registered, the CLI lists available user agents, prompts you to pick one, and saves the selection to your auth profile for future fetches.
 
 Install this skill: `tollbit guide --install <SKILLS_DIR>`.
 Compare frontmatter `version` with `tollbit version` when updating.

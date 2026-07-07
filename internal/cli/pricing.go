@@ -14,7 +14,6 @@ import (
 )
 
 type pricingOptions struct {
-	agentName string
 	userAgent string
 	asJSON    bool
 }
@@ -40,8 +39,7 @@ func newPricingCommand(factory app.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.agentName, "agent-name", "", "agent identity name")
-	cmd.Flags().StringVar(&opts.userAgent, "agent-user-agent", "", "agent user agent for request")
+	cmd.Flags().StringVar(&opts.userAgent, "user-agent", "", "user agent for request")
 	cmd.Flags().BoolVar(&opts.asJSON, "json", false, "emit raw JSON response")
 
 	return cmd
@@ -67,8 +65,7 @@ func runPricing(cmd *cobra.Command, factory app.Factory, opts pricingOptions, ur
 	}
 
 	identityOpts := agenttoken.ResolveIdentityOptions{
-		Name:      flagChangedStr(cmd, "agent-name"),
-		UserAgent: flagChangedStr(cmd, "agent-user-agent"),
+		UserAgent: flagChangedStr(cmd, "user-agent"),
 	}
 	identity, err := credentials.ResolveIdentity(cmd.Context(), identityOpts)
 	if err != nil {
