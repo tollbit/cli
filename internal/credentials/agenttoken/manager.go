@@ -18,7 +18,6 @@ import (
 const (
 	identityFilename = "agent-identity.json"
 	tokenFilename    = "agent-token.jwt"
-	EnvAgentToken    = "TOLLBIT_AGENT_TOKEN"
 )
 
 type (
@@ -249,18 +248,6 @@ func (m *CredentialManager) CurrentAgentToken(ctx context.Context) (agent.Token,
 }
 
 func (m *CredentialManager) cachedAgentToken(ctx context.Context) (agent.Token, bool, error) {
-	if err := ctx.Err(); err != nil {
-		return agent.Token{}, false, err
-	}
-	if raw := strings.TrimSpace(os.Getenv(EnvAgentToken)); raw != "" {
-		token := agent.Token{RawToken: raw}
-		err := token.Validate()
-		return token, true, err
-	}
-	return m.cachedAgentTokenFromDisk(ctx)
-}
-
-func (m *CredentialManager) cachedAgentTokenFromDisk(ctx context.Context) (agent.Token, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return agent.Token{}, false, err
 	}

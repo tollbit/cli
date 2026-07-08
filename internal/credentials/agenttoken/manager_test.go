@@ -624,31 +624,6 @@ func TestResolveIdentityRequiresName(t *testing.T) {
 	}
 }
 
-func TestEnvAgentTokenOverridesDisk(t *testing.T) {
-	dir := t.TempDir()
-	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	diskToken := testJWT(t, validClaims())
-	if err := os.WriteFile(filepath.Join(dir, tokenFilename), []byte(diskToken), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	envToken := testJWT(t, validClaims())
-	t.Setenv(EnvAgentToken, envToken)
-
-	token, exists, err := mgr.CurrentAgentToken(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !exists {
-		t.Fatal("expected env token")
-	}
-	if token.RawToken != envToken {
-		t.Fatalf("expected env token, got %q", token.RawToken)
-	}
-}
-
 func TestSaveIdentityClearsToken(t *testing.T) {
 	dir := t.TempDir()
 	tokenPath := filepath.Join(dir, tokenFilename)

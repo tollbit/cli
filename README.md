@@ -70,7 +70,7 @@ go build ./cmd/tollbit
 
 Agent credentials are stored under `TOLLBIT_CREDENTIALS_STORAGE_DIR` (default platform path): `agent-identity.json` and `agent-token.jwt`.
 
-For local development, a `.env` file in the current working directory is loaded at startup (existing shell variables are not overwritten). Override the path with `TOLLBIT_ENV_FILE`. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_AGENT_TOKEN`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
+For local development, a `.env` file in the current working directory is loaded at startup (existing shell variables are not overwritten). Override the path with `TOLLBIT_ENV_FILE`. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
 
 ## Commands
 
@@ -92,7 +92,7 @@ Manage your agent profile and authorization token:
 
 `TOLLBIT_AGENT_DEFAULT_NAME` and `TOLLBIT_AGENT_DEFAULT_USER_AGENT` set fallback profile defaults. Saved profile overrides those defaults. `search` and `content` accept `--user-agent` as a per-request override.
 
-`auth status --check` exits `0` when the token is valid, `1` when invalid/expired, and `2` when missing (no stdout). For CI, inject a token with `TOLLBIT_AGENT_TOKEN` instead of minting interactively.
+`auth status --check` exits `0` when the token is valid, `1` when invalid/expired, and `2` when missing (no stdout).
 
 Set `TOLLBIT_AUTH_BROWSER_CONSENT_AUTO_OPEN_BROWSER=false` in headless environments. Confirm readiness with `auth status` before search calls.
 
