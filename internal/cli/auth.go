@@ -273,19 +273,20 @@ func runAuthSet(cmd *cobra.Command, factory app.Factory, opts authSetOptions) er
 	if err != nil {
 		return RuntimeError(err)
 	}
-	result, err := credentials.PatchIdentity(cmd.Context(), agenttoken.PatchIdentityOptions{
+	identity, err := credentials.ResolveIdentity(cmd.Context(), agenttoken.ResolveIdentityOptions{
 		Name:      flagChangedStr(cmd, "name"),
 		UserAgent: flagChangedStr(cmd, "user-agent"),
 	})
 	if err != nil {
 		return RuntimeError(err)
 	}
+	if err := credentials.SaveIdentity(cmd.Context(), identity); err != nil {
+		return RuntimeError(err)
+	}
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
-	fmt.Fprintf(stdout, "updated agent profile %s\n", result.Identity.Name)
-	if result.NameChanged {
-		fmt.Fprintln(stderr, "cleared token — name changed; run 'tollbit auth login'")
-	}
+	fmt.Fprintf(stdout, "updated agent profile %s\n", identity.Name)
+	fmt.Fprintln(stderr, "cleared token — profile updated; run 'tollbit auth login'")
 	return nil
 }
 

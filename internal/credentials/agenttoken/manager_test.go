@@ -624,66 +624,6 @@ func TestResolveIdentityRequiresName(t *testing.T) {
 	}
 }
 
-func TestPatchIdentityUserAgentOnlyKeepsToken(t *testing.T) {
-	dir := t.TempDir()
-	tokenPath := filepath.Join(dir, tokenFilename)
-	if err := os.WriteFile(tokenPath, []byte(testJWT(t, validClaims())), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := mgr.WriteIdentity(context.Background(), testAgentIdentity()); err != nil {
-		t.Fatal(err)
-	}
-
-	userAgent := "patched-agent/0.2"
-	result, err := mgr.PatchIdentity(context.Background(), PatchIdentityOptions{UserAgent: &userAgent})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.NameChanged {
-		t.Fatal("expected name unchanged")
-	}
-	if result.Identity.UserAgent != "patched-agent/0.2" {
-		t.Fatalf("unexpected identity: %#v", result.Identity)
-	}
-	if _, err := os.Stat(tokenPath); err != nil {
-		t.Fatalf("expected token to remain, got err=%v", err)
-	}
-}
-
-func TestPatchIdentityNameChangeClearsToken(t *testing.T) {
-	dir := t.TempDir()
-	tokenPath := filepath.Join(dir, tokenFilename)
-	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := mgr.WriteIdentity(context.Background(), testAgentIdentity()); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(tokenPath, []byte(testJWT(t, validClaims())), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	newName := "renamed-agent"
-	result, err := mgr.PatchIdentity(context.Background(), PatchIdentityOptions{Name: &newName})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !result.NameChanged {
-		t.Fatal("expected name changed")
-	}
-	if result.Identity.Name != "renamed-agent" || result.Identity.UserAgent != "agent-test/0.1" {
-		t.Fatalf("expected merged identity, got %#v", result.Identity)
-	}
-	if _, err := os.Stat(tokenPath); !os.IsNotExist(err) {
-		t.Fatalf("expected token to be cleared, got err=%v", err)
-	}
-}
-
 func TestEnvAgentTokenOverridesDisk(t *testing.T) {
 	dir := t.TempDir()
 	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})

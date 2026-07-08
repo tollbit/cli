@@ -33,16 +33,6 @@ type (
 		UserAgent *string
 	}
 
-	PatchIdentityOptions struct {
-		Name      *string
-		UserAgent *string
-	}
-
-	PatchIdentityResult struct {
-		Identity    auth.AgentIdentity
-		NameChanged bool
-	}
-
 	CredentialManagerConfig struct {
 		Path            string
 		DefaultIdentity auth.AgentIdentity
@@ -117,60 +107,6 @@ func (m *CredentialManager) WriteIdentity(ctx context.Context, identity auth.Age
 		return fmt.Errorf("save agent identity credential: %w", err)
 	}
 	return nil
-}
-
-func (m *CredentialManager) PatchIdentity(ctx context.Context, opts PatchIdentityOptions) (PatchIdentityResult, error) {
-	if opts.Name == nil && opts.UserAgent == nil {
-		return PatchIdentityResult{}, errors.New("at least one of name or user-agent is required")
-	}
-	if err := ctx.Err(); err != nil {
-		return PatchIdentityResult{}, err
-	}
-
-	stored, storedExists, err := m.GetStoredIdentity(ctx)
-	if err != nil {
-		return PatchIdentityResult{}, err
-	}
-
-	base := m.defaultIdentity
-	if storedExists {
-		base = stored
-	}
-
-	merged := base
-	if opts.Name != nil {
-		merged.Name = strings.TrimSpace(*opts.Name)
-	}
-	if opts.UserAgent != nil {
-		merged.UserAgent = strings.TrimSpace(*opts.UserAgent)
-	}
-	if merged.Name == "" {
-		return PatchIdentityResult{}, errors.New("agent name is required")
-	}
-
-	nameChanged := false
-	if opts.Name != nil {
-		if storedExists {
-			nameChanged = merged.Name != stored.Name
-		} else {
-			token, exists, tokenErr := m.cachedAgentTokenFromDisk(ctx)
-			if exists && tokenErr == nil {
-				if claims, claimsErr := token.Claims(); claimsErr == nil && claims.Subject != merged.Name {
-					nameChanged = true
-				}
-			}
-		}
-	}
-
-	if err := m.writeJSON(ctx, m.identityPath, merged); err != nil {
-		return PatchIdentityResult{}, fmt.Errorf("save agent identity credential: %w", err)
-	}
-	if nameChanged {
-		if err := m.ClearAgentTokens(ctx); err != nil {
-			return PatchIdentityResult{}, err
-		}
-	}
-	return PatchIdentityResult{Identity: merged, NameChanged: nameChanged}, nil
 }
 
 func (m *CredentialManager) GetIdentity(ctx context.Context) (auth.AgentIdentity, error) {

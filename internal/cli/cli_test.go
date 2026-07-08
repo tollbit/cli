@@ -441,7 +441,7 @@ func TestRunAuthSetNameChangeClearsToken(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("auth set rename failed: code=%d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "cleared token — name changed") {
+	if !strings.Contains(stderr.String(), "cleared token — profile updated") {
 		t.Fatalf("expected token cleared notice, got stderr=%q", stderr.String())
 	}
 

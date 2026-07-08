@@ -333,9 +333,7 @@ func resolveRegisteredUserAgent(
 	}
 
 	identity.UserAgent = selected.UserAgent
-	if _, saveErr := credentials.PatchIdentity(cmd.Context(), agenttoken.PatchIdentityOptions{
-		UserAgent: &selected.UserAgent,
-	}); saveErr != nil {
+	if saveErr := credentials.SaveIdentity(cmd.Context(), identity); saveErr != nil {
 		return identity, fmt.Errorf("error saving user agent: %w", saveErr)
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "updated auth profile: user-agent=%s\n", selected.UserAgent)
