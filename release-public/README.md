@@ -54,26 +54,25 @@ From **[GitHub Releases](https://github.com/tollbit/tollbit-cli-releases/release
 
 - Install `tollbit` so it is on **`PATH`** in every environment where you run shell commands (CI images, local sandboxes, agent runners).
 - Run **`tollbit guide`** for orientation, then **`tollbit guide --install <SKILLS_DIR>`** to persist the bundled skill.
-- Configure agent identity: **`tollbit identity set <name>`** (or `TOLLBIT_AGENT_DEFAULT_NAME`), then confirm with **`tollbit agent status`** before search calls.
-- Use **`tollbit agent login`** when user/org authorization is required.
-- Prefer **`--json`** on **`search`** and **`agent status`** when you need machine-readable output.
+- Configure agent profile: **`tollbit auth set --name <name>`** (or `TOLLBIT_AGENT_DEFAULT_NAME`), then confirm with **`tollbit auth status`** before search calls.
+- Use **`tollbit auth login`** when user/org authorization is required.
+- Prefer **`--json`** on **`search`** and **`auth status`** when you need machine-readable output.
 
 ## What the CLI can do
 
 | Command | Purpose |
 |--------|---------|
-| **`identity set/get/clear`** | Persist and inspect agent identity. |
-| **`agent login/status/logout`** | OAuth user/org linking and token status. |
+| **`auth login/logout/status/set`** | Agent profile and OAuth authorization token. |
 | **`search "query"`** | Search publisher content via the gateway API. |
 | **`guide`** | Print the agent guide; optionally install bundled skill markdown. |
 | **`version`** | Print the CLI version string. |
 
-Typical flow: **`identity set`** → **`agent status`** → **`search "query"`**. Use **`--help`** on each command for flags.
+Typical flow: **`auth login`** → **`auth status`** → **`search "query"`**. Use **`--help`** on each command for flags.
 
 ## Search examples
 
 ```bash
-tollbit agent status
+tollbit auth status
 
 tollbit search "climate policy"
 tollbit search "climate policy" --size 10 --json

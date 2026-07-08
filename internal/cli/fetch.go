@@ -39,7 +39,6 @@ type fetchOptions struct {
 	toDisk         string
 	rateIndex      int
 	userAgentIndex int
-	agentName      string
 	userAgent      string
 	asJSON         bool
 }
@@ -69,8 +68,7 @@ func newFetchCommand(factory app.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&opts.toDisk, "toDisk", "", "write fetched content to the given file path")
 	cmd.Flags().IntVar(&opts.rateIndex, "rate-index", 0, "1-based index when multiple license rates are returned")
 	cmd.Flags().IntVar(&opts.userAgentIndex, "user-agent-index", 0, "1-based index when selecting a registered user agent")
-	cmd.Flags().StringVar(&opts.agentName, "agent-name", "", "agent identity name")
-	cmd.Flags().StringVar(&opts.userAgent, "agent-user-agent", "", "registered TollBit user agent for content fetch")
+	cmd.Flags().StringVar(&opts.userAgent, "user-agent", "", "registered TollBit user agent for content fetch")
 	cmd.Flags().BoolVar(&opts.asJSON, "json", false, "emit raw JSON response")
 
 	return cmd
@@ -97,8 +95,7 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 	}
 
 	identityOpts := agenttoken.ResolveIdentityOptions{
-		Name:      flagChangedStr(cmd, "agent-name"),
-		UserAgent: flagChangedStr(cmd, "agent-user-agent"),
+		UserAgent: flagChangedStr(cmd, "user-agent"),
 	}
 	identity, err := credentials.ResolveIdentity(cmd.Context(), identityOpts)
 	if err != nil {
@@ -339,6 +336,7 @@ func resolveRegisteredUserAgent(
 	if saveErr := credentials.SaveIdentity(cmd.Context(), identity); saveErr != nil {
 		return identity, fmt.Errorf("error saving user agent: %w", saveErr)
 	}
+	fmt.Fprintf(cmd.ErrOrStderr(), "updated auth profile: user-agent=%s\n", selected.UserAgent)
 	return identity, nil
 }
 

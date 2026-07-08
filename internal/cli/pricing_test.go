@@ -42,7 +42,7 @@ func TestRunPricingRendersResults(t *testing.T) {
 	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"content", "pricing", "https://example.com/article", "--agent-name", "agent-test"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "pricing", "https://example.com/article"}, nil, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
@@ -87,7 +87,7 @@ func TestRunContentPricingRendersResults(t *testing.T) {
 	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"content", "pricing", "https://example.com/article", "--agent-name", "agent-test"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "pricing", "https://example.com/article"}, nil, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())

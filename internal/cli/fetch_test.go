@@ -40,7 +40,7 @@ func TestRunFetchRendersBody(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	stdin := strings.NewReader("y\n")
-	code := executeTestCommand([]string{"content", "fetch", "https://example.com/article", "--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User"}, stdin, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "fetch", "https://example.com/article", "--user-agent", "MyAgent-User"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 	}
@@ -77,7 +77,7 @@ func TestRunFetchConfirmSkipsPrompt(t *testing.T) {
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"content", "fetch", "https://example.com/article", "--confirm", "--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"content", "fetch", "https://example.com/article", "--confirm", "--user-agent", "MyAgent-User"}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 	}
@@ -117,7 +117,7 @@ func TestRunFetchToDisk(t *testing.T) {
 	code := executeTestCommand([]string{
 		"content", "fetch", "https://example.com/article",
 		"--confirm", "--toDisk", outPath,
-		"--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User",
+		"--user-agent", "MyAgent-User",
 	}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
@@ -159,7 +159,7 @@ func TestRunFetchJSON(t *testing.T) {
 	code := executeTestCommand([]string{
 		"content", "fetch", "https://example.com/article",
 		"--confirm", "--json",
-		"--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User",
+		"--user-agent", "MyAgent-User",
 	}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
@@ -199,7 +199,7 @@ func TestRunFetchMultipleRatesRequiresIndexWithJSON(t *testing.T) {
 	code := executeTestCommand([]string{
 		"content", "fetch", "https://example.com/article",
 		"--confirm", "--json",
-		"--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User",
+		"--user-agent", "MyAgent-User",
 	}, nil, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("expected exit code 2, got %d stderr=%q", code, stderr.String())
@@ -231,7 +231,7 @@ func TestRunFetchDeclineConfirm(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
 		"content", "fetch", "https://example.com/article",
-		"--agent-name", "agent-test", "--agent-user-agent", "MyAgent-User",
+		"--user-agent", "MyAgent-User",
 	}, strings.NewReader("n\n"), &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("expected exit code 1, got %d stderr=%q", code, stderr.String())
@@ -288,7 +288,7 @@ func TestRunFetchUserAgentRegistrationRetry(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
 		"content", "fetch", "https://example.com/article",
-		"--confirm", "--agent-name", "agent-test", "--agent-user-agent", "Bad-Agent",
+		"--confirm", "--user-agent", "Bad-Agent",
 	}, strings.NewReader("1\n"), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
@@ -347,7 +347,7 @@ func TestRunFetchEmptyUserAgentListsAndRegisters(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
 		"content", "fetch", "https://example.com/article",
-		"--confirm", "--agent-name", "agent-test",
+		"--confirm",
 	}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
@@ -392,7 +392,7 @@ func TestRunFetchNoRegisteredUserAgents(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{
 		"content", "fetch", "https://example.com/article",
-		"--confirm", "--agent-name", "agent-test",
+		"--confirm",
 	}, nil, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("expected exit code 1, got %d stderr=%q", code, stderr.String())

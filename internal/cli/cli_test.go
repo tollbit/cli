@@ -114,7 +114,7 @@ func TestRunSearchRendersResults(t *testing.T) {
 	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"search", "climate policy", "--agent-name", "agent-test", "--size", "5"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"search", "climate policy", "--size", "5"}, nil, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
@@ -164,51 +164,51 @@ func TestRunSearchJSON(t *testing.T) {
 	}
 }
 
-func TestRunIdentityCommands(t *testing.T) {
+func TestRunAuthSetStatusAndLogoutAll(t *testing.T) {
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"identity", "set", "agent-test", "--user-agent", "agent-test/0.1"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"auth", "set", "--name", "agent-test", "--user-agent", "agent-test/0.1"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("identity set failed: code=%d stderr=%q", code, stderr.String())
+		t.Fatalf("auth set failed: code=%d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "saved agent identity agent-test") {
+	if !strings.Contains(stdout.String(), "updated agent profile agent-test") {
 		t.Fatalf("unexpected set stdout: %q", stdout.String())
 	}
 
 	stdout.Reset()
 	stderr.Reset()
-	code = executeTestCommand([]string{"identity", "get"}, nil, &stdout, &stderr)
+	code = executeTestCommand([]string{"auth", "status"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("identity get failed: code=%d stderr=%q", code, stderr.String())
+		t.Fatalf("auth status failed: code=%d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "name: agent-test") || !strings.Contains(stdout.String(), "user-agent: agent-test/0.1") {
-		t.Fatalf("unexpected get stdout: %q", stdout.String())
+	if !strings.Contains(stdout.String(), "Agent:      agent-test") || !strings.Contains(stdout.String(), "User agent: agent-test/0.1") {
+		t.Fatalf("unexpected status stdout: %q", stdout.String())
 	}
 
 	stdout.Reset()
 	stderr.Reset()
-	code = executeTestCommand([]string{"identity", "clear"}, nil, &stdout, &stderr)
+	code = executeTestCommand([]string{"auth", "logout", "--all"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("identity clear failed: code=%d stderr=%q", code, stderr.String())
+		t.Fatalf("auth logout --all failed: code=%d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "cleared agent identity") {
-		t.Fatalf("unexpected clear stdout: %q", stdout.String())
+	if !strings.Contains(stdout.String(), "Cleared agent profile and token.") {
+		t.Fatalf("unexpected logout stdout: %q", stdout.String())
 	}
 }
 
-func TestRunIdentityGetDefaultsToAnonymous(t *testing.T) {
+func TestRunAuthStatusDefaultsToAnonymous(t *testing.T) {
 	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"identity", "get"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"auth", "status"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("identity get failed: code=%d stderr=%q", code, stderr.String())
+		t.Fatalf("auth status failed: code=%d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "name: anonymous") {
-		t.Fatalf("unexpected get stdout: %q", stdout.String())
+	if !strings.Contains(stdout.String(), "Agent:      anonymous") {
+		t.Fatalf("unexpected status stdout: %q", stdout.String())
 	}
 }
 
-func TestRunAgentLoginStatusAndLogout(t *testing.T) {
+func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 	storageDir := t.TempDir()
 	baseToken := testAgentJWT(t)
 	oboToken := testAgentJWTWithOBO(t)
@@ -271,26 +271,27 @@ func TestRunAgentLoginStatusAndLogout(t *testing.T) {
 	t.Setenv(testAuthBaseURLEnvVar, authSrv.URL)
 	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
 	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{"agent", "login", "--agent-name", "agent-test"}, nil, &stdout, &stderr)
+	code := executeTestCommand([]string{"auth", "login", "--name", "agent-test"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("agent login failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		t.Fatalf("auth login failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if !sawStart || !sawRedeem {
 		t.Fatalf("expected start and redeem requests, sawStart=%v sawRedeem=%v", sawStart, sawRedeem)
 	}
-	for _, want := range []string{"Authorize agent: agent-test", "Open this URL in your browser", "Agent authorized.", "User: usr_123", "Organization: org_456", "Source: consent"} {
-		if !strings.Contains(stdout.String(), want) {
-			t.Fatalf("expected login stdout to contain %q, got %q", want, stdout.String())
+	for _, want := range []string{"Authorize agent: agent-test", "Open this URL in your browser", "authorized as agent-test", "user usr_123", "org org_456"} {
+		combined := stdout.String() + stderr.String()
+		if !strings.Contains(combined, want) {
+			t.Fatalf("expected login output to contain %q, got stdout=%q stderr=%q", want, stdout.String(), stderr.String())
 		}
 	}
 
 	stdout.Reset()
 	stderr.Reset()
-	code = executeTestCommand([]string{"agent", "status"}, nil, &stdout, &stderr)
+	code = executeTestCommand([]string{"auth", "status"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("agent status failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		t.Fatalf("auth status failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	for _, want := range []string{"Agent: anonymous", "Agent token: valid", "Authorization: present", "Source: consent"} {
+	for _, want := range []string{"Agent:      agent-test", "Token:      valid", "On behalf:  user usr_123 / org org_456 (consent)"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected status stdout to contain %q, got %q", want, stdout.String())
 		}
@@ -298,17 +299,17 @@ func TestRunAgentLoginStatusAndLogout(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = executeTestCommand([]string{"agent", "status", "--json"}, nil, &stdout, &stderr)
+	code = executeTestCommand([]string{"auth", "status", "--json"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("agent json status failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		t.Fatalf("auth json status failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	var status map[string]any
 	if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
 		t.Fatalf("failed to decode status json: %v\n%s", err, stdout.String())
 	}
 	identity := status["identity"].(map[string]any)
-	if identity["name"] != "anonymous" {
-		t.Fatalf("expected default persisted identity, got %#v", identity)
+	if identity["name"] != "agent-test" {
+		t.Fatalf("expected persisted identity agent-test, got %#v", identity)
 	}
 	tokenStatus := status["token"].(map[string]any)
 	oboStatus := tokenStatus["obo"].(map[string]any)
@@ -318,9 +319,9 @@ func TestRunAgentLoginStatusAndLogout(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = executeTestCommand([]string{"agent", "logout"}, nil, &stdout, &stderr)
+	code = executeTestCommand([]string{"auth", "logout"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("agent logout failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		t.Fatalf("auth logout failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "Cleared agent token.") {
 		t.Fatalf("unexpected logout stdout: %q", stdout.String())
@@ -328,12 +329,12 @@ func TestRunAgentLoginStatusAndLogout(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = executeTestCommand([]string{"agent", "status"}, nil, &stdout, &stderr)
+	code = executeTestCommand([]string{"auth", "status"}, nil, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("agent status after logout failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		t.Fatalf("auth status after logout failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Agent token: missing") {
-		t.Fatalf("expected agent token to be cleared, got %q", stdout.String())
+	if !strings.Contains(stdout.String(), "Token:      none") {
+		t.Fatalf("expected token to be cleared, got %q", stdout.String())
 	}
 }
 
@@ -383,6 +384,95 @@ func encodeJSONSegment(t *testing.T, value any) string {
 		t.Fatal(err)
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func TestRunAuthStatusCheckExitCodes(t *testing.T) {
+	storageDir := t.TempDir()
+	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
+
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommand([]string{"auth", "status", "--check"}, nil, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("expected exit code 2 for missing token, got %d stderr=%q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout with --check, got %q", stdout.String())
+	}
+
+	expiredToken := testAgentJWTExpired(t)
+	if err := os.WriteFile(filepath.Join(storageDir, "agent-token.jwt"), []byte(expiredToken), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = executeTestCommand([]string{"auth", "status", "--check"}, nil, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for invalid token, got %d stderr=%q", code, stderr.String())
+	}
+
+	validToken := testAgentJWT(t)
+	if err := os.WriteFile(filepath.Join(storageDir, "agent-token.jwt"), []byte(validToken), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = executeTestCommand([]string{"auth", "status", "--check"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for valid token, got %d stderr=%q", code, stderr.String())
+	}
+}
+
+func TestRunAuthSetNameChangeClearsToken(t *testing.T) {
+	storageDir := t.TempDir()
+	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
+	if err := os.WriteFile(filepath.Join(storageDir, "agent-token.jwt"), []byte(testAgentJWT(t)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommand([]string{"auth", "set", "--name", "agent-test", "--user-agent", "agent-test/0.1"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("auth set failed: code=%d stderr=%q", code, stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = executeTestCommand([]string{"auth", "set", "--name", "other-agent"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("auth set rename failed: code=%d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "cleared token — profile updated") {
+		t.Fatalf("expected token cleared notice, got stderr=%q", stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = executeTestCommand([]string{"auth", "status"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("auth status failed: code=%d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Token:      none") {
+		t.Fatalf("expected missing token after rename, got %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "User agent: agent-test/0.1") {
+		t.Fatalf("expected user agent preserved, got %q", stdout.String())
+	}
+}
+
+func testAgentJWTExpired(t *testing.T) string {
+	t.Helper()
+	claims := struct {
+		jwt.RegisteredClaims
+		TBT string `json:"tbt"`
+	}{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "agent-test",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Hour)),
+		},
+		TBT: "agent-token",
+	}
+	header := map[string]any{"alg": "none"}
+	return encodeJSONSegment(t, header) + "." + encodeJSONSegment(t, claims) + "." + base64.RawURLEncoding.EncodeToString([]byte("signature"))
 }
 
 func TestRunGuideInstallWritesSkillUnderSkillName(t *testing.T) {

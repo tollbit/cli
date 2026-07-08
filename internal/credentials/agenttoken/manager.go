@@ -86,6 +86,13 @@ func New(cfg CredentialManagerConfig) (*CredentialManager, error) {
 }
 
 func (m *CredentialManager) SaveIdentity(ctx context.Context, identity auth.AgentIdentity) error {
+	if err := m.WriteIdentity(ctx, identity); err != nil {
+		return err
+	}
+	return m.ClearAgentTokens(ctx)
+}
+
+func (m *CredentialManager) WriteIdentity(ctx context.Context, identity auth.AgentIdentity) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -98,7 +105,7 @@ func (m *CredentialManager) SaveIdentity(ctx context.Context, identity auth.Agen
 	if err := m.writeJSON(ctx, m.identityPath, identity); err != nil {
 		return fmt.Errorf("save agent identity credential: %w", err)
 	}
-	return m.ClearAgentTokens(ctx)
+	return nil
 }
 
 func (m *CredentialManager) GetIdentity(ctx context.Context) (auth.AgentIdentity, error) {
