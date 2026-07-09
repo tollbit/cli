@@ -8,14 +8,16 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tollbit/tollbit-cli/internal/app"
+	"github.com/tollbit/tollbit-cli/internal/cli/globalflags"
 	"github.com/tollbit/tollbit-cli/internal/credentials/agenttoken"
 	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
 )
 
 type (
 	authLoginOptions struct {
-		name      string
-		userAgent string
+		name             string
+		userAgent        string
+		useRefreshTokens bool
 	}
 
 	authStatusOptions struct {
@@ -71,6 +73,7 @@ func NewAuthLoginCommand(factory app.Factory) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.name, "name", "", "agent name to authorize")
 	cmd.Flags().StringVar(&opts.userAgent, "user-agent", "", "user agent sent when minting the agent token")
+	cmd.Flags().BoolVar(&opts.useRefreshTokens, "use-refresh-tokens", factory.Config.Auth.UseRefreshTokens, "request offline access and store refresh tokens for this agent")
 	return cmd
 }
 
@@ -134,7 +137,12 @@ func NewAuthSetCommand(factory app.Factory) *cobra.Command {
 }
 
 func runAuthLogin(cmd *cobra.Command, factory app.Factory, opts authLoginOptions) error {
-	app, err := appForCommand(factory, cmd)
+	overrides, err := globalflags.OverridesFromCommand(cmd)
+	if err != nil {
+		return RuntimeError(err)
+	}
+	overrides.AuthUseRefreshTokens = &opts.useRefreshTokens
+	app, err := factory.New(overrides)
 	if err != nil {
 		return RuntimeError(err)
 	}
@@ -152,7 +160,7 @@ func runAuthLogin(cmd *cobra.Command, factory app.Factory, opts authLoginOptions
 		return RuntimeError(err)
 	}
 
-	token, err := credentials.GetAgentToken(cmd, identity, agenttoken.WithOBO())
+	token, err := credentials.GetAgentToken(cmd, identity, agenttoken.WithOBO(), agenttoken.WithRefreshTokens(opts.useRefreshTokens))
 	if err != nil {
 		return RuntimeError(err)
 	}

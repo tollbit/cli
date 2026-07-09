@@ -38,6 +38,9 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 			if body.RedirectURI == "" || body.State == "" || body.CodeChallenge == "" || body.CodeChallengeMethod != "S256" {
 				t.Fatalf("unexpected start body: %#v", body)
 			}
+			if body.Scope != "offline_access" {
+				t.Fatalf("expected offline_access scope, got %q", body.Scope)
+			}
 			sawStart = true
 			go func() {
 				callbackURL, err := url.Parse(body.RedirectURI)
@@ -52,7 +55,7 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 				callbackCh <- callbackURL.String()
 			}()
 			_ = json.NewEncoder(w).Encode(map[string]string{"consent_url": "https://auth.example.test/consent"})
-		case "/agent/v1/consent/redirect/token":
+		case "/agent/v1/tokens/identity":
 			if r.Header.Get("Authorization") != "Bearer "+baseToken {
 				t.Fatalf("unexpected redeem authorization: %q", r.Header.Get("Authorization"))
 			}
@@ -60,11 +63,12 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatal(err)
 			}
-			if body.Code != "code-123" || body.CodeVerifier == "" || body.RedirectURI == "" {
+			if body.AgentIdentifier != "agent-test" || body.Code != "code-123" || body.CodeVerifier == "" || body.RedirectURI == "" {
 				t.Fatalf("unexpected redeem body: %#v", body)
 			}
 			sawRedeem = true
-			_ = json.NewEncoder(w).Encode(map[string]string{"token": oboToken})
+			refreshToken := "agrt_test"
+			_ = json.NewEncoder(w).Encode(auth.AgentTokenResponse{Token: oboToken, RefreshToken: &refreshToken})
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
@@ -75,10 +79,11 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 		t.Fatal(err)
 	}
 	authorizer, err := NewBrowserConsentAuthorizer(BrowserConsentAuthorizerConfig{
-		AuthClient:      authClient,
-		CallbackAddress: "127.0.0.1:54321",
-		AutoOpenBrowser: false,
-		Timeout:         2 * time.Second,
+		AuthClient:       authClient,
+		CallbackAddress:  "127.0.0.1:54321",
+		AutoOpenBrowser:  false,
+		Timeout:          2 * time.Second,
+		UseRefreshTokens: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -93,8 +98,8 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.RawToken != oboToken {
-		t.Fatalf("expected OBO token, got %q", got.RawToken)
+	if got.Token != oboToken || got.RefreshToken == nil || *got.RefreshToken != "agrt_test" {
+		t.Fatalf("expected OBO token response, got %#v", got)
 	}
 	if !sawStart || !sawRedeem {
 		t.Fatalf("expected start and redeem, sawStart=%v sawRedeem=%v", sawStart, sawRedeem)

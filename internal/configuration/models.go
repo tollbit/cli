@@ -18,6 +18,7 @@ type AuthConfig struct {
 	BaseURL            string               `mapstructure:"base_url"`
 	RetryOnOBORequired bool                 `mapstructure:"retry_on_obo_required"`
 	TokenTTLSeconds    int32                `mapstructure:"token_ttl_seconds"`
+	UseRefreshTokens   bool                 `mapstructure:"use_refresh_tokens"`
 	BrowserConsent     BrowserConsentConfig `mapstructure:"browser_consent"`
 }
 
@@ -44,6 +45,7 @@ type OverrideOptions struct {
 	AuthBaseURL                       *string
 	AuthRetryOnOBORequired            *bool
 	AuthTokenTTLSeconds               *int32
+	AuthUseRefreshTokens              *bool
 	AuthBrowserConsentCallbackAddress *string
 	AuthBrowserConsentTimeout         *time.Duration
 	AuthBrowserConsentAutoOpenBrowser *bool
@@ -60,6 +62,9 @@ func (c Config) WithOverrides(opts OverrideOptions) (Config, error) {
 	}
 	if opts.AuthTokenTTLSeconds != nil {
 		c.Auth.TokenTTLSeconds = *opts.AuthTokenTTLSeconds
+	}
+	if opts.AuthUseRefreshTokens != nil {
+		c.Auth.UseRefreshTokens = *opts.AuthUseRefreshTokens
 	}
 	if opts.AuthBrowserConsentCallbackAddress != nil {
 		c.Auth.BrowserConsent.CallbackAddress = *opts.AuthBrowserConsentCallbackAddress

@@ -17,6 +17,7 @@ const (
 	FlagAuthBaseURL                       = "auth-base-url"
 	FlagAuthRetryOnOBORequired            = "auth-retry-on-obo-required"
 	FlagAuthTokenTTLSeconds               = "auth-token-ttl-seconds"
+	FlagAuthUseRefreshTokens              = "auth-use-refresh-tokens"
 	FlagAuthBrowserConsentCallbackAddress = "auth-browser-consent-callback-address"
 	FlagAuthBrowserConsentTimeout         = "auth-browser-consent-timeout"
 	FlagAuthBrowserConsentAutoOpenBrowser = "auth-browser-consent-auto-open-browser"
@@ -29,6 +30,7 @@ var devFlagNames = []string{
 	FlagGatewayBaseURL,
 	FlagAuthRetryOnOBORequired,
 	FlagAuthTokenTTLSeconds,
+	FlagAuthUseRefreshTokens,
 	FlagAuthBrowserConsentCallbackAddress,
 	FlagAuthBrowserConsentTimeout,
 	FlagAuthBrowserConsentAutoOpenBrowser,
@@ -40,6 +42,7 @@ type configFlagOptions struct {
 	gatewayBaseURL                    string
 	authRetryOnOBORequired            bool
 	authTokenTTLSeconds               int32
+	authUseRefreshTokens              bool
 	authBrowserConsentCallbackAddress string
 	authBrowserConsentTimeout         time.Duration
 	authBrowserConsentAutoOpenBrowser bool
@@ -56,6 +59,7 @@ func Add(cmd *cobra.Command, config configuration.Config) {
 		gatewayBaseURL:                    config.Gateway.BaseURL,
 		authRetryOnOBORequired:            config.Auth.RetryOnOBORequired,
 		authTokenTTLSeconds:               config.Auth.TokenTTLSeconds,
+		authUseRefreshTokens:              config.Auth.UseRefreshTokens,
 		authBrowserConsentCallbackAddress: config.Auth.BrowserConsent.CallbackAddress,
 		authBrowserConsentTimeout:         config.Auth.BrowserConsent.Timeout,
 		authBrowserConsentAutoOpenBrowser: config.Auth.BrowserConsent.AutoOpenBrowser,
@@ -66,6 +70,7 @@ func Add(cmd *cobra.Command, config configuration.Config) {
 	flags.StringVar(&opts.gatewayBaseURL, FlagGatewayBaseURL, opts.gatewayBaseURL, "Gateway API base URL")
 	flags.BoolVar(&opts.authRetryOnOBORequired, FlagAuthRetryOnOBORequired, opts.authRetryOnOBORequired, "retry once with OBO authorization when required")
 	flags.Int32Var(&opts.authTokenTTLSeconds, FlagAuthTokenTTLSeconds, opts.authTokenTTLSeconds, "agent token TTL in seconds; 0 uses server default")
+	flags.BoolVar(&opts.authUseRefreshTokens, FlagAuthUseRefreshTokens, opts.authUseRefreshTokens, "request and use refresh tokens for OBO authorization")
 	flags.StringVar(&opts.authBrowserConsentCallbackAddress, FlagAuthBrowserConsentCallbackAddress, opts.authBrowserConsentCallbackAddress, "auth browser consent callback address")
 	flags.DurationVar(&opts.authBrowserConsentTimeout, FlagAuthBrowserConsentTimeout, opts.authBrowserConsentTimeout, "auth browser consent timeout")
 	flags.BoolVar(&opts.authBrowserConsentAutoOpenBrowser, FlagAuthBrowserConsentAutoOpenBrowser, opts.authBrowserConsentAutoOpenBrowser, "automatically open browser for auth consent")
@@ -107,6 +112,10 @@ func OverridesFromCommand(cmd *cobra.Command) (configuration.OverrideOptions, er
 		return overrides, err
 	}
 	overrides.AuthTokenTTLSeconds, err = changedValue(flags, FlagAuthTokenTTLSeconds, flags.GetInt32)
+	if err != nil {
+		return overrides, err
+	}
+	overrides.AuthUseRefreshTokens, err = changedValue(flags, FlagAuthUseRefreshTokens, flags.GetBool)
 	if err != nil {
 		return overrides, err
 	}

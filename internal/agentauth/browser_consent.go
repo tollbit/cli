@@ -23,17 +23,19 @@ const (
 )
 
 type BrowserConsentAuthorizerConfig struct {
-	AuthClient      *auth.Client
-	CallbackAddress string
-	AutoOpenBrowser bool
-	Timeout         time.Duration
+	AuthClient       *auth.Client
+	CallbackAddress  string
+	AutoOpenBrowser  bool
+	Timeout          time.Duration
+	UseRefreshTokens bool
 }
 
 type BrowserConsentAuthorizer struct {
-	authClient      *auth.Client
-	callbackAddress string
-	autoOpenBrowser bool
-	timeout         time.Duration
+	authClient       *auth.Client
+	callbackAddress  string
+	autoOpenBrowser  bool
+	timeout          time.Duration
+	useRefreshTokens bool
 }
 
 func NewBrowserConsentAuthorizer(cfg BrowserConsentAuthorizerConfig) (*BrowserConsentAuthorizer, error) {
@@ -47,29 +49,34 @@ func NewBrowserConsentAuthorizer(cfg BrowserConsentAuthorizerConfig) (*BrowserCo
 		return nil, errors.New("timeout must be non-negative")
 	}
 	return &BrowserConsentAuthorizer{
-		authClient:      cfg.AuthClient,
-		callbackAddress: strings.TrimSpace(cfg.CallbackAddress),
-		autoOpenBrowser: cfg.AutoOpenBrowser,
-		timeout:         cfg.Timeout,
+		authClient:       cfg.AuthClient,
+		callbackAddress:  strings.TrimSpace(cfg.CallbackAddress),
+		autoOpenBrowser:  cfg.AutoOpenBrowser,
+		timeout:          cfg.Timeout,
+		useRefreshTokens: cfg.UseRefreshTokens,
 	}, nil
 }
 
-func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.AgentIdentity, baseToken agent.Token) (agent.Token, error) {
+func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.AgentIdentity, baseToken agent.Token) (auth.AgentTokenResponse, error) {
 	ctx := inv.Context()
 
 	callback, err := loopback.Start(ctx, a.callbackAddress)
 	if err != nil {
-		return agent.Token{}, err
+		return auth.AgentTokenResponse{}, err
 	}
 	defer callback.Close()
 
 	codeVerifier, codeChallenge, err := generatePKCE()
 	if err != nil {
-		return agent.Token{}, err
+		return auth.AgentTokenResponse{}, err
 	}
 	state, err := randomURLToken(32)
 	if err != nil {
-		return agent.Token{}, err
+		return auth.AgentTokenResponse{}, err
+	}
+	scope := ""
+	if a.useRefreshTokens {
+		scope = "offline_access"
 	}
 
 	startResp, err := a.authClient.StartAgentConsentRedirect(ctx, baseToken, auth.ConsentRedirectStartRequest{
@@ -77,12 +84,13 @@ func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.Age
 		State:               state,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: pkceChallengeMethod,
+		Scope:               scope,
 	})
 	if err != nil {
-		return agent.Token{}, err
+		return auth.AgentTokenResponse{}, err
 	}
 	if strings.TrimSpace(startResp.ConsentURL) == "" {
-		return agent.Token{}, errors.New("auth did not return a consent URL")
+		return auth.AgentTokenResponse{}, errors.New("auth did not return a consent URL")
 	}
 
 	stdout := inv.OutOrStdout()
@@ -112,29 +120,37 @@ func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.Age
 	result, err := callback.Wait(waitCtx)
 	if err != nil {
 		if errors.Is(waitCtx.Err(), context.DeadlineExceeded) {
-			return agent.Token{}, fmt.Errorf("authorization timed out; no agent token was saved")
+			return auth.AgentTokenResponse{}, fmt.Errorf("authorization timed out; no agent token was saved")
 		}
-		return agent.Token{}, err
+		return auth.AgentTokenResponse{}, err
 	}
 	if result.Err != nil {
-		return agent.Token{}, result.Err
+		return auth.AgentTokenResponse{}, result.Err
 	}
 	if result.State != state {
-		return agent.Token{}, fmt.Errorf("callback state mismatch")
+		return auth.AgentTokenResponse{}, fmt.Errorf("callback state mismatch")
+	}
+	var ua *string
+	if identity.UserAgent != "" {
+		ua = &identity.UserAgent
 	}
 
-	oboToken, err := a.authClient.RedeemAgentConsentRedirect(ctx, baseToken, auth.ConsentRedirectTokenRequest{
-		Code:         result.Code,
-		CodeVerifier: codeVerifier,
-		RedirectURI:  callback.RedirectURI,
+	resp, err := a.authClient.RedeemAgentConsentRedirect(ctx, baseToken, auth.ConsentRedirectTokenRequest{
+		AgentIdentifier: identity.Name,
+		Code:            result.Code,
+		CodeVerifier:    codeVerifier,
+		RedirectURI:     callback.RedirectURI,
+		UA:              ua,
+		WBA:             identity.WBA,
 	})
 	if err != nil {
-		return agent.Token{}, err
+		return auth.AgentTokenResponse{}, err
 	}
+	oboToken := agent.Token{RawToken: resp.Token}
 	if err := oboToken.Validate(); err != nil {
-		return agent.Token{}, err
+		return auth.AgentTokenResponse{}, err
 	}
-	return oboToken, nil
+	return resp, nil
 }
 
 func generatePKCE() (string, string, error) {

@@ -6,5 +6,5 @@ import (
 )
 
 type OBOAuthorizer interface {
-	AuthorizeOBO(inv Invocation, identity auth.AgentIdentity, baseToken agent.Token) (agent.Token, error)
+	AuthorizeOBO(inv Invocation, identity auth.AgentIdentity, baseToken agent.Token) (auth.AgentTokenResponse, error)
 }

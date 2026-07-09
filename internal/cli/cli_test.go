@@ -64,7 +64,8 @@ func testConfig() configuration.Config {
 			Name: "tollbit",
 		},
 		Auth: configuration.AuthConfig{
-			BaseURL: authBaseURL,
+			BaseURL:          authBaseURL,
+			UseRefreshTokens: true,
 			BrowserConsent: configuration.BrowserConsentConfig{
 				CallbackAddress: "127.0.0.1:54321",
 				Timeout:         3 * time.Minute,
@@ -219,9 +220,26 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 		switch r.URL.RequestURI() {
 		case "/agent/v1/tokens/identity":
 			if r.Method != http.MethodPost {
-				t.Fatalf("expected POST mint, got %s", r.Method)
+				t.Fatalf("expected POST token grant, got %s", r.Method)
 			}
-			_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			switch body["grant_type"] {
+			case "self_attested":
+				_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
+			case "consent":
+				if body["agent_identifier"] != "agent-test" || body["code"] != "auth-code" || body["code_verifier"] == "" || body["redirect_uri"] == "" {
+					t.Fatalf("unexpected redeem body: %#v", body)
+				}
+				sawRedeem = true
+				refreshToken := "agrt_cli"
+				refreshExpiresAt := time.Now().Add(24 * time.Hour).Format(time.RFC3339)
+				_ = json.NewEncoder(w).Encode(auth.AgentTokenResponse{Token: oboToken, RefreshToken: &refreshToken, RefreshTokenExpiresAt: &refreshExpiresAt})
+			default:
+				t.Fatalf("unexpected token grant body: %#v", body)
+			}
 		case "/agent/v1/consent/redirect/start":
 			if r.Method != http.MethodPost {
 				t.Fatalf("expected POST start, got %s", r.Method)
@@ -246,22 +264,11 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 				ConsentURL:  "https://hack.tollbit.test/oauth/consent-new?consent_challenge=ach_test",
 				ExpiresAt:   time.Now().Add(time.Minute).Format(time.RFC3339),
 			})
-		case "/agent/v1/consent/redirect/token":
+		case "/agent/v1/tokens/refresh/revoke":
 			if r.Method != http.MethodPost {
-				t.Fatalf("expected POST redeem, got %s", r.Method)
+				t.Fatalf("expected POST revoke, got %s", r.Method)
 			}
-			if r.Header.Get("Authorization") != "Bearer "+baseToken {
-				t.Fatalf("unexpected redeem authorization: %q", r.Header.Get("Authorization"))
-			}
-			var body auth.ConsentRedirectTokenRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatal(err)
-			}
-			if body.Code != "auth-code" || body.CodeVerifier == "" || body.RedirectURI == "" {
-				t.Fatalf("unexpected redeem body: %#v", body)
-			}
-			sawRedeem = true
-			_ = json.NewEncoder(w).Encode(map[string]string{"token": oboToken})
+			_ = json.NewEncoder(w).Encode(auth.RevokeRefreshTokenResponse{Revoked: true})
 		default:
 			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.RequestURI())
 		}

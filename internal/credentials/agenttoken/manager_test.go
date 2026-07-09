@@ -208,6 +208,73 @@ func TestClearRemovesToken(t *testing.T) {
 	}
 }
 
+func TestClearAuthTokensRemovesAgentAndRefreshTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, tokenFilename)
+	if err := os.WriteFile(path, []byte(testJWT(t, validClaims())), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var sawRevoke bool
+	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/agent/v1/tokens/refresh/revoke" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
+		}
+		var body auth.RevokeRefreshTokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.RefreshToken != "agrt_old" {
+			t.Fatalf("unexpected revoke body: %#v", body)
+		}
+		sawRevoke = true
+		_ = json.NewEncoder(w).Encode(auth.RevokeRefreshTokenResponse{Revoked: true})
+	}))
+	if err := mgr.writeJSON(context.Background(), mgr.refreshPath, refreshCredential{RefreshToken: "agrt_old"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := mgr.ClearAuthTokens(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected token file removed, got err=%v", err)
+	}
+	if !sawRevoke {
+		t.Fatal("expected refresh token revocation")
+	}
+	if _, err := os.Stat(mgr.refreshPath); !os.IsNotExist(err) {
+		t.Fatalf("expected refresh token file removed, got err=%v", err)
+	}
+}
+
+func TestClearAuthTokensKeepsRefreshTokenWhenRevokeFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, tokenFilename)
+	if err := os.WriteFile(path, []byte(testJWT(t, validClaims())), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/agent/v1/tokens/refresh/revoke" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"detail": "revoke failed"})
+	}))
+	if err := mgr.writeJSON(context.Background(), mgr.refreshPath, refreshCredential{RefreshToken: "agrt_old"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := mgr.ClearAuthTokens(context.Background()); err == nil {
+		t.Fatal("expected revoke error")
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected agent token to remain after revoke failure, got err=%v", err)
+	}
+	if _, err := os.Stat(mgr.refreshPath); err != nil {
+		t.Fatalf("expected refresh token to remain after revoke failure, got err=%v", err)
+	}
+}
+
 func TestClearSucceedsWhenTokenIsMissing(t *testing.T) {
 	dir := t.TempDir()
 	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
@@ -264,7 +331,7 @@ func TestGetAgentTokenWithOBOAuthorizesAndOverwritesToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	authorizer := &fakeOBOAuthorizer{token: agent.Token{RawToken: oboToken}}
+	authorizer := &fakeOBOAuthorizer{token: oboToken}
 	mgr := newTestManagerWithConfig(t, dir, CredentialManagerConfig{OBOAuthorizer: authorizer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("auth client should not be called when base token is cached")
 	}))
@@ -295,7 +362,7 @@ func TestGetAgentTokenWithOBOMintsBaseTokenBeforeAuthorizing(t *testing.T) {
 		claims.OBO = &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_abc", Org: "org_xyz"}
 		return claims
 	}))
-	authorizer := &fakeOBOAuthorizer{token: agent.Token{RawToken: oboToken}}
+	authorizer := &fakeOBOAuthorizer{token: oboToken}
 	mgr := newTestManagerWithConfig(t, dir, CredentialManagerConfig{OBOAuthorizer: authorizer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
 	}))
@@ -309,15 +376,12 @@ func TestGetAgentTokenWithOBOMintsBaseTokenBeforeAuthorizing(t *testing.T) {
 	}
 }
 
-func TestGetAgentTokenWithOBORequiresAuthorizer(t *testing.T) {
-	dir := t.TempDir()
-	baseToken := testJWT(t, validClaims())
-	if err := os.WriteFile(filepath.Join(dir, tokenFilename), []byte(baseToken), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-
-	_, err := mgr.GetAgentToken(testInvocation{}, testAgentIdentity(), WithOBO())
+func TestNewRequiresOBOAuthorizer(t *testing.T) {
+	_, err := New(CredentialManagerConfig{
+		Path:            t.TempDir(),
+		DefaultIdentity: auth.AgentIdentity{Name: "anonymous"},
+		AuthClient:      newTestAuthClient(t),
+	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -326,9 +390,171 @@ func TestGetAgentTokenWithOBORequiresAuthorizer(t *testing.T) {
 	}
 }
 
+func TestGetAgentTokenWithOBORefreshesExpiredTokenAndStoresRotatedRefreshToken(t *testing.T) {
+	dir := t.TempDir()
+	expiredOBO := testJWT(t, expiredClaims(func(claims agent.Claims) agent.Claims {
+		claims.OBO = &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_old", Org: "org_old"}
+		return claims
+	}))
+	baseToken := testJWT(t, validClaims())
+	refreshedOBO := testJWT(t, validClaims(func(claims agent.Claims) agent.Claims {
+		claims.OBO = &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_new", Org: "org_new"}
+		return claims
+	}))
+
+	mgr := newTestManagerWithConfig(t, dir, CredentialManagerConfig{UseRefreshTokens: true, OBOAuthorizer: &fakeOBOAuthorizer{}}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		switch body["grant_type"] {
+		case "self_attested":
+			_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
+		case "refresh_token":
+			if r.Header.Get("Authorization") != "Bearer "+baseToken {
+				t.Fatalf("unexpected refresh authorization: %q", r.Header.Get("Authorization"))
+			}
+			if body["agent_identifier"] != "agent-test" || body["refresh_token"] != "agrt_old" {
+				t.Fatalf("unexpected refresh body: %#v", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"token":                    refreshedOBO,
+				"refresh_token":            "agrt_new",
+				"refresh_token_expires_at": "2026-07-08T12:00:00Z",
+			})
+		default:
+			t.Fatalf("unexpected grant body: %#v", body)
+		}
+	}))
+	if err := os.WriteFile(filepath.Join(dir, tokenFilename), []byte(expiredOBO), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := mgr.writeJSON(context.Background(), mgr.refreshPath, refreshCredential{RefreshToken: "agrt_old"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := mgr.GetAgentToken(testInvocation{}, testAgentIdentity(), WithOBO())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RawToken != refreshedOBO {
+		t.Fatalf("expected refreshed OBO token, got %q", got.RawToken)
+	}
+	refresh, exists, err := mgr.readRefreshCredential(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists || refresh.RefreshToken != "agrt_new" || refresh.RefreshTokenExpiresAt != "2026-07-08T12:00:00Z" {
+		t.Fatalf("unexpected refresh credential exists=%v cred=%#v", exists, refresh)
+	}
+}
+
+func TestGetAgentTokenWithOBOClearsFailedRefreshTokenAndFallsBackToConsent(t *testing.T) {
+	dir := t.TempDir()
+	expiredOBO := testJWT(t, expiredClaims(func(claims agent.Claims) agent.Claims {
+		claims.OBO = &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_old", Org: "org_old"}
+		return claims
+	}))
+	baseToken := testJWT(t, validClaims())
+	consentOBO := testJWT(t, validClaims(func(claims agent.Claims) agent.Claims {
+		claims.OBO = &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_new", Org: "org_new"}
+		return claims
+	}))
+	authorizer := &fakeOBOAuthorizer{token: consentOBO}
+	var refreshCount int
+
+	mgr := newTestManagerWithConfig(t, dir, CredentialManagerConfig{UseRefreshTokens: true, OBOAuthorizer: authorizer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		switch body["grant_type"] {
+		case "self_attested":
+			_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
+		case "refresh_token":
+			refreshCount++
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]any{"detail": "refresh token invalid"})
+		default:
+			t.Fatalf("unexpected grant body: %#v", body)
+		}
+	}))
+	if err := os.WriteFile(filepath.Join(dir, tokenFilename), []byte(expiredOBO), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := mgr.writeJSON(context.Background(), mgr.refreshPath, refreshCredential{RefreshToken: "agrt_old"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := mgr.GetAgentToken(testInvocation{}, testAgentIdentity(), WithOBO())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RawToken != consentOBO {
+		t.Fatalf("expected consent fallback OBO token, got %q", got.RawToken)
+	}
+	if refreshCount != 1 || authorizer.callCount != 1 {
+		t.Fatalf("expected one refresh attempt and one consent fallback, refresh=%d consent=%d", refreshCount, authorizer.callCount)
+	}
+	if _, exists, err := mgr.readRefreshCredential(context.Background()); err != nil || exists {
+		t.Fatalf("expected failed refresh token to be cleared, exists=%v err=%v", exists, err)
+	}
+}
+
+func TestGetAgentTokenWithOBOClearsExpiredRefreshTokenAndFallsBackToConsent(t *testing.T) {
+	dir := t.TempDir()
+	expiredOBO := testJWT(t, expiredClaims(func(claims agent.Claims) agent.Claims {
+		claims.OBO = &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_old", Org: "org_old"}
+		return claims
+	}))
+	baseToken := testJWT(t, validClaims())
+	consentOBO := testJWT(t, validClaims(func(claims agent.Claims) agent.Claims {
+		claims.OBO = &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_new", Org: "org_new"}
+		return claims
+	}))
+	authorizer := &fakeOBOAuthorizer{token: consentOBO}
+	var refreshCount int
+
+	mgr := newTestManagerWithConfig(t, dir, CredentialManagerConfig{UseRefreshTokens: true, OBOAuthorizer: authorizer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		switch body["grant_type"] {
+		case "self_attested":
+			_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
+		case "refresh_token":
+			refreshCount++
+			t.Fatal("refresh token grant should not be called for expired refresh token")
+		default:
+			t.Fatalf("unexpected grant body: %#v", body)
+		}
+	}))
+	if err := os.WriteFile(filepath.Join(dir, tokenFilename), []byte(expiredOBO), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := mgr.writeJSON(context.Background(), mgr.refreshPath, refreshCredential{RefreshToken: "agrt_old", RefreshTokenExpiresAt: "2000-01-01T00:00:00Z"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := mgr.GetAgentToken(testInvocation{}, testAgentIdentity(), WithOBO())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RawToken != consentOBO {
+		t.Fatalf("expected consent fallback OBO token, got %q", got.RawToken)
+	}
+	if refreshCount != 0 || authorizer.callCount != 1 {
+		t.Fatalf("expected no refresh attempt and one consent fallback, refresh=%d consent=%d", refreshCount, authorizer.callCount)
+	}
+	if _, exists, err := mgr.readRefreshCredential(context.Background()); err != nil || exists {
+		t.Fatalf("expected expired refresh token to be cleared, exists=%v err=%v", exists, err)
+	}
+}
+
 func TestCanonicalAgentTokenRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})
+	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t), OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +677,7 @@ func TestNewTreatsPathAsDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: c})
+	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: c, OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -465,7 +691,7 @@ func TestNewTreatsPathAsDirectory(t *testing.T) {
 
 func TestIdentityCredentialRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})
+	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t), OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +724,7 @@ func TestIdentityCredentialRoundTrip(t *testing.T) {
 }
 
 func TestGetStoredIdentityReturnsFalseWhenMissing(t *testing.T) {
-	mgr, err := New(CredentialManagerConfig{Path: t.TempDir(), DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})
+	mgr, err := New(CredentialManagerConfig{Path: t.TempDir(), DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t), OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -516,6 +742,7 @@ func TestGetIdentityUsesConfiguredDefaultWhenMissing(t *testing.T) {
 		Path:            t.TempDir(),
 		DefaultIdentity: auth.AgentIdentity{Name: "configured-agent", UserAgent: "configured-agent/0.1"},
 		AuthClient:      newTestAuthClient(t),
+		OBOAuthorizer:   &fakeOBOAuthorizer{},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -534,6 +761,7 @@ func TestResolveIdentityUsesConfiguredDefaultWhenMissing(t *testing.T) {
 		Path:            t.TempDir(),
 		DefaultIdentity: auth.AgentIdentity{Name: " configured-agent ", UserAgent: " configured-agent/0.1 "},
 		AuthClient:      newTestAuthClient(t),
+		OBOAuthorizer:   &fakeOBOAuthorizer{},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -553,6 +781,7 @@ func TestResolveIdentityUsesStoredIdentity(t *testing.T) {
 		Path:            t.TempDir(),
 		DefaultIdentity: auth.AgentIdentity{Name: "configured-agent", UserAgent: "configured-agent/0.1"},
 		AuthClient:      newTestAuthClient(t),
+		OBOAuthorizer:   &fakeOBOAuthorizer{},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -571,7 +800,7 @@ func TestResolveIdentityUsesStoredIdentity(t *testing.T) {
 }
 
 func TestResolveIdentityNameOverrideWinsOverStoredIdentity(t *testing.T) {
-	mgr, err := New(CredentialManagerConfig{Path: t.TempDir(), DefaultIdentity: auth.AgentIdentity{Name: "configured-agent"}, AuthClient: newTestAuthClient(t)})
+	mgr, err := New(CredentialManagerConfig{Path: t.TempDir(), DefaultIdentity: auth.AgentIdentity{Name: "configured-agent"}, AuthClient: newTestAuthClient(t), OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,7 +819,7 @@ func TestResolveIdentityNameOverrideWinsOverStoredIdentity(t *testing.T) {
 }
 
 func TestResolveIdentityUserAgentOverrideWinsOverStoredIdentity(t *testing.T) {
-	mgr, err := New(CredentialManagerConfig{Path: t.TempDir(), DefaultIdentity: auth.AgentIdentity{Name: "configured-agent"}, AuthClient: newTestAuthClient(t)})
+	mgr, err := New(CredentialManagerConfig{Path: t.TempDir(), DefaultIdentity: auth.AgentIdentity{Name: "configured-agent"}, AuthClient: newTestAuthClient(t), OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,7 +838,7 @@ func TestResolveIdentityUserAgentOverrideWinsOverStoredIdentity(t *testing.T) {
 }
 
 func TestResolveIdentityRequiresName(t *testing.T) {
-	mgr, err := New(CredentialManagerConfig{Path: t.TempDir(), DefaultIdentity: auth.AgentIdentity{Name: "configured-agent"}, AuthClient: newTestAuthClient(t)})
+	mgr, err := New(CredentialManagerConfig{Path: t.TempDir(), DefaultIdentity: auth.AgentIdentity{Name: "configured-agent"}, AuthClient: newTestAuthClient(t), OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -630,7 +859,7 @@ func TestSaveIdentityClearsToken(t *testing.T) {
 	if err := os.WriteFile(tokenPath, []byte(testJWT(t, validClaims())), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})
+	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t), OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -645,7 +874,7 @@ func TestSaveIdentityClearsToken(t *testing.T) {
 
 func TestClearIdentityRemovesIdentityAndToken(t *testing.T) {
 	dir := t.TempDir()
-	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t)})
+	mgr, err := New(CredentialManagerConfig{Path: dir, DefaultIdentity: auth.AgentIdentity{Name: "anonymous"}, AuthClient: newTestAuthClient(t), OBOAuthorizer: &fakeOBOAuthorizer{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -684,6 +913,9 @@ func newTestManagerWithConfig(t *testing.T, dir string, cfg CredentialManagerCon
 		cfg.DefaultIdentity = auth.AgentIdentity{Name: "anonymous"}
 	}
 	cfg.AuthClient = c
+	if cfg.OBOAuthorizer == nil {
+		cfg.OBOAuthorizer = &fakeOBOAuthorizer{}
+	}
 	mgr, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -724,15 +956,15 @@ func (i testInvocation) ErrOrStderr() io.Writer {
 }
 
 type fakeOBOAuthorizer struct {
-	token     agent.Token
+	token     string
 	baseToken agent.Token
 	callCount int
 }
 
-func (a *fakeOBOAuthorizer) AuthorizeOBO(inv agentauth.Invocation, identity auth.AgentIdentity, baseToken agent.Token) (agent.Token, error) {
+func (a *fakeOBOAuthorizer) AuthorizeOBO(inv agentauth.Invocation, identity auth.AgentIdentity, baseToken agent.Token) (auth.AgentTokenResponse, error) {
 	a.callCount++
 	a.baseToken = baseToken
-	return a.token, nil
+	return auth.AgentTokenResponse{Token: a.token}, nil
 }
 
 func testAgentIdentity() auth.AgentIdentity {
@@ -758,14 +990,15 @@ func validClaims(mutators ...func(agent.Claims) agent.Claims) agent.Claims {
 	return claims
 }
 
-func expiredClaims() agent.Claims {
-	return validClaims(func(c agent.Claims) agent.Claims {
+func expiredClaims(mutators ...func(agent.Claims) agent.Claims) agent.Claims {
+	mutators = append([]func(agent.Claims) agent.Claims{func(c agent.Claims) agent.Claims {
 		c.ExpiresAt = jwt.NewNumericDate(time.Now().Add(-time.Minute))
 		c.IssuedAt = jwt.NewNumericDate(time.Now().Add(-time.Hour))
 		c.NotBefore = jwt.NewNumericDate(time.Now().Add(-time.Minute))
 
 		return c
-	})
+	}}, mutators...)
+	return validClaims(mutators...)
 }
 
 func testJWT(t *testing.T, claims agent.Claims) string {
