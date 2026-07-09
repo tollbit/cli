@@ -36,6 +36,7 @@ type (
 		State               string `json:"state"`
 		CodeChallenge       string `json:"code_challenge"`
 		CodeChallengeMethod string `json:"code_challenge_method"`
+		Scope               string `json:"scope,omitempty"`
 	}
 
 	ConsentRedirectStartResponse struct {
@@ -45,9 +46,27 @@ type (
 	}
 
 	ConsentRedirectTokenRequest struct {
-		Code         string `json:"code"`
-		CodeVerifier string `json:"code_verifier"`
-		RedirectURI  string `json:"redirect_uri"`
+		AgentIdentifier string      `json:"agent_identifier"`
+		Code            string      `json:"code"`
+		CodeVerifier    string      `json:"code_verifier"`
+		RedirectURI     string      `json:"redirect_uri"`
+		UA              *string     `json:"ua,omitempty"`
+		WBA             *WebBotAuth `json:"wba,omitempty"`
+	}
+
+	RefreshTokenGrantRequest struct {
+		AgentIdentifier string
+		RefreshToken    string
+		UA              *string
+		WBA             *WebBotAuth
+	}
+
+	RevokeRefreshTokenRequest struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+
+	RevokeRefreshTokenResponse struct {
+		Revoked bool `json:"revoked"`
 	}
 
 	WebBotAuth struct {
@@ -57,14 +76,28 @@ type (
 	}
 
 	AgentTokenRequest struct {
+		GrantType       string      `json:"grant_type"`
 		AgentIdentifier string      `json:"agent_identifier"`
 		TTLSeconds      *int32      `json:"ttl_seconds,omitempty"`
 		UA              *string     `json:"ua,omitempty"`
 		WBA             *WebBotAuth `json:"wba,omitempty"`
 	}
 
-	agentTokenResponse struct {
-		Token string `json:"token"`
+	AgentTokenResponse struct {
+		Token                 string  `json:"token"`
+		RefreshToken          *string `json:"refresh_token,omitempty"`
+		RefreshTokenExpiresAt *string `json:"refresh_token_expires_at,omitempty"`
+	}
+
+	identityTokenRequest struct {
+		GrantType       string      `json:"grant_type"`
+		AgentIdentifier string      `json:"agent_identifier"`
+		Code            string      `json:"code,omitempty"`
+		CodeVerifier    string      `json:"code_verifier,omitempty"`
+		RedirectURI     string      `json:"redirect_uri,omitempty"`
+		RefreshToken    string      `json:"refresh_token,omitempty"`
+		UA              *string     `json:"ua,omitempty"`
+		WBA             *WebBotAuth `json:"wba,omitempty"`
 	}
 
 	Client struct {
@@ -101,6 +134,7 @@ func (c *Client) CreateAgentToken(ctx context.Context, identity AgentIdentity, o
 	}
 
 	req := AgentTokenRequest{
+		GrantType:       "self_attested",
 		AgentIdentifier: identity.Name,
 		TTLSeconds:      opts.TTLSeconds,
 		UA:              ua,
@@ -108,7 +142,7 @@ func (c *Client) CreateAgentToken(ctx context.Context, identity AgentIdentity, o
 	}
 
 	u := c.resolve("/agent/v1/tokens/identity")
-	var out agentTokenResponse
+	var out AgentTokenResponse
 	if err := c.doJSON(ctx, http.MethodPost, u.String(), req, &out, withUserAgent(identity.UserAgent)); err != nil {
 		return agent.Token{}, err
 	}
@@ -140,26 +174,86 @@ func (c *Client) StartAgentConsentRedirect(ctx context.Context, token agent.Toke
 	return out, nil
 }
 
-func (c *Client) RedeemAgentConsentRedirect(ctx context.Context, token agent.Token, req ConsentRedirectTokenRequest) (agent.Token, error) {
+func (c *Client) RedeemAgentConsentRedirect(ctx context.Context, token agent.Token, req ConsentRedirectTokenRequest) (AgentTokenResponse, error) {
 	if strings.TrimSpace(token.RawToken) == "" {
-		return agent.Token{}, errors.New("agent token is required")
+		return AgentTokenResponse{}, errors.New("agent token is required")
 	}
 	if strings.TrimSpace(req.Code) == "" {
-		return agent.Token{}, errors.New("authorization code is required")
+		return AgentTokenResponse{}, errors.New("authorization code is required")
 	}
 	if strings.TrimSpace(req.CodeVerifier) == "" {
-		return agent.Token{}, errors.New("code verifier is required")
+		return AgentTokenResponse{}, errors.New("code verifier is required")
 	}
 	if strings.TrimSpace(req.RedirectURI) == "" {
-		return agent.Token{}, errors.New("redirect uri is required")
+		return AgentTokenResponse{}, errors.New("redirect uri is required")
+	}
+	if strings.TrimSpace(req.AgentIdentifier) == "" {
+		return AgentTokenResponse{}, errors.New("agent identifier is required")
 	}
 
-	u := c.resolve("/agent/v1/consent/redirect/token")
-	var out agentTokenResponse
-	if err := c.doJSON(ctx, http.MethodPost, u.String(), req, &out, withBearerToken(token)); err != nil {
-		return agent.Token{}, err
+	body := identityTokenRequest{
+		GrantType:       "consent",
+		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
+		Code:            req.Code,
+		CodeVerifier:    req.CodeVerifier,
+		RedirectURI:     req.RedirectURI,
+		UA:              req.UA,
+		WBA:             req.WBA,
 	}
-	return agent.Token{RawToken: out.Token}, nil
+	u := c.resolve("/agent/v1/tokens/identity")
+	var out AgentTokenResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(token), withOptionalUserAgent(req.UA)); err != nil {
+		return AgentTokenResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *Client) RefreshAgentToken(ctx context.Context, baseToken agent.Token, req RefreshTokenGrantRequest) (AgentTokenResponse, error) {
+	if strings.TrimSpace(baseToken.RawToken) == "" {
+		return AgentTokenResponse{}, errors.New("agent token is required")
+	}
+	if strings.TrimSpace(req.AgentIdentifier) == "" {
+		return AgentTokenResponse{}, errors.New("agent identifier is required")
+	}
+	if strings.TrimSpace(req.RefreshToken) == "" {
+		return AgentTokenResponse{}, errors.New("refresh token is required")
+	}
+
+	body := identityTokenRequest{
+		GrantType:       "refresh_token",
+		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
+		RefreshToken:    strings.TrimSpace(req.RefreshToken),
+		UA:              req.UA,
+		WBA:             req.WBA,
+	}
+	u := c.resolve("/agent/v1/tokens/identity")
+	var out AgentTokenResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(baseToken), withOptionalUserAgent(req.UA)); err != nil {
+		return AgentTokenResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *Client) RevokeRefreshToken(ctx context.Context, refreshToken string) (RevokeRefreshTokenResponse, error) {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return RevokeRefreshTokenResponse{}, errors.New("refresh token is required")
+	}
+
+	u := c.resolve("/agent/v1/tokens/refresh/revoke")
+	var out RevokeRefreshTokenResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), RevokeRefreshTokenRequest{RefreshToken: refreshToken}, &out); err != nil {
+		return RevokeRefreshTokenResponse{}, err
+	}
+	return out, nil
+}
+
+func withOptionalUserAgent(userAgent *string) requestOption {
+	return func(req *http.Request) {
+		if userAgent != nil && *userAgent != "" {
+			req.Header.Set("User-Agent", *userAgent)
+		}
+	}
 }
 
 func withUserAgent(userAgent string) requestOption {
@@ -270,7 +364,7 @@ func logRequest(ctx context.Context, req *http.Request, body []byte) {
 		e = e.Str("authorization", redactSecret(token))
 	}
 	if len(body) > 0 {
-		e = e.Str("request_body", string(body))
+		e = e.Str("request_body", redactLogBody(body))
 	}
 	e.Msg("auth request")
 }
@@ -293,7 +387,7 @@ func logResponse(ctx context.Context, method, rawURL string, reqBody []byte, sta
 			Str("status", status).
 			Str("response_body", loggedBody)
 		if len(reqBody) > 0 {
-			e = e.Str("request_body", string(reqBody))
+			e = e.Str("request_body", redactLogBody(reqBody))
 		}
 		e.Msg("auth response error")
 	}
@@ -308,11 +402,13 @@ func redactLogBody(body []byte) string {
 	if err := json.Unmarshal(body, &m); err != nil {
 		return truncateLog(s)
 	}
-	if tok, ok := m["token"]; ok {
-		raw := strings.TrimSpace(string(tok))
-		redacted, err := json.Marshal(redactSecret(strings.Trim(raw, `"`)))
-		if err == nil {
-			m["token"] = redacted
+	for _, key := range []string{"token", "refresh_token"} {
+		if tok, ok := m[key]; ok {
+			raw := strings.TrimSpace(string(tok))
+			redacted, err := json.Marshal(redactSecret(strings.Trim(raw, `"`)))
+			if err == nil {
+				m[key] = redacted
+			}
 		}
 	}
 	encoded, err := json.Marshal(m)

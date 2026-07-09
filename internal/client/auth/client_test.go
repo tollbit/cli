@@ -50,7 +50,7 @@ func TestClientCreatesAgentToken(t *testing.T) {
 		}
 
 		sawRequest = true
-		_ = json.NewEncoder(w).Encode(agentTokenResponse{Token: "agent-token"})
+		_ = json.NewEncoder(w).Encode(AgentTokenResponse{Token: "agent-token"})
 	}))
 	defer srv.Close()
 
@@ -89,7 +89,7 @@ func TestClientOmitsOptionalUserAgent(t *testing.T) {
 		if _, ok := body["ua"]; ok {
 			t.Fatalf("expected ua to be omitted, got %#v", body["ua"])
 		}
-		_ = json.NewEncoder(w).Encode(agentTokenResponse{Token: "agent-token"})
+		_ = json.NewEncoder(w).Encode(AgentTokenResponse{Token: "agent-token"})
 	}))
 	defer srv.Close()
 
@@ -161,7 +161,7 @@ func TestClientStartAgentConsentRedirect(t *testing.T) {
 func TestClientRedeemAgentConsentRedirect(t *testing.T) {
 	var sawRequest bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/consent/redirect/token" {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/tokens/identity" {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
 		}
 		if r.Header.Get("Authorization") != "Bearer unlinked-token" {
@@ -171,11 +171,11 @@ func TestClientRedeemAgentConsentRedirect(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if body.Code != "code" || body.CodeVerifier != "verifier" || body.RedirectURI != "http://127.0.0.1:1234/callback" {
+		if body.AgentIdentifier != "agent-test" || body.Code != "code" || body.CodeVerifier != "verifier" || body.RedirectURI != "http://127.0.0.1:1234/callback" {
 			t.Fatalf("unexpected body: %#v", body)
 		}
 		sawRequest = true
-		_ = json.NewEncoder(w).Encode(agentTokenResponse{Token: "linked-token"})
+		_ = json.NewEncoder(w).Encode(AgentTokenResponse{Token: "linked-token"})
 	}))
 	defer srv.Close()
 
@@ -183,16 +183,87 @@ func TestClientRedeemAgentConsentRedirect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, err := c.RedeemAgentConsentRedirect(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentRedirectTokenRequest{
-		Code:         "code",
-		CodeVerifier: "verifier",
-		RedirectURI:  "http://127.0.0.1:1234/callback",
+	resp, err := c.RedeemAgentConsentRedirect(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentRedirectTokenRequest{
+		AgentIdentifier: "agent-test",
+		Code:            "code",
+		CodeVerifier:    "verifier",
+		RedirectURI:     "http://127.0.0.1:1234/callback",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sawRequest || token.RawToken != "linked-token" {
-		t.Fatalf("unexpected token: %#v", token)
+	if !sawRequest || resp.Token != "linked-token" {
+		t.Fatalf("unexpected token response: %#v", resp)
+	}
+}
+
+func TestClientRefreshAgentToken(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/tokens/identity" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		if r.Header.Get("Authorization") != "Bearer base-token" {
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+		var body identityTokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.GrantType != "refresh_token" || body.AgentIdentifier != "agent-test" || body.RefreshToken != "agrt_old" {
+			t.Fatalf("unexpected body: %#v", body)
+		}
+		sawRequest = true
+		newRefreshToken := "agrt_new"
+		refreshExpiresAt := "2026-07-08T12:00:00Z"
+		_ = json.NewEncoder(w).Encode(AgentTokenResponse{Token: "new-obo-token", RefreshToken: &newRefreshToken, RefreshTokenExpiresAt: &refreshExpiresAt})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.RefreshAgentToken(context.Background(), agent.Token{RawToken: "base-token"}, RefreshTokenGrantRequest{
+		AgentIdentifier: "agent-test",
+		RefreshToken:    "agrt_old",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawRequest || resp.Token != "new-obo-token" || resp.RefreshToken == nil || *resp.RefreshToken != "agrt_new" {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+}
+
+func TestClientRevokesRefreshToken(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/tokens/refresh/revoke" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		var body RevokeRefreshTokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.RefreshToken != "agrt_old" {
+			t.Fatalf("unexpected body: %#v", body)
+		}
+		sawRequest = true
+		_ = json.NewEncoder(w).Encode(RevokeRefreshTokenResponse{Revoked: true})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.RevokeRefreshToken(context.Background(), " agrt_old ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawRequest || !resp.Revoked {
+		t.Fatalf("unexpected response: %#v", resp)
 	}
 }
 

@@ -93,10 +93,11 @@ func (a *App) buildOBOAuthorizer() (agentauth.OBOAuthorizer, error) {
 	}
 	browserConsent := a.config.Auth.BrowserConsent
 	authorizer, err := agentauth.NewBrowserConsentAuthorizer(agentauth.BrowserConsentAuthorizerConfig{
-		AuthClient:      authClient,
-		CallbackAddress: browserConsent.CallbackAddress,
-		AutoOpenBrowser: browserConsent.AutoOpenBrowser,
-		Timeout:         browserConsent.Timeout,
+		AuthClient:       authClient,
+		CallbackAddress:  browserConsent.CallbackAddress,
+		AutoOpenBrowser:  browserConsent.AutoOpenBrowser,
+		Timeout:          browserConsent.Timeout,
+		UseRefreshTokens: a.config.Auth.UseRefreshTokens,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build OBO authorizer: %w", err)
@@ -130,9 +131,10 @@ func (a *App) buildCredentials() (*agenttoken.CredentialManager, error) {
 			Name:      a.config.Agent.DefaultName,
 			UserAgent: a.config.Agent.DefaultUserAgent,
 		},
-		TokenOptions:  tokenOptions,
-		AuthClient:    authClient,
-		OBOAuthorizer: oboAuthorizer,
+		TokenOptions:     tokenOptions,
+		AuthClient:       authClient,
+		OBOAuthorizer:    oboAuthorizer,
+		UseRefreshTokens: a.config.Auth.UseRefreshTokens,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build credentials: %w", err)

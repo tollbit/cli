@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var testDefaultConfig = []byte("app:\n  name: tollbit\nauth:\n  base_url: https://oauth.tollbit.com\n  retry_on_obo_required: true\n  token_ttl_seconds: 0\n  browser_consent:\n    callback_address: 127.0.0.1:54321\n    timeout: 3m\n    auto_open_browser: true\nagent:\n  default_name: anonymous\n  default_user_agent: \"\"\ncredentials:\n  storage_dir: __default__\ngateway:\n  base_url: https://gateway.tollbit.com\n")
+var testDefaultConfig = []byte("app:\n  name: tollbit\nauth:\n  base_url: https://oauth.tollbit.com\n  retry_on_obo_required: true\n  token_ttl_seconds: 0\n  use_refresh_tokens: true\n  browser_consent:\n    callback_address: 127.0.0.1:54321\n    timeout: 3m\n    auto_open_browser: true\nagent:\n  default_name: anonymous\n  default_user_agent: \"\"\ncredentials:\n  storage_dir: __default__\ngateway:\n  base_url: https://gateway.tollbit.com\n")
 
 func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
 	config := assembleTestConfiguration(t, t.TempDir())
@@ -20,6 +20,9 @@ func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
 	}
 	if config.Auth.BrowserConsent.Timeout != 3*time.Minute {
 		t.Fatalf("expected browser consent timeout default, got %s", config.Auth.BrowserConsent.Timeout)
+	}
+	if !config.Auth.UseRefreshTokens {
+		t.Fatal("expected refresh tokens enabled by default")
 	}
 	if config.Credentials.StorageDir == "" || config.Credentials.StorageDir == "__default__" {
 		t.Fatalf("expected resolved credentials storage dir, got %q", config.Credentials.StorageDir)
