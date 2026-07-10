@@ -7,11 +7,14 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/tollbit/tollbit-cli/internal/installmethod"
 )
 
-// updateWarningHeader is set by the backend when this CLI version is outdated
-// but still supported.
-const updateWarningHeader = "X-Tollbit-Cli-Warning"
+// latestVersionHeader is set by the backend when this CLI version is outdated
+// but still supported. The update message is composed locally because the
+// right remediation command depends on how the CLI was installed.
+const latestVersionHeader = "X-Tollbit-Cli-Latest-Version"
 
 var (
 	updateWarnOnce sync.Once
@@ -19,14 +22,14 @@ var (
 	updateWarnWriter io.Writer = os.Stderr
 )
 
-// notifyUpdateWarning prints the server-provided update notice at most once
-// per process, on stderr so machine-readable stdout stays clean.
+// notifyUpdateWarning prints an install-method-aware update notice at most
+// once per process, on stderr so machine-readable stdout stays clean.
 func notifyUpdateWarning(headers http.Header) {
-	msg := strings.TrimSpace(headers.Get(updateWarningHeader))
-	if msg == "" {
+	latest := strings.TrimSpace(headers.Get(latestVersionHeader))
+	if latest == "" {
 		return
 	}
 	updateWarnOnce.Do(func() {
-		fmt.Fprintln(updateWarnWriter, msg)
+		fmt.Fprintln(updateWarnWriter, installmethod.UpdateInstructions(installmethod.Detect(), latest))
 	})
 }

@@ -174,6 +174,9 @@ TEMP_DEST="${DEST_PATH}.tmp.$$"
 install -m 0755 "${EXTRACTED_BIN}" "${TEMP_DEST}"
 mv -f "${TEMP_DEST}" "${DEST_PATH}"
 
+# Record the install method so the CLI can show the right update command.
+printf 'installer\n' > "${INSTALL_DIR}/.tollbit-install-method" || true
+
 PATH_ENTRY_PRESENT=0
 case ":${PATH}:" in
   *:"${INSTALL_DIR}":*) PATH_ENTRY_PRESENT=1 ;;

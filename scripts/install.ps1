@@ -108,6 +108,9 @@ function Install-Tollbit {
         Copy-Item -Path $extractedBin -Destination $tmpDest -Force
         Move-Item -Path $tmpDest -Destination $destPath -Force
 
+        # Record the install method so the CLI can show the right update command.
+        Set-Content -Path (Join-Path $InstallDir ".tollbit-install-method") -Value "installer"
+
         $pathUpdated = $false
         if (-not $NoModifyPath) {
             $pathUpdated = Ensure-UserPathContains -PathEntry $InstallDir

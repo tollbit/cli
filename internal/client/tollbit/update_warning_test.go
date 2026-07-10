@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
+	"github.com/tollbit/tollbit-cli/internal/installmethod"
 	"github.com/tollbit/tollbit-cli/internal/version"
 )
 
@@ -53,11 +54,11 @@ func TestClientVersionHeaderSent(t *testing.T) {
 
 func TestUpdateWarningPrintedOncePerProcess(t *testing.T) {
 	buf := captureUpdateWarnings(t)
-	const warning = "A new version of the TollBit CLI is available. Run: npm update -g @tollbit/cli"
+	t.Setenv(installmethod.EnvVar, "npm")
 
 	token := validAgentToken(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Tollbit-Cli-Warning", warning)
+		w.Header().Set("X-Tollbit-Cli-Latest-Version", "0.2.0")
 		_ = json.NewEncoder(w).Encode(PagedSearchResultResponse{})
 	}))
 	defer srv.Close()
@@ -72,12 +73,16 @@ func TestUpdateWarningPrintedOncePerProcess(t *testing.T) {
 		}
 	}
 
-	if got, want := buf.String(), warning+"\n"; got != want {
+	want := installmethod.UpdateInstructions(installmethod.MethodNPM, "0.2.0") + "\n"
+	if got := buf.String(); got != want {
 		t.Fatalf("warning output = %q, want it printed exactly once as %q", got, want)
+	}
+	if !strings.Contains(buf.String(), "npm update -g @tollbit/cli") {
+		t.Fatalf("warning %q should carry the npm update command", buf.String())
 	}
 }
 
-func TestNoUpdateWarningHeaderPrintsNothing(t *testing.T) {
+func TestNoLatestVersionHeaderPrintsNothing(t *testing.T) {
 	buf := captureUpdateWarnings(t)
 
 	token := validAgentToken(t)
@@ -100,18 +105,18 @@ func TestNoUpdateWarningHeaderPrintsNothing(t *testing.T) {
 }
 
 func TestUpdateRequiredBlocksWithProblemJSON(t *testing.T) {
-	const detail = "This version of the TollBit CLI is no longer supported. Run: npm update -g @tollbit/cli"
-
 	token := validAgentToken(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(http.StatusUpgradeRequired)
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"type":   "about:blank",
-			"title":  "Upgrade Required",
-			"status": http.StatusUpgradeRequired,
-			"detail": detail,
-			"code":   "cli_update_required",
+			"type":           "about:blank",
+			"title":          "Upgrade Required",
+			"status":         http.StatusUpgradeRequired,
+			"detail":         "TollBit CLI version 0.0.1 is below the minimum supported version 0.1.0. Update the CLI to continue.",
+			"code":           "cli_update_required",
+			"minimumVersion": "0.1.0",
+			"latestVersion":  "0.2.0",
 		})
 	}))
 	defer srv.Close()
@@ -132,13 +137,16 @@ func TestUpdateRequiredBlocksWithProblemJSON(t *testing.T) {
 	if problem.Status != http.StatusUpgradeRequired {
 		t.Fatalf("problem status = %d, want %d", problem.Status, http.StatusUpgradeRequired)
 	}
-	if problem.Code == nil || *problem.Code != problemjson.ErrorCode("cli_update_required") {
+	if !problem.IsCLIUpdateRequired() {
 		t.Fatalf("problem code = %v, want cli_update_required", problem.Code)
 	}
 	if problem.IsOBORequired() {
 		t.Fatal("426 must not be classified as obo_required (would trigger token retry)")
 	}
-	if !strings.Contains(err.Error(), detail) {
-		t.Fatalf("error %q should contain server-provided detail", err.Error())
+	if minimum, ok := problem.StringProperty("minimumVersion"); !ok || minimum != "0.1.0" {
+		t.Fatalf("minimumVersion = %q (ok=%v), want 0.1.0", minimum, ok)
+	}
+	if latest, ok := problem.StringProperty("latestVersion"); !ok || latest != "0.2.0" {
+		t.Fatalf("latestVersion = %q (ok=%v), want 0.2.0", latest, ok)
 	}
 }

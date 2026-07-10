@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
+	"github.com/tollbit/tollbit-cli/internal/installmethod"
 )
 
 type ExitError struct {
@@ -42,4 +45,17 @@ func ExitCode(err error) int {
 		return 2
 	}
 	return 1
+}
+
+// RenderError returns the user-facing message for a command error. Backend
+// "CLI update required" rejections are rewritten into an update instruction
+// matching this binary's install method; everything else renders as-is.
+func RenderError(err error) string {
+	var problem problemjson.Problem
+	if errors.As(err, &problem) && problem.IsCLIUpdateRequired() {
+		minimum, _ := problem.StringProperty("minimumVersion")
+		latest, _ := problem.StringProperty("latestVersion")
+		return installmethod.RequiredInstructions(installmethod.Detect(), minimum, latest)
+	}
+	return err.Error()
 }
