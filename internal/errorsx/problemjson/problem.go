@@ -16,6 +16,9 @@ const (
 	// ErrorCodeUserAgentNotRegistered means the user agent is not registered for
 	// content access token creation.
 	ErrorCodeUserAgentNotRegistered ErrorCode = "user_agent_not_registered"
+	// ErrorCodeCLIUpdateRequired means the backend rejected this CLI version as
+	// below the minimum supported version; the user must update to continue.
+	ErrorCodeCLIUpdateRequired ErrorCode = "cli_update_required"
 )
 
 // Problem is the CLI-local representation of the ProblemJSON shape returned by
@@ -99,6 +102,25 @@ func (p Problem) IsOBORequired() bool {
 // user_agent_not_registered error code.
 func (p Problem) IsUserAgentNotRegistered() bool {
 	return p.Code != nil && *p.Code == ErrorCodeUserAgentNotRegistered
+}
+
+// IsCLIUpdateRequired reports whether the problem has the cli_update_required
+// error code.
+func (p Problem) IsCLIUpdateRequired() bool {
+	return p.Code != nil && *p.Code == ErrorCodeCLIUpdateRequired
+}
+
+// StringProperty returns a top-level additional property as a string.
+func (p Problem) StringProperty(key string) (string, bool) {
+	raw, ok := p.AdditionalProperties[key]
+	if !ok {
+		return "", false
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", false
+	}
+	return value, true
 }
 
 // RequiredOBO parses the required.obo.org/user extension returned with

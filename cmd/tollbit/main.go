@@ -39,7 +39,7 @@ func main() {
 	rootCmd.SetErr(os.Stderr)
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		fmt.Fprintln(rootCmd.ErrOrStderr(), err)
+		fmt.Fprintln(rootCmd.ErrOrStderr(), cli.RenderError(err))
 		os.Exit(cli.ExitCode(err))
 	}
 }

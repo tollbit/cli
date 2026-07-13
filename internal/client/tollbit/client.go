@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/tollbit/tollbit-cli/internal/errorsx"
 	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/tollbit-cli/internal/version"
 )
 
 type (
@@ -360,6 +361,7 @@ func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 		return err
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-Tollbit-Client", version.ClientHeader())
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -383,6 +385,7 @@ func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return errorsx.ParseResponseError(ctx, resp.Status, resp.StatusCode, resp.Header, respBody)
 	}
+	notifyUpdateWarning(resp.Header)
 	if out == nil {
 		return nil
 	}
