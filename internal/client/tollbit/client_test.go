@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
 	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/tollbit-cli/internal/version"
 )
 
 func TestConfigNormalize(t *testing.T) {
@@ -56,6 +57,9 @@ func TestSearch(t *testing.T) {
 		}
 		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
 			t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("User-Agent") != version.HTTPUserAgent() {
+			t.Fatalf("unexpected user agent: %q", r.Header.Get("User-Agent"))
 		}
 		_ = json.NewEncoder(w).Encode(PagedSearchResultResponse{
 			NextToken: "page-3",
@@ -117,6 +121,9 @@ func TestBatchGetRates(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
 			t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
 		}
+		if r.Header.Get("User-Agent") != version.HTTPUserAgent() {
+			t.Fatalf("unexpected user agent: %q", r.Header.Get("User-Agent"))
+		}
 		var req BatchGetRateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatal(err)
@@ -138,7 +145,7 @@ func TestBatchGetRates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := c.BatchGetRates(context.Background(), urls, token, "MyAgent-User")
+	resp, err := c.BatchGetRates(context.Background(), urls, token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +162,7 @@ func TestBatchGetRatesRequiresURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.BatchGetRates(context.Background(), nil, validAgentToken(t), "")
+	_, err = c.BatchGetRates(context.Background(), nil, validAgentToken(t))
 	if err == nil || !strings.Contains(err.Error(), "at least one URL is required") {
 		t.Fatalf("expected URL required error, got %v", err)
 	}
@@ -220,7 +227,7 @@ func TestCreateContentAccessToken(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
 			t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
 		}
-		if r.Header.Get("User-Agent") != "MyAgent-User" {
+		if r.Header.Get("User-Agent") != version.HTTPUserAgent() {
 			t.Fatalf("unexpected user agent: %q", r.Header.Get("User-Agent"))
 		}
 		var req CreateContentAccessTokenRequest
@@ -246,7 +253,7 @@ func TestCreateContentAccessToken(t *testing.T) {
 		LicenseType:    "ON_DEMAND_LICENSE",
 		LicenseCuid:    "lic_1",
 		Format:         "markdown",
-	}, token, "MyAgent-User")
+	}, token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,22 +262,50 @@ func TestCreateContentAccessToken(t *testing.T) {
 	}
 }
 
+func TestCreateContentAccessTokenOmitsUserAgent(t *testing.T) {
+	token := validAgentToken(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := req["userAgent"]; ok {
+			t.Fatalf("expected userAgent to be omitted, got %#v", req["userAgent"])
+		}
+		_ = json.NewEncoder(w).Encode(CreateContentAccessTokenResponse{Token: "content-jwt"})
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Config{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.CreateContentAccessToken(context.Background(), CreateContentAccessTokenRequest{
+		URL:            "https://example.com/article",
+		MaxPriceMicros: 50000,
+		Currency:       "USD",
+		LicenseType:    "ON_DEMAND_LICENSE",
+		LicenseCuid:    "lic_1",
+		Format:         "markdown",
+	}, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGetContent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/dev/v2/content/example.com/article" {
+		if r.Method != http.MethodGet || r.URL.Path != "/agents/v1/content/example.com/article" {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("TollbitToken") != "content-jwt" {
-			t.Fatalf("unexpected tollbit token: %q", r.Header.Get("TollbitToken"))
+		if r.Header.Get("Tollbit-Token") != "content-jwt" {
+			t.Fatalf("unexpected tollbit token: %q", r.Header.Get("Tollbit-Token"))
 		}
 		if r.Header.Get("Tollbit-User-Agent") != "MyAgent-User" {
 			t.Fatalf("unexpected tollbit user agent: %q", r.Header.Get("Tollbit-User-Agent"))
 		}
-		if r.Header.Get("User-Agent") != "MyAgent-User/1.0" {
+		if r.Header.Get("User-Agent") != version.HTTPUserAgent() {
 			t.Fatalf("unexpected user agent: %q", r.Header.Get("User-Agent"))
-		}
-		if r.Header.Get("Tollbit-Accept-Content") != "text/markdown" {
-			t.Fatalf("unexpected accept content: %q", r.Header.Get("Tollbit-Accept-Content"))
 		}
 		_ = json.NewEncoder(w).Encode(GetContentResponse{
 			Content: PageContent{Body: "article body"},
@@ -293,7 +328,7 @@ func TestGetContent(t *testing.T) {
 
 func TestGetContentStripsTrailingSlash(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/dev/v2/content/example.com/article" {
+		if r.URL.Path != "/agents/v1/content/example.com/article" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		_ = json.NewEncoder(w).Encode(GetContentResponse{Content: PageContent{Body: "ok"}})
@@ -310,15 +345,12 @@ func TestGetContentStripsTrailingSlash(t *testing.T) {
 	}
 }
 
-func TestListUserAgents(t *testing.T) {
-	token := validAgentToken(t)
+func TestGetContentOmitsTollbitUserAgent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/agents/v1/user-agents" {
-			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		if r.Header.Get("Tollbit-User-Agent") != "" {
+			t.Fatalf("expected empty tollbit user agent, got %q", r.Header.Get("Tollbit-User-Agent"))
 		}
-		_ = json.NewEncoder(w).Encode([]UserAgentResponse{{
-			Cuid: "ua_1", OrgCuid: "org_1", UserAgent: "MyAgent-User",
-		}})
+		_ = json.NewEncoder(w).Encode(GetContentResponse{Content: PageContent{Body: "ok"}})
 	}))
 	defer srv.Close()
 
@@ -326,27 +358,8 @@ func TestListUserAgents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := c.ListUserAgents(context.Background(), token)
+	_, err = c.GetContent(context.Background(), "https://example.com/article", "content-jwt", "")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(resp) != 1 || resp[0].UserAgent != "MyAgent-User" {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-}
-
-func TestContentRequestUserAgent(t *testing.T) {
-	tests := []struct {
-		in   string
-		want string
-	}{
-		{"MyAgent-User", "MyAgent-User/1.0"},
-		{"MyAgent-User/1.0", "MyAgent-User/1.0"},
-		{"", ""},
-	}
-	for _, tc := range tests {
-		if got := contentRequestUserAgent(tc.in); got != tc.want {
-			t.Fatalf("contentRequestUserAgent(%q) = %q, want %q", tc.in, got, tc.want)
-		}
 	}
 }

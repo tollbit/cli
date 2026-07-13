@@ -144,7 +144,7 @@ func (c *Client) CreateAgentToken(ctx context.Context, identity AgentIdentity, o
 
 	u := c.resolve("/agent/v1/tokens/identity")
 	var out AgentTokenResponse
-	if err := c.doJSON(ctx, http.MethodPost, u.String(), req, &out, withUserAgent(identity.UserAgent)); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), req, &out); err != nil {
 		return agent.Token{}, err
 	}
 	return agent.Token{RawToken: out.Token}, nil
@@ -203,7 +203,7 @@ func (c *Client) RedeemAgentConsentRedirect(ctx context.Context, token agent.Tok
 	}
 	u := c.resolve("/agent/v1/tokens/identity")
 	var out AgentTokenResponse
-	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(token), withOptionalUserAgent(req.UA)); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(token)); err != nil {
 		return AgentTokenResponse{}, err
 	}
 	return out, nil
@@ -229,7 +229,7 @@ func (c *Client) RefreshAgentToken(ctx context.Context, baseToken agent.Token, r
 	}
 	u := c.resolve("/agent/v1/tokens/identity")
 	var out AgentTokenResponse
-	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(baseToken), withOptionalUserAgent(req.UA)); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(baseToken)); err != nil {
 		return AgentTokenResponse{}, err
 	}
 	return out, nil
@@ -247,22 +247,6 @@ func (c *Client) RevokeRefreshToken(ctx context.Context, refreshToken string) (R
 		return RevokeRefreshTokenResponse{}, err
 	}
 	return out, nil
-}
-
-func withOptionalUserAgent(userAgent *string) requestOption {
-	return func(req *http.Request) {
-		if userAgent != nil && *userAgent != "" {
-			req.Header.Set("User-Agent", *userAgent)
-		}
-	}
-}
-
-func withUserAgent(userAgent string) requestOption {
-	return func(req *http.Request) {
-		if userAgent != "" {
-			req.Header.Set("User-Agent", userAgent)
-		}
-	}
 }
 
 func withBearerToken(token agent.Token) requestOption {
@@ -286,6 +270,7 @@ func (c *Client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Tollbit-Client", version.ClientHeader())
+	req.Header.Set("User-Agent", version.HTTPUserAgent())
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

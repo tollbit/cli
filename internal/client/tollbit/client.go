@@ -25,10 +25,9 @@ type (
 
 	Client interface {
 		Search(ctx context.Context, params SearchParams, token agent.Token) (PagedSearchResultResponse, error)
-		BatchGetRates(ctx context.Context, urls []string, token agent.Token, userAgent string) ([]BatchRateResponseV2, error)
-		CreateContentAccessToken(ctx context.Context, req CreateContentAccessTokenRequest, token agent.Token, userAgent string) (CreateContentAccessTokenResponse, error)
+		BatchGetRates(ctx context.Context, urls []string, token agent.Token) ([]BatchRateResponseV2, error)
+		CreateContentAccessToken(ctx context.Context, req CreateContentAccessTokenRequest, token agent.Token) (CreateContentAccessTokenResponse, error)
 		GetContent(ctx context.Context, articleURL, contentToken, userAgent string) (GetContentResponse, error)
-		ListUserAgents(ctx context.Context, token agent.Token) ([]UserAgentResponse, error)
 	}
 
 	client struct {
@@ -102,7 +101,7 @@ type (
 
 	CreateContentAccessTokenRequest struct {
 		URL            string `json:"url"`
-		UserAgent      string `json:"userAgent"`
+		UserAgent      string `json:"userAgent,omitempty"`
 		MaxPriceMicros int64  `json:"maxPriceMicros"`
 		Currency       string `json:"currency"`
 		LicenseType    string `json:"licenseType"`
@@ -138,12 +137,6 @@ type (
 	ContentRate struct {
 		Price   RatePriceResponse        `json:"price"`
 		License BatchRateLicenseResponse `json:"license"`
-	}
-
-	UserAgentResponse struct {
-		Cuid      string `json:"cuid"`
-		OrgCuid   string `json:"orgCuid"`
-		UserAgent string `json:"userAgent"`
 	}
 
 	requestOption func(*http.Request)
@@ -199,7 +192,7 @@ func (c *client) Search(ctx context.Context, params SearchParams, token agent.To
 	return out, c.doJSON(ctx, http.MethodGet, u.String(), nil, &out, withBearerToken(token.RawToken))
 }
 
-func (c *client) BatchGetRates(ctx context.Context, urls []string, token agent.Token, userAgent string) ([]BatchRateResponseV2, error) {
+func (c *client) BatchGetRates(ctx context.Context, urls []string, token agent.Token) ([]BatchRateResponseV2, error) {
 	if len(urls) == 0 {
 		return nil, errors.New("at least one URL is required")
 	}
@@ -211,26 +204,21 @@ func (c *client) BatchGetRates(ctx context.Context, urls []string, token agent.T
 	var out []BatchRateResponseV2
 	return out, c.doJSON(ctx, http.MethodPost, u.String(), BatchGetRateRequest{URLs: urls}, &out,
 		withBearerToken(token.RawToken),
-		withUserAgent(userAgent),
 	)
 }
 
-func (c *client) CreateContentAccessToken(ctx context.Context, req CreateContentAccessTokenRequest, token agent.Token, userAgent string) (CreateContentAccessTokenResponse, error) {
+func (c *client) CreateContentAccessToken(ctx context.Context, req CreateContentAccessTokenRequest, token agent.Token) (CreateContentAccessTokenResponse, error) {
 	if err := requireAgentToken(token); err != nil {
 		return CreateContentAccessTokenResponse{}, err
 	}
 	if strings.TrimSpace(req.URL) == "" {
 		return CreateContentAccessTokenResponse{}, errors.New("content URL is required")
 	}
-	if strings.TrimSpace(req.UserAgent) == "" {
-		return CreateContentAccessTokenResponse{}, errors.New("user agent is required")
-	}
 
 	u := c.resolve("/agents/v1/tokens/content")
 	var out CreateContentAccessTokenResponse
 	return out, c.doJSON(ctx, http.MethodPost, u.String(), req, &out,
 		withBearerToken(token.RawToken),
-		withUserAgent(userAgent),
 	)
 }
 
@@ -244,7 +232,7 @@ func (c *client) GetContent(ctx context.Context, articleURL, contentToken, userA
 		return GetContentResponse{}, err
 	}
 
-	u := c.resolve("/dev/v2/content/" + escapeContentResourcePath(resourcePath))
+	u := c.resolve("/agents/v1/content/" + escapeContentResourcePath(resourcePath))
 	if parsed, err := url.Parse(strings.TrimSpace(articleURL)); err == nil && parsed.RawQuery != "" {
 		u.RawQuery = parsed.RawQuery
 	}
@@ -252,19 +240,7 @@ func (c *client) GetContent(ctx context.Context, articleURL, contentToken, userA
 	return out, c.doJSON(ctx, http.MethodGet, u.String(), nil, &out,
 		withTollbitToken(contentToken),
 		withTollbitUserAgent(userAgent),
-		withUserAgent(contentRequestUserAgent(userAgent)),
-		withAcceptContent("text/markdown"),
 	)
-}
-
-func (c *client) ListUserAgents(ctx context.Context, token agent.Token) ([]UserAgentResponse, error) {
-	if err := requireAgentToken(token); err != nil {
-		return nil, err
-	}
-
-	u := c.resolve("/agents/v1/user-agents")
-	var out []UserAgentResponse
-	return out, c.doJSON(ctx, http.MethodGet, u.String(), nil, &out, withBearerToken(token.RawToken))
 }
 
 func contentResourcePath(articleURL string) (string, error) {
@@ -310,14 +286,6 @@ func withBearerToken(token string) requestOption {
 	}
 }
 
-func withUserAgent(userAgent string) requestOption {
-	return func(req *http.Request) {
-		if ua := strings.TrimSpace(userAgent); ua != "" {
-			req.Header.Set("User-Agent", ua)
-		}
-	}
-}
-
 func withTollbitUserAgent(userAgent string) requestOption {
 	return func(req *http.Request) {
 		if ua := strings.TrimSpace(userAgent); ua != "" {
@@ -326,28 +294,9 @@ func withTollbitUserAgent(userAgent string) requestOption {
 	}
 }
 
-func contentRequestUserAgent(registeredUserAgent string) string {
-	ua := strings.TrimSpace(registeredUserAgent)
-	if ua == "" {
-		return ""
-	}
-	if strings.Contains(ua, "/") {
-		return ua
-	}
-	return ua + "/1.0"
-}
-
 func withTollbitToken(token string) requestOption {
 	return func(req *http.Request) {
-		req.Header.Set("TollbitToken", token)
-	}
-}
-
-func withAcceptContent(format string) requestOption {
-	return func(req *http.Request) {
-		if f := strings.TrimSpace(format); f != "" {
-			req.Header.Set("Tollbit-Accept-Content", f)
-		}
+		req.Header.Set("Tollbit-Token", token)
 	}
 }
 
@@ -362,6 +311,7 @@ func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Tollbit-Client", version.ClientHeader())
+	req.Header.Set("User-Agent", version.HTTPUserAgent())
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

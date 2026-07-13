@@ -12,7 +12,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tollbit/tollbit-cli/internal/app"
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
 	"github.com/tollbit/tollbit-cli/internal/client/tollbit"
 	"github.com/tollbit/tollbit-cli/internal/credentials/agenttoken"
 	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
@@ -29,18 +28,17 @@ Use --toDisk to save fetched content to a file path.
 When multiple license rates are returned, you will be prompted to choose one
 unless --rate-index is set. With --json and multiple rates, --rate-index is required.
 
-If the configured user agent is not registered for content access, the CLI lists
-available user agents to choose from and saves the selection for future fetches.`
+When no user agent is configured, the org default -tbcli- agent is used.
+Set one with auth set --user-agent or pass --user-agent on this command.`
 
-const createUserAgentURL = "https://hack.tollbit.com/my-agents"
+const registerUserAgentURL = "https://hack.tollbit.com/my-agents"
 
 type fetchOptions struct {
-	confirm        bool
-	toDisk         string
-	rateIndex      int
-	userAgentIndex int
-	userAgent      string
-	asJSON         bool
+	confirm   bool
+	toDisk    string
+	rateIndex int
+	userAgent string
+	asJSON    bool
 }
 
 func newFetchCommand(factory app.Factory) *cobra.Command {
@@ -67,7 +65,6 @@ func newFetchCommand(factory app.Factory) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.confirm, "confirm", false, "skip interactive price confirmation (fetch still charges money)")
 	cmd.Flags().StringVar(&opts.toDisk, "toDisk", "", "write fetched content to the given file path")
 	cmd.Flags().IntVar(&opts.rateIndex, "rate-index", 0, "1-based index when multiple license rates are returned")
-	cmd.Flags().IntVar(&opts.userAgentIndex, "user-agent-index", 0, "1-based index when selecting a registered user agent")
 	cmd.Flags().StringVar(&opts.userAgent, "user-agent", "", "registered TollBit user agent for content fetch")
 	cmd.Flags().BoolVar(&opts.asJSON, "json", false, "emit raw JSON response")
 
@@ -105,14 +102,14 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 	var batchResp []tollbit.BatchRateResponseV2
 	if app.Config().Auth.RetryOnOBORequired {
 		batchResp, err = agenttoken.WithOBORetry(cmd, credentials, identity, func(token agent.Token) ([]tollbit.BatchRateResponseV2, error) {
-			return tollbitClient.BatchGetRates(cmd.Context(), []string{articleURL}, token, identity.UserAgent)
+			return tollbitClient.BatchGetRates(cmd.Context(), []string{articleURL}, token)
 		})
 	} else {
 		token, tokenErr := credentials.GetAgentToken(cmd, identity)
 		if tokenErr != nil {
 			return RuntimeError(fmt.Errorf("error fetching agent token: %w", tokenErr))
 		}
-		batchResp, err = tollbitClient.BatchGetRates(cmd.Context(), []string{articleURL}, token, identity.UserAgent)
+		batchResp, err = tollbitClient.BatchGetRates(cmd.Context(), []string{articleURL}, token)
 	}
 	if err != nil {
 		return RuntimeError(fmt.Errorf("error fetching rates: %w", err))
@@ -146,30 +143,40 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 
 	tokenReq := tollbit.CreateContentAccessTokenRequest{
 		URL:            articleURL,
-		UserAgent:      identity.UserAgent,
 		MaxPriceMicros: selectedRate.Price.PriceMicros,
 		Currency:       selectedRate.Price.Currency,
 		LicenseType:    selectedRate.License.LicenseType,
 		LicenseCuid:    selectedRate.License.Cuid,
 		Format:         "markdown",
 	}
+	if ua := strings.TrimSpace(identity.UserAgent); ua != "" {
+		tokenReq.UserAgent = ua
+	}
 
-	contentToken, identity, err := createContentAccessTokenWithUserAgentRetry(
-		cmd,
-		credentials,
-		tollbitClient,
-		identity,
-		tokenReq,
-		opts,
-		app.Config().Auth.RetryOnOBORequired,
-	)
-	if err != nil {
-		return RuntimeError(err)
+	var contentToken string
+	if app.Config().Auth.RetryOnOBORequired {
+		resp, tokenErr := agenttoken.WithOBORetry(cmd, credentials, identity, func(token agent.Token) (tollbit.CreateContentAccessTokenResponse, error) {
+			return tollbitClient.CreateContentAccessToken(cmd.Context(), tokenReq, token)
+		})
+		if tokenErr != nil {
+			return userAgentFetchError(cmd.ErrOrStderr(), tokenErr, "error creating content access token")
+		}
+		contentToken = resp.Token
+	} else {
+		token, tokenErr := credentials.GetAgentToken(cmd, identity)
+		if tokenErr != nil {
+			return RuntimeError(fmt.Errorf("error fetching agent token: %w", tokenErr))
+		}
+		resp, tokenErr := tollbitClient.CreateContentAccessToken(cmd.Context(), tokenReq, token)
+		if tokenErr != nil {
+			return userAgentFetchError(cmd.ErrOrStderr(), tokenErr, "error creating content access token")
+		}
+		contentToken = resp.Token
 	}
 
 	content, err := tollbitClient.GetContent(cmd.Context(), articleURL, contentToken, identity.UserAgent)
 	if err != nil {
-		return RuntimeError(fmt.Errorf("error fetching content: %w", err))
+		return userAgentFetchError(cmd.ErrOrStderr(), err, "error fetching content")
 	}
 
 	if opts.asJSON {
@@ -248,143 +255,6 @@ func selectRate(stderr io.Writer, stdin io.Reader, rates []tollbit.BatchDevelope
 	return rates[index], nil
 }
 
-func createContentAccessTokenWithUserAgentRetry(
-	cmd *cobra.Command,
-	credentials *agenttoken.CredentialManager,
-	tollbitClient tollbit.Client,
-	identity auth.AgentIdentity,
-	tokenReq tollbit.CreateContentAccessTokenRequest,
-	opts fetchOptions,
-	retryOnOBO bool,
-) (string, auth.AgentIdentity, error) {
-	if strings.TrimSpace(identity.UserAgent) == "" {
-		var resolveErr error
-		identity, resolveErr = resolveRegisteredUserAgent(cmd, credentials, tollbitClient, identity, opts, retryOnOBO)
-		if resolveErr != nil {
-			return "", identity, resolveErr
-		}
-		tokenReq.UserAgent = identity.UserAgent
-	}
-
-	create := func(token agent.Token) (tollbit.CreateContentAccessTokenResponse, error) {
-		return tollbitClient.CreateContentAccessToken(cmd.Context(), tokenReq, token, identity.UserAgent)
-	}
-
-	var resp tollbit.CreateContentAccessTokenResponse
-	var err error
-	if retryOnOBO {
-		resp, err = agenttoken.WithOBORetry(cmd, credentials, identity, create)
-	} else {
-		var token agent.Token
-		token, err = credentials.GetAgentToken(cmd, identity)
-		if err != nil {
-			return "", identity, err
-		}
-		resp, err = create(token)
-	}
-	if err == nil {
-		return resp.Token, identity, nil
-	}
-	if !isUserAgentNotRegistered(err) {
-		return "", identity, fmt.Errorf("error creating content access token: %w", err)
-	}
-
-	identity, err = resolveRegisteredUserAgent(cmd, credentials, tollbitClient, identity, opts, retryOnOBO)
-	if err != nil {
-		return "", identity, err
-	}
-
-	tokenReq.UserAgent = identity.UserAgent
-	if retryOnOBO {
-		resp, err = agenttoken.WithOBORetry(cmd, credentials, identity, create)
-	} else {
-		var token agent.Token
-		token, err = credentials.GetAgentToken(cmd, identity)
-		if err != nil {
-			return "", identity, err
-		}
-		resp, err = create(token)
-	}
-	if err != nil {
-		return "", identity, fmt.Errorf("error creating content access token: %w", err)
-	}
-	return resp.Token, identity, nil
-}
-
-func resolveRegisteredUserAgent(
-	cmd *cobra.Command,
-	credentials *agenttoken.CredentialManager,
-	tollbitClient tollbit.Client,
-	identity auth.AgentIdentity,
-	opts fetchOptions,
-	retryOnOBO bool,
-) (auth.AgentIdentity, error) {
-	agents, listErr := listUserAgents(cmd, credentials, tollbitClient, identity, retryOnOBO)
-	if listErr != nil {
-		return identity, listErr
-	}
-	if len(agents) == 0 {
-		return identity, noRegisteredUserAgentsError(cmd.ErrOrStderr())
-	}
-
-	selected, selectErr := selectUserAgent(cmd.ErrOrStderr(), cmd.InOrStdin(), agents, opts.userAgentIndex, opts.asJSON)
-	if selectErr != nil {
-		return identity, selectErr
-	}
-
-	identity.UserAgent = selected.UserAgent
-	if saveErr := credentials.SaveIdentity(cmd.Context(), identity); saveErr != nil {
-		return identity, fmt.Errorf("error saving user agent: %w", saveErr)
-	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "updated auth profile: user-agent=%s\n", selected.UserAgent)
-	return identity, nil
-}
-
-func listUserAgents(
-	cmd *cobra.Command,
-	credentials *agenttoken.CredentialManager,
-	tollbitClient tollbit.Client,
-	identity auth.AgentIdentity,
-	retryOnOBO bool,
-) ([]tollbit.UserAgentResponse, error) {
-	if retryOnOBO {
-		return agenttoken.WithOBORetry(cmd, credentials, identity, func(token agent.Token) ([]tollbit.UserAgentResponse, error) {
-			return tollbitClient.ListUserAgents(cmd.Context(), token)
-		})
-	}
-	token, err := credentials.GetAgentToken(cmd, identity)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching agent token: %w", err)
-	}
-	agents, err := tollbitClient.ListUserAgents(cmd.Context(), token)
-	if err != nil {
-		return nil, fmt.Errorf("error listing user agents: %w", err)
-	}
-	return agents, nil
-}
-
-func selectUserAgent(stderr io.Writer, stdin io.Reader, agents []tollbit.UserAgentResponse, userAgentIndex int, asJSON bool) (tollbit.UserAgentResponse, error) {
-	if len(agents) == 1 {
-		return agents[0], nil
-	}
-	if userAgentIndex > 0 {
-		if userAgentIndex > len(agents) {
-			return tollbit.UserAgentResponse{}, UsageError("user-agent-index %d is out of range (1-%d)", userAgentIndex, len(agents))
-		}
-		return agents[userAgentIndex-1], nil
-	}
-	if asJSON {
-		return tollbit.UserAgentResponse{}, UsageError("user agent not registered; pass --user-agent-index with --json")
-	}
-	index, err := promptSelectIndex(stderr, stdin, "registered user agents", len(agents), func(i int) string {
-		return agents[i].UserAgent
-	})
-	if err != nil {
-		return tollbit.UserAgentResponse{}, RuntimeError(err)
-	}
-	return agents[index], nil
-}
-
 func promptSelectIndex(stderr io.Writer, stdin io.Reader, label string, count int, describe func(int) string) (int, error) {
 	fmt.Fprintf(stderr, "Select %s:\n", label)
 	for i := 0; i < count; i++ {
@@ -443,12 +313,16 @@ func writeFetchToDisk(path string, content tollbit.GetContentResponse, asJSON bo
 	return nil
 }
 
+func userAgentFetchError(stderr io.Writer, err error, prefix string) error {
+	if isUserAgentNotRegistered(err) {
+		fmt.Fprintln(stderr, err.Error())
+		fmt.Fprintf(stderr, "Register a user agent at %s or run auth set --user-agent.\n", registerUserAgentURL)
+		return RuntimeError(fmt.Errorf("%s: %w", prefix, err))
+	}
+	return RuntimeError(fmt.Errorf("%s: %w", prefix, err))
+}
+
 func isUserAgentNotRegistered(err error) bool {
 	var problem problemjson.Problem
 	return errors.As(err, &problem) && problem.IsUserAgentNotRegistered()
-}
-
-func noRegisteredUserAgentsError(w io.Writer) error {
-	fmt.Fprintf(w, "No registered user agents found.\nCreate one at %s, then run this command again.\n", createUserAgentURL)
-	return errors.New("no registered user agents available")
 }

@@ -52,7 +52,7 @@ tollbit content fetch https://example.com/article --confirm --json
 
 Use `--toDisk=<path>` to persist fetched content locally. With `--json`, the full API response is written to stdout (and to disk when `--toDisk` is set).
 
-If the configured user agent is not registered, the CLI lists available user agents, prompts you to pick one, and saves the selection to your auth profile for future fetches.
+When no user agent is configured, the org default `-tbcli-` agent is used. Set one with `auth set --user-agent` or pass `--user-agent` on fetch. If the user agent is not registered, the CLI prints the API error and registration guidance (no interactive picker).
 
 Install this skill: `tollbit guide --install <SKILLS_DIR>`.
 Compare frontmatter `version` with `tollbit version` when updating.
