@@ -18,18 +18,20 @@ const (
 	searchDefaultSize        = 10
 )
 
-const searchLongHelp = `Search content ready to license on the TollBit network.
+const searchLongHelp = `Search content on the TollBit network.
 
-Use --allowed-only to limit results to publisher properties your account has
-access to. Without it, search spans the full catalog of discoverable content.`
+Results show access type: Programmatic (licensable via the CLI now) or
+Enterprise (reach out to Tollbit for access). Use --programmatic-only to
+limit results to Programmatic content. Without it, search spans the full
+catalog of discoverable content.`
 
 type searchOptions struct {
-	size         int
-	nextToken    string
-	properties   string
-	allowedOnly  bool
-	userAgent    string
-	asJSON       bool
+	size             int
+	nextToken        string
+	properties       string
+	programmaticOnly bool
+	userAgent        string
+	asJSON           bool
 }
 
 func NewSearchCommand(factory app.Factory) *cobra.Command {
@@ -37,7 +39,7 @@ func NewSearchCommand(factory app.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   `search "query"`,
-		Short: "Search content ready to license on the TollBit network",
+		Short: "Search content on the TollBit network",
 		Long:  searchLongHelp,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -56,7 +58,7 @@ func NewSearchCommand(factory app.Factory) *cobra.Command {
 	cmd.Flags().IntVar(&opts.size, "size", searchDefaultSize, "number of results to return (max 20)")
 	cmd.Flags().StringVar(&opts.nextToken, "next-token", "", "pagination token from a previous search")
 	cmd.Flags().StringVar(&opts.properties, "properties", "", "comma-separated domains to boost (max 20)")
-	cmd.Flags().BoolVar(&opts.allowedOnly, "allowed-only", false, "limit results to properties your account has access to")
+	cmd.Flags().BoolVar(&opts.programmaticOnly, "programmatic-only", false, "limit results to Programmatic content")
 	cmd.Flags().StringVar(&opts.userAgent, "user-agent", "", "user agent for request")
 	cmd.Flags().BoolVar(&opts.asJSON, "json", false, "emit raw JSON response")
 
@@ -98,12 +100,12 @@ func runSearch(cmd *cobra.Command, factory app.Factory, opts searchOptions, quer
 	}
 
 	params := tollbit.SearchParams{
-		Query:          query,
-		Size:           opts.size,
-		NextToken:      opts.nextToken,
-		Properties:     properties,
-		AllowedOnly:    opts.allowedOnly,
-		AllowedOnlySet: cmd.Flags().Changed("allowed-only"),
+		Query:               query,
+		Size:                opts.size,
+		NextToken:           opts.nextToken,
+		Properties:          properties,
+		ProgrammaticOnly:    opts.programmaticOnly,
+		ProgrammaticOnlySet: cmd.Flags().Changed("programmatic-only"),
 	}
 
 	var resp tollbit.PagedSearchResultResponse
@@ -150,10 +152,23 @@ func printSearchResults(w io.Writer, resp tollbit.PagedSearchResultResponse) {
 			fmt.Fprintf(w, "%d. %s\n", i+1, item.Title)
 			fmt.Fprintf(w, "   %s\n", item.URL)
 			fmt.Fprintf(w, "   %s (%s) · %s\n", item.Publisher.Name, item.Publisher.Domain, item.PublishedDate)
-			fmt.Fprintf(w, "   discoverable=%t readyToLicense=%t\n", item.Availability.Discoverable, item.Availability.ReadyToLicense)
+			fmt.Fprintf(w, "   %s\n", formatAvailabilityLabels(item.Availability))
 		}
 	}
 	if next := strings.TrimSpace(resp.NextToken); next != "" {
 		fmt.Fprintf(w, "\nMore results available. Pass --next-token %q to continue.\n", next)
 	}
+}
+
+func formatAvailabilityLabels(a tollbit.Availability) string {
+	labels := make([]string, 0, 2)
+	if a.Discoverable {
+		labels = append(labels, "In TollBit network")
+	}
+	if a.ReadyToLicense {
+		labels = append(labels, "Programmatic")
+	} else {
+		labels = append(labels, "Enterprise")
+	}
+	return strings.Join(labels, " · ")
 }

@@ -76,7 +76,7 @@ tollbit auth status
 
 tollbit search "climate policy"
 tollbit search "climate policy" --size 10 --json
-tollbit search "query" --properties example.com,cnn.com --allowed-only
+tollbit search "query" --properties example.com,cnn.com --programmatic-only
 ```
 
 Environment:

@@ -79,12 +79,12 @@ func TestSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp, err := c.Search(context.Background(), SearchParams{
-		Query:          "climate policy",
-		Size:           5,
-		NextToken:      "page-2",
-		Properties:     "example.com,other.com",
-		AllowedOnly:    true,
-		AllowedOnlySet: true,
+		Query:               "climate policy",
+		Size:                5,
+		NextToken:           "page-2",
+		Properties:          "example.com,other.com",
+		ProgrammaticOnly:    true,
+		ProgrammaticOnlySet: true,
 	}, token)
 	if err != nil {
 		t.Fatal(err)

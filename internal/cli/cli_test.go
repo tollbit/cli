@@ -127,6 +127,12 @@ func TestRunSearchRendersResults(t *testing.T) {
 	if want := "Climate Policy Overview"; !strings.Contains(stdout.String(), want) {
 		t.Fatalf("expected stdout to contain %q, got %q", want, stdout.String())
 	}
+	if want := "In TollBit network"; !strings.Contains(stdout.String(), want) {
+		t.Fatalf("expected stdout to contain %q, got %q", want, stdout.String())
+	}
+	if want := "Programmatic"; !strings.Contains(stdout.String(), want) {
+		t.Fatalf("expected stdout to contain %q, got %q", want, stdout.String())
+	}
 	if want := "page-2"; !strings.Contains(stdout.String(), want) {
 		t.Fatalf("expected stdout to contain next-token hint, got %q", stdout.String())
 	}
