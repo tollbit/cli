@@ -18,10 +18,10 @@ Search publisher content:
 ```bash
 tollbit search "climate policy" --size 10
 tollbit search "query" --json
-tollbit search "query" --allowed-only
+tollbit search "query" --programmatic-only
 ```
 
-Use `--allowed-only` to limit results to publisher properties your account has access to. Without it, search spans the full catalog of discoverable content on the network.
+Results are labeled **Programmatic** (licensable via the CLI now) or **Enterprise** (reach out to Tollbit for access). Use `--programmatic-only` to limit results to Programmatic content. Without it, search spans the full catalog of discoverable content on the network.
 
 Content workflow (search → pricing → fetch):
 

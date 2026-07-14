@@ -36,12 +36,12 @@ type (
 	}
 
 	SearchParams struct {
-		Query          string
-		Size           int
-		NextToken      string
-		Properties     string
-		AllowedOnly    bool
-		AllowedOnlySet bool
+		Query               string
+		Size                int
+		NextToken           string
+		Properties          string
+		ProgrammaticOnly    bool
+		ProgrammaticOnlySet bool
 	}
 
 	PagedSearchResultResponse struct {
@@ -182,8 +182,8 @@ func (c *client) Search(ctx context.Context, params SearchParams, token agent.To
 	if properties := strings.TrimSpace(params.Properties); properties != "" {
 		q.Set("properties", properties)
 	}
-	if params.AllowedOnlySet {
-		q.Set("allowedOnly", strconv.FormatBool(params.AllowedOnly))
+	if params.ProgrammaticOnlySet {
+		q.Set("allowedOnly", strconv.FormatBool(params.ProgrammaticOnly))
 	}
 
 	u := c.resolve("/agents/v1/search")
@@ -376,6 +376,9 @@ func logRequest(ctx context.Context, req *http.Request, body []byte) {
 		Str("user_agent", req.Header.Get("User-Agent"))
 	if token := req.Header.Get("Authorization"); token != "" {
 		e = e.Str("authorization", redactSecret(token))
+	}
+	if token := req.Header.Get("Tollbit-Token"); token != "" {
+		e = e.Str("tollbit_token", redactSecret(token))
 	}
 	if ua := req.Header.Get("Tollbit-User-Agent"); ua != "" {
 		e = e.Str("tollbit_user_agent", ua)
