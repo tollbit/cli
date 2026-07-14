@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var testDefaultConfig = []byte("app:\n  name: tollbit\nauth:\n  base_url: https://oauth.tollbit.com\n  retry_on_obo_required: true\n  token_ttl_seconds: 0\n  use_refresh_tokens: true\n  browser_consent:\n    callback_address: 127.0.0.1:54321\n    timeout: 3m\n    auto_open_browser: true\nagent:\n  default_name: anonymous\n  default_user_agent: \"\"\ncredentials:\n  storage_dir: __default__\ngateway:\n  base_url: https://gateway.tollbit.com\n")
+var testDefaultConfig = []byte("app:\n  name: tollbit\nauth:\n  base_url: https://oauth.tollbit.com\n  retry_on_obo_required: true\n  token_ttl_seconds: 0\n  use_refresh_tokens: true\n  browser_consent:\n    callback_address: 127.0.0.1:54321\n    timeout: 3m\n    auto_open_browser: true\nagent:\n  default_name: anonymous\n  default_user_agent: \"\"\n  register_user_agent_url: https://hack.tollbit.com/my-agents\ncredentials:\n  storage_dir: __default__\ngateway:\n  base_url: https://gateway.tollbit.com\n")
 
 func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
 	config := assembleTestConfiguration(t, t.TempDir())

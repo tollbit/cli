@@ -31,8 +31,6 @@ unless --rate-index is set. With --json and multiple rates, --rate-index is requ
 When no user agent is configured, the org default -tbcli- agent is used.
 Set one with auth set --user-agent or pass --user-agent on this command.`
 
-const registerUserAgentURL = "https://hack.tollbit.com/my-agents"
-
 type fetchOptions struct {
 	confirm   bool
 	toDisk    string
@@ -159,7 +157,7 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 			return tollbitClient.CreateContentAccessToken(cmd.Context(), tokenReq, token)
 		})
 		if tokenErr != nil {
-			return userAgentFetchError(cmd.ErrOrStderr(), tokenErr, "error creating content access token")
+			return userAgentFetchError(cmd.ErrOrStderr(), tokenErr, "error creating content access token", app.Config().Agent.RegisterUserAgentURL)
 		}
 		contentToken = resp.Token
 	} else {
@@ -169,14 +167,14 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 		}
 		resp, tokenErr := tollbitClient.CreateContentAccessToken(cmd.Context(), tokenReq, token)
 		if tokenErr != nil {
-			return userAgentFetchError(cmd.ErrOrStderr(), tokenErr, "error creating content access token")
+			return userAgentFetchError(cmd.ErrOrStderr(), tokenErr, "error creating content access token", app.Config().Agent.RegisterUserAgentURL)
 		}
 		contentToken = resp.Token
 	}
 
 	content, err := tollbitClient.GetContent(cmd.Context(), articleURL, contentToken, identity.UserAgent)
 	if err != nil {
-		return userAgentFetchError(cmd.ErrOrStderr(), err, "error fetching content")
+		return userAgentFetchError(cmd.ErrOrStderr(), err, "error fetching content", app.Config().Agent.RegisterUserAgentURL)
 	}
 
 	if opts.asJSON {
@@ -313,10 +311,10 @@ func writeFetchToDisk(path string, content tollbit.GetContentResponse, asJSON bo
 	return nil
 }
 
-func userAgentFetchError(stderr io.Writer, err error, prefix string) error {
+func userAgentFetchError(stderr io.Writer, err error, prefix, registerURL string) error {
 	if isUserAgentNotRegistered(err) {
 		fmt.Fprintln(stderr, err.Error())
-		fmt.Fprintf(stderr, "Register a user agent at %s or run auth set --user-agent.\n", registerUserAgentURL)
+		fmt.Fprintf(stderr, "Register a user agent at %s or run auth set --user-agent.\n", registerURL)
 		return RuntimeError(fmt.Errorf("%s: %w", prefix, err))
 	}
 	return RuntimeError(fmt.Errorf("%s: %w", prefix, err))

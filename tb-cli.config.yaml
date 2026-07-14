@@ -12,6 +12,7 @@ auth:
 agent:
   default_name: anonymous
   default_user_agent: ""
+  register_user_agent_url: https://hack.tollbit.com/my-agents
 credentials:
   storage_dir: __default__
 gateway:

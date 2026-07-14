@@ -343,7 +343,7 @@ func TestRunFetchUserAgentNotRegisteredShowsError(t *testing.T) {
 	if !strings.Contains(stderr.String(), "user agent bad-agent is not registered") {
 		t.Fatalf("expected problem detail on stderr, got %q", stderr.String())
 	}
-	if !strings.Contains(stderr.String(), registerUserAgentURL) {
+	if !strings.Contains(stderr.String(), "https://hack.tollbit.com/my-agents") {
 		t.Fatalf("expected registration URL on stderr, got %q", stderr.String())
 	}
 }

@@ -23,8 +23,9 @@ type AuthConfig struct {
 }
 
 type AgentConfig struct {
-	DefaultName      string `mapstructure:"default_name"`
-	DefaultUserAgent string `mapstructure:"default_user_agent"`
+	DefaultName          string `mapstructure:"default_name"`
+	DefaultUserAgent     string `mapstructure:"default_user_agent"`
+	RegisterUserAgentURL string `mapstructure:"register_user_agent_url"`
 }
 
 type CredentialsConfig struct {
