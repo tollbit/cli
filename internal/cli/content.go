@@ -8,7 +8,7 @@ import (
 func NewContentCommand(factory app.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "content",
-		Short: "Work with publisher content",
+		Short: "Price and Fetch licensed publisher content",
 		Long:  "Price and fetch licensed publisher content on the TollBit network. Every fetch charges money.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
