@@ -27,7 +27,7 @@ type (
 		Search(ctx context.Context, params SearchParams, token agent.Token) (PagedSearchResultResponse, error)
 		BatchGetRates(ctx context.Context, urls []string, token agent.Token) ([]BatchRateResponseV2, error)
 		CreateContentAccessToken(ctx context.Context, req CreateContentAccessTokenRequest, token agent.Token) (CreateContentAccessTokenResponse, error)
-		GetContent(ctx context.Context, articleURL, contentToken, userAgent string) (GetContentResponse, error)
+		GetContent(ctx context.Context, articleURL, contentToken, userAgent string, token agent.Token) (GetContentResponse, error)
 	}
 
 	client struct {
@@ -222,7 +222,10 @@ func (c *client) CreateContentAccessToken(ctx context.Context, req CreateContent
 	)
 }
 
-func (c *client) GetContent(ctx context.Context, articleURL, contentToken, userAgent string) (GetContentResponse, error) {
+func (c *client) GetContent(ctx context.Context, articleURL, contentToken, userAgent string, token agent.Token) (GetContentResponse, error) {
+	if err := requireAgentToken(token); err != nil {
+		return GetContentResponse{}, err
+	}
 	contentToken = strings.TrimSpace(contentToken)
 	if contentToken == "" {
 		return GetContentResponse{}, errors.New("content token is required")
@@ -238,6 +241,7 @@ func (c *client) GetContent(ctx context.Context, articleURL, contentToken, userA
 	}
 	var out GetContentResponse
 	return out, c.doJSON(ctx, http.MethodGet, u.String(), nil, &out,
+		withBearerToken(token.RawToken),
 		withTollbitToken(contentToken),
 		withTollbitUserAgent(userAgent),
 	)
@@ -301,9 +305,13 @@ func withTollbitToken(token string) requestOption {
 }
 
 func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, out any, opts ...requestOption) error {
-	reader, err := bodyReader(body)
+	bodyBytes, err := encodeBody(body)
 	if err != nil {
 		return err
+	}
+	var reader io.Reader
+	if bodyBytes != nil {
+		reader = bytes.NewReader(bodyBytes)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, reader)
 	if err != nil {
@@ -312,13 +320,13 @@ func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Tollbit-Client", version.ClientHeader())
 	req.Header.Set("User-Agent", version.HTTPUserAgent())
-	if body != nil {
+	if bodyBytes != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	for _, opt := range opts {
 		opt(req)
 	}
-	logRequest(ctx, req)
+	logRequest(ctx, req, bodyBytes)
 
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -342,7 +350,7 @@ func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 	return json.Unmarshal(respBody, out)
 }
 
-func bodyReader(body any) (io.Reader, error) {
+func encodeBody(body any) ([]byte, error) {
 	if body == nil {
 		return nil, nil
 	}
@@ -350,7 +358,7 @@ func bodyReader(body any) (io.Reader, error) {
 	if err := json.NewEncoder(buf).Encode(body); err != nil {
 		return nil, err
 	}
-	return buf, nil
+	return buf.Bytes(), nil
 }
 
 func (c *client) resolve(p string) *url.URL {
@@ -359,14 +367,21 @@ func (c *client) resolve(p string) *url.URL {
 	return &u
 }
 
-func logRequest(ctx context.Context, req *http.Request) {
+func logRequest(ctx context.Context, req *http.Request, body []byte) {
 	e := zerolog.Ctx(ctx).Debug().
 		Str("method", req.Method).
 		Str("url", req.URL.String()).
 		Str("accept", req.Header.Get("Accept")).
-		Str("content_type", req.Header.Get("Content-Type"))
+		Str("content_type", req.Header.Get("Content-Type")).
+		Str("user_agent", req.Header.Get("User-Agent"))
 	if token := req.Header.Get("Authorization"); token != "" {
 		e = e.Str("authorization", redactSecret(token))
+	}
+	if ua := req.Header.Get("Tollbit-User-Agent"); ua != "" {
+		e = e.Str("tollbit_user_agent", ua)
+	}
+	if len(body) > 0 {
+		e = e.Str("request_body", strings.TrimSpace(string(body)))
 	}
 	e.Msg("tollbit request")
 }

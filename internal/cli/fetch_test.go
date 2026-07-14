@@ -267,6 +267,9 @@ func TestRunFetchWithoutUserAgentUsesDefault(t *testing.T) {
 			}
 			_ = json.NewEncoder(w).Encode(tollbit.CreateContentAccessTokenResponse{Token: "content-jwt"})
 		case r.Method == http.MethodGet && r.URL.Path == "/agents/v1/content/example.com/article":
+			if r.Header.Get("Authorization") != "Bearer "+token {
+				t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
+			}
 			if r.Header.Get("Tollbit-User-Agent") != "" {
 				t.Fatalf("expected empty Tollbit-User-Agent, got %q", r.Header.Get("Tollbit-User-Agent"))
 			}
@@ -379,6 +382,9 @@ func newFetchGatewayServer(t *testing.T, agentToken string, handlers fetchGatewa
 			}
 			_ = json.NewEncoder(w).Encode(tollbit.CreateContentAccessTokenResponse{Token: handlers.contentToken})
 		case r.Method == http.MethodGet && r.URL.Path == "/agents/v1/content/example.com/article":
+			if r.Header.Get("Authorization") != "Bearer "+agentToken {
+				t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
+			}
 			if r.Header.Get("Tollbit-Token") != handlers.contentToken {
 				t.Fatalf("unexpected tollbit token: %q", r.Header.Get("Tollbit-Token"))
 			}
