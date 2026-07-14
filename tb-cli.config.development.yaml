@@ -3,6 +3,6 @@
 auth:
   base_url: http://oauth.localhost:7011
 gateway:
-  base_url: http://gateway.localhost:7011
+  base_url: http://tollbit.localhost:7011
 # auth:
 #   retry_on_obo_required: true

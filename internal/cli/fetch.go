@@ -172,7 +172,18 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 		contentToken = resp.Token
 	}
 
-	content, err := tollbitClient.GetContent(cmd.Context(), articleURL, contentToken, identity.UserAgent)
+	var content tollbit.GetContentResponse
+	if app.Config().Auth.RetryOnOBORequired {
+		content, err = agenttoken.WithOBORetry(cmd, credentials, identity, func(token agent.Token) (tollbit.GetContentResponse, error) {
+			return tollbitClient.GetContent(cmd.Context(), articleURL, contentToken, identity.UserAgent, token)
+		})
+	} else {
+		token, tokenErr := credentials.GetAgentToken(cmd, identity)
+		if tokenErr != nil {
+			return RuntimeError(fmt.Errorf("error fetching agent token: %w", tokenErr))
+		}
+		content, err = tollbitClient.GetContent(cmd.Context(), articleURL, contentToken, identity.UserAgent, token)
+	}
 	if err != nil {
 		return userAgentFetchError(cmd.ErrOrStderr(), err, "error fetching content", app.Config().Agent.RegisterUserAgentURL)
 	}

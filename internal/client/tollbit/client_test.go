@@ -294,9 +294,13 @@ func TestCreateContentAccessTokenOmitsUserAgent(t *testing.T) {
 }
 
 func TestGetContent(t *testing.T) {
+	token := validAgentToken(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || r.URL.Path != "/agents/v1/content/example.com/article" {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
+			t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
 		}
 		if r.Header.Get("Tollbit-Token") != "content-jwt" {
 			t.Fatalf("unexpected tollbit token: %q", r.Header.Get("Tollbit-Token"))
@@ -317,7 +321,7 @@ func TestGetContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := c.GetContent(context.Background(), "https://example.com/article", "content-jwt", "MyAgent-User")
+	resp, err := c.GetContent(context.Background(), "https://example.com/article", "content-jwt", "MyAgent-User", token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,6 +331,7 @@ func TestGetContent(t *testing.T) {
 }
 
 func TestGetContentStripsTrailingSlash(t *testing.T) {
+	token := validAgentToken(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/agents/v1/content/example.com/article" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -339,13 +344,14 @@ func TestGetContentStripsTrailingSlash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.GetContent(context.Background(), "https://example.com/article/", "content-jwt", "MyAgent-User")
+	_, err = c.GetContent(context.Background(), "https://example.com/article/", "content-jwt", "MyAgent-User", token)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestGetContentOmitsTollbitUserAgent(t *testing.T) {
+	token := validAgentToken(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Tollbit-User-Agent") != "" {
 			t.Fatalf("expected empty tollbit user agent, got %q", r.Header.Get("Tollbit-User-Agent"))
@@ -358,8 +364,19 @@ func TestGetContentOmitsTollbitUserAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.GetContent(context.Background(), "https://example.com/article", "content-jwt", "")
+	_, err = c.GetContent(context.Background(), "https://example.com/article", "content-jwt", "", token)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGetContentRequiresAgentToken(t *testing.T) {
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.GetContent(context.Background(), "https://example.com/article", "content-jwt", "", agent.Token{})
+	if err == nil {
+		t.Fatal("expected error")
 	}
 }
