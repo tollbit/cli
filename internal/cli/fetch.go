@@ -139,6 +139,9 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 		}
 	}
 
+	stopSpinner := startSpinner(cmd.ErrOrStderr(), !opts.asJSON, "Fetching")
+	defer stopSpinner()
+
 	tokenReq := tollbit.CreateContentAccessTokenRequest{
 		URL:            articleURL,
 		MaxPriceMicros: selectedRate.Price.PriceMicros,
@@ -157,16 +160,19 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 			return tollbitClient.CreateContentAccessToken(cmd.Context(), tokenReq, token)
 		})
 		if tokenErr != nil {
+			stopSpinner()
 			return userAgentFetchError(cmd.ErrOrStderr(), tokenErr, "error creating content access token", app.Config().Agent.RegisterUserAgentURL)
 		}
 		contentToken = resp.Token
 	} else {
 		token, tokenErr := credentials.GetAgentToken(cmd, identity)
 		if tokenErr != nil {
+			stopSpinner()
 			return RuntimeError(fmt.Errorf("error fetching agent token: %w", tokenErr))
 		}
 		resp, tokenErr := tollbitClient.CreateContentAccessToken(cmd.Context(), tokenReq, token)
 		if tokenErr != nil {
+			stopSpinner()
 			return userAgentFetchError(cmd.ErrOrStderr(), tokenErr, "error creating content access token", app.Config().Agent.RegisterUserAgentURL)
 		}
 		contentToken = resp.Token
@@ -180,10 +186,12 @@ func runFetch(cmd *cobra.Command, factory app.Factory, opts fetchOptions, articl
 	} else {
 		token, tokenErr := credentials.GetAgentToken(cmd, identity)
 		if tokenErr != nil {
+			stopSpinner()
 			return RuntimeError(fmt.Errorf("error fetching agent token: %w", tokenErr))
 		}
 		content, err = tollbitClient.GetContent(cmd.Context(), articleURL, contentToken, identity.UserAgent, token)
 	}
+	stopSpinner()
 	if err != nil {
 		return userAgentFetchError(cmd.ErrOrStderr(), err, "error fetching content", app.Config().Agent.RegisterUserAgentURL)
 	}
