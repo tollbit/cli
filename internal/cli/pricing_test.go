@@ -57,6 +57,9 @@ func TestRunPricingRendersResults(t *testing.T) {
 	if !strings.Contains(out, "standard") {
 		t.Fatalf("expected stdout to contain license type, got %q", out)
 	}
+	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(out, want) {
+		t.Fatalf("expected stdout to contain fetch leading command, got %q", out)
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected empty stderr, got %q", stderr.String())
 	}
@@ -99,6 +102,9 @@ func TestRunContentPricingRendersResults(t *testing.T) {
 	if !strings.Contains(out, "USD 0.05") {
 		t.Fatalf("expected stdout to contain formatted price, got %q", out)
 	}
+	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(out, want) {
+		t.Fatalf("expected stdout to contain fetch leading command, got %q", out)
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected empty stderr, got %q", stderr.String())
 	}
@@ -129,6 +135,9 @@ func TestRunPricingJSON(t *testing.T) {
 	code := executeTestCommand([]string{"content", "pricing", "https://example.com/a", "--json"}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "To fetch content:") {
+		t.Fatalf("expected no leading command in --json output, got %q", stdout.String())
 	}
 	var resp []tollbit.BatchRateResponseV2
 	if err := json.NewDecoder(&stdout).Decode(&resp); err != nil {
@@ -271,5 +280,8 @@ func TestPrintPricingResultsLicenseDetails(t *testing.T) {
 	}
 	if !strings.Contains(out, "premium") || !strings.Contains(out, "https://example.com/licenses/premium") {
 		t.Fatalf("expected premium license URL, got %q", out)
+	}
+	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(out, want) {
+		t.Fatalf("expected fetch leading command, got %q", out)
 	}
 }
