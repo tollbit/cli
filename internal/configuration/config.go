@@ -79,6 +79,9 @@ func validate(config Config) error {
 	if strings.TrimSpace(config.Agent.DefaultName) == "" {
 		return errors.New("agent.default_name is required")
 	}
+	if strings.TrimSpace(config.Agent.RegisterUserAgentURL) == "" {
+		return errors.New("agent.register_user_agent_url is required")
+	}
 	if strings.TrimSpace(config.Gateway.BaseURL) == "" {
 		return errors.New("gateway.base_url is required")
 	}
