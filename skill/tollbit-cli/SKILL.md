@@ -38,7 +38,7 @@ Human (non-`--json`) search and pricing output ends with a leading command hint 
 **Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost).
 
 ```bash
-# Interactive: shows price, prompts to confirm, prints article body to stdout
+# Interactive: shows price, prompts to confirm, then a stderr "Fetching" spinner until the body prints to stdout
 tollbit content fetch https://example.com/article
 
 # Non-interactive automation (still paid)
