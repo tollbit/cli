@@ -136,6 +136,9 @@ func TestRunSearchRendersResults(t *testing.T) {
 	if want := "page-2"; !strings.Contains(stdout.String(), want) {
 		t.Fatalf("expected stdout to contain next-token hint, got %q", stdout.String())
 	}
+	if want := "To get pricing: tollbit content pricing <url>[,<url>...]"; !strings.Contains(stdout.String(), want) {
+		t.Fatalf("expected stdout to contain pricing leading command, got %q", stdout.String())
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected empty stderr, got %q", stderr.String())
 	}
@@ -165,6 +168,9 @@ func TestRunSearchJSON(t *testing.T) {
 	code := executeTestCommand([]string{"search", "test", "--json"}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "To get pricing:") {
+		t.Fatalf("expected no leading command in --json output, got %q", stdout.String())
 	}
 	var resp tollbit.PagedSearchResultResponse
 	if err := json.NewDecoder(&stdout).Decode(&resp); err != nil {

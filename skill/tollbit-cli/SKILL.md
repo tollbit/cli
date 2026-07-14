@@ -32,6 +32,7 @@ tollbit content pricing https://example.com/article --json
 tollbit content fetch https://example.com/article --confirm --toDisk ./article.md
 ```
 
+Human (non-`--json`) search and pricing output ends with a leading command hint for the next step (pricing after search, fetch after pricing).
 ## Fetch (paid)
 
 **Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost).

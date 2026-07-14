@@ -137,6 +137,7 @@ func normalizeArticleURL(raw string) (string, error) {
 }
 
 func printPricingResults(w io.Writer, resp []tollbit.BatchRateResponseV2) {
+	var firstPricedURL string
 	for i, item := range resp {
 		if i > 0 {
 			fmt.Fprintln(w)
@@ -145,6 +146,9 @@ func printPricingResults(w io.Writer, resp []tollbit.BatchRateResponseV2) {
 		if len(item.Rates) == 0 {
 			fmt.Fprintln(w, "  (no rates)")
 			continue
+		}
+		if firstPricedURL == "" {
+			firstPricedURL = item.URL
 		}
 		for _, rate := range item.Rates {
 			display := licenseDisplayInfo(rate.License)
@@ -160,6 +164,9 @@ func printPricingResults(w io.Writer, resp []tollbit.BatchRateResponseV2) {
 				fmt.Fprintf(w, "    %s\n", display.licenseURL)
 			}
 		}
+	}
+	if firstPricedURL != "" {
+		printLeadingCommand(w, "To fetch content: tollbit content fetch "+firstPricedURL)
 	}
 }
 

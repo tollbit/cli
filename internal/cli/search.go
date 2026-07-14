@@ -158,6 +158,9 @@ func printSearchResults(w io.Writer, resp tollbit.PagedSearchResultResponse) {
 	if next := strings.TrimSpace(resp.NextToken); next != "" {
 		fmt.Fprintf(w, "\nMore results available. Pass --next-token %q to continue.\n", next)
 	}
+	if len(resp.Items) > 0 {
+		printLeadingCommand(w, "To get pricing: tollbit content pricing <url>[,<url>...]")
+	}
 }
 
 func formatAvailabilityLabels(a tollbit.Availability) string {
