@@ -72,7 +72,11 @@ func testConfig() configuration.Config {
 				AutoOpenBrowser: false,
 			},
 		},
-		Agent:       configuration.AgentConfig{DefaultName: agentDefaultName, DefaultUserAgent: agentDefaultUserAgent},
+		Agent: configuration.AgentConfig{
+			DefaultName:          agentDefaultName,
+			DefaultUserAgent:     agentDefaultUserAgent,
+			RegisterUserAgentURL: "https://hack.tollbit.com/my-agents",
+		},
 		Credentials: configuration.CredentialsConfig{StorageDir: storageDir},
 		Gateway:     configuration.GatewayConfig{BaseURL: gatewayBaseURL},
 	}

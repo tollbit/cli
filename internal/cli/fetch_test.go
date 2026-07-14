@@ -238,82 +238,13 @@ func TestRunFetchDeclineConfirm(t *testing.T) {
 	}
 }
 
-func TestRunFetchUserAgentRegistrationRetry(t *testing.T) {
+func TestRunFetchWithoutUserAgentUsesDefault(t *testing.T) {
 	token := testAgentJWT(t)
 	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
 	}))
 	defer authSrv.Close()
 
-	storageDir := t.TempDir()
-	tokenAttempts := 0
-	gatewaySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/agents/v1/rates/batch":
-			_ = json.NewEncoder(w).Encode([]tollbit.BatchRateResponseV2{{
-				URL: "https://example.com/article",
-				Rates: []tollbit.BatchDeveloperRateResponse{{
-					Price:   tollbit.RatePriceResponse{PriceMicros: 50000, Currency: "USD"},
-					License: tollbit.BatchRateLicenseResponse{LicenseType: "standard", Cuid: "lic_1"},
-				}},
-			}})
-		case r.Method == http.MethodPost && r.URL.Path == "/agents/v1/tokens/content":
-			tokenAttempts++
-			if tokenAttempts == 1 {
-				w.Header().Set("Content-Type", "application/problem+json")
-				w.WriteHeader(http.StatusBadRequest)
-				code := problemjson.ErrorCodeUserAgentNotRegistered
-				_ = json.NewEncoder(w).Encode(problemjson.Problem{
-					Type: "about:blank", Title: "Bad Request", Status: 400, Code: &code,
-				})
-				return
-			}
-			_ = json.NewEncoder(w).Encode(tollbit.CreateContentAccessTokenResponse{Token: "content-jwt"})
-		case r.Method == http.MethodGet && r.URL.Path == "/agents/v1/user-agents":
-			_ = json.NewEncoder(w).Encode([]tollbit.UserAgentResponse{{
-				Cuid: "ua_1", OrgCuid: "org_1", UserAgent: "Registered-Agent",
-			}})
-		case r.Method == http.MethodGet && r.URL.Path == "/dev/v2/content/example.com/article":
-			_ = json.NewEncoder(w).Encode(tollbit.GetContentResponse{Content: tollbit.PageContent{Body: "registered body"}})
-		default:
-			t.Fatalf("unexpected gateway request: %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer gatewaySrv.Close()
-
-	t.Setenv(testAuthBaseURLEnvVar, authSrv.URL)
-	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
-	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
-
-	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{
-		"content", "fetch", "https://example.com/article",
-		"--confirm", "--user-agent", "Bad-Agent",
-	}, strings.NewReader("1\n"), &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
-	}
-	if stdout.String() != "registered body\n" {
-		t.Fatalf("unexpected stdout: %q", stdout.String())
-	}
-
-	identityRaw, err := os.ReadFile(filepath.Join(storageDir, "agent-identity.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(identityRaw), "Registered-Agent") {
-		t.Fatalf("expected saved user agent, got %q", string(identityRaw))
-	}
-}
-
-func TestRunFetchEmptyUserAgentListsAndRegisters(t *testing.T) {
-	token := testAgentJWT(t)
-	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
-	}))
-	defer authSrv.Close()
-
-	storageDir := t.TempDir()
 	contentTokenCalled := false
 	gatewaySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -325,60 +256,21 @@ func TestRunFetchEmptyUserAgentListsAndRegisters(t *testing.T) {
 					License: tollbit.BatchRateLicenseResponse{LicenseType: "standard", Cuid: "lic_1"},
 				}},
 			}})
-		case r.Method == http.MethodGet && r.URL.Path == "/agents/v1/user-agents":
-			_ = json.NewEncoder(w).Encode([]tollbit.UserAgentResponse{{
-				Cuid: "ua_1", OrgCuid: "org_1", UserAgent: "Registered-Agent",
-			}})
 		case r.Method == http.MethodPost && r.URL.Path == "/agents/v1/tokens/content":
 			contentTokenCalled = true
+			var req map[string]json.RawMessage
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := req["userAgent"]; ok {
+				t.Fatalf("expected userAgent to be omitted, got %#v", req["userAgent"])
+			}
 			_ = json.NewEncoder(w).Encode(tollbit.CreateContentAccessTokenResponse{Token: "content-jwt"})
-		case r.Method == http.MethodGet && r.URL.Path == "/dev/v2/content/example.com/article":
-			_ = json.NewEncoder(w).Encode(tollbit.GetContentResponse{Content: tollbit.PageContent{Body: "registered body"}})
-		default:
-			t.Fatalf("unexpected gateway request: %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer gatewaySrv.Close()
-
-	t.Setenv(testAuthBaseURLEnvVar, authSrv.URL)
-	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
-	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
-
-	var stdout, stderr bytes.Buffer
-	code := executeTestCommand([]string{
-		"content", "fetch", "https://example.com/article",
-		"--confirm",
-	}, nil, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
-	}
-	if !contentTokenCalled {
-		t.Fatal("expected content token request after registering user agent")
-	}
-	if stdout.String() != "registered body\n" {
-		t.Fatalf("unexpected stdout: %q", stdout.String())
-	}
-}
-
-func TestRunFetchNoRegisteredUserAgents(t *testing.T) {
-	token := testAgentJWT(t)
-	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
-	}))
-	defer authSrv.Close()
-
-	gatewaySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/agents/v1/rates/batch":
-			_ = json.NewEncoder(w).Encode([]tollbit.BatchRateResponseV2{{
-				URL: "https://example.com/article",
-				Rates: []tollbit.BatchDeveloperRateResponse{{
-					Price:   tollbit.RatePriceResponse{PriceMicros: 50000, Currency: "USD"},
-					License: tollbit.BatchRateLicenseResponse{LicenseType: "standard", Cuid: "lic_1"},
-				}},
-			}})
-		case r.Method == http.MethodGet && r.URL.Path == "/agents/v1/user-agents":
-			_ = json.NewEncoder(w).Encode([]tollbit.UserAgentResponse{})
+		case r.Method == http.MethodGet && r.URL.Path == "/agents/v1/content/example.com/article":
+			if r.Header.Get("Tollbit-User-Agent") != "" {
+				t.Fatalf("expected empty Tollbit-User-Agent, got %q", r.Header.Get("Tollbit-User-Agent"))
+			}
+			_ = json.NewEncoder(w).Encode(tollbit.GetContentResponse{Content: tollbit.PageContent{Body: "default body"}})
 		default:
 			t.Fatalf("unexpected gateway request: %s %s", r.Method, r.URL.Path)
 		}
@@ -394,14 +286,65 @@ func TestRunFetchNoRegisteredUserAgents(t *testing.T) {
 		"content", "fetch", "https://example.com/article",
 		"--confirm",
 	}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+	if !contentTokenCalled {
+		t.Fatal("expected content token request")
+	}
+	if stdout.String() != "default body\n" {
+		t.Fatalf("unexpected stdout: %q", stdout.String())
+	}
+}
+
+func TestRunFetchUserAgentNotRegisteredShowsError(t *testing.T) {
+	token := testAgentJWT(t)
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
+	}))
+	defer authSrv.Close()
+
+	gatewaySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/agents/v1/rates/batch":
+			_ = json.NewEncoder(w).Encode([]tollbit.BatchRateResponseV2{{
+				URL: "https://example.com/article",
+				Rates: []tollbit.BatchDeveloperRateResponse{{
+					Price:   tollbit.RatePriceResponse{PriceMicros: 50000, Currency: "USD"},
+					License: tollbit.BatchRateLicenseResponse{LicenseType: "standard", Cuid: "lic_1"},
+				}},
+			}})
+		case r.Method == http.MethodPost && r.URL.Path == "/agents/v1/tokens/content":
+			w.Header().Set("Content-Type", "application/problem+json")
+			w.WriteHeader(http.StatusBadRequest)
+			code := problemjson.ErrorCodeUserAgentNotRegistered
+			detail := "user agent bad-agent is not registered"
+			_ = json.NewEncoder(w).Encode(problemjson.Problem{
+				Type: "about:blank", Title: "Bad Request", Status: 400, Code: &code, Detail: &detail,
+			})
+		default:
+			t.Fatalf("unexpected gateway request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer gatewaySrv.Close()
+
+	t.Setenv(testAuthBaseURLEnvVar, authSrv.URL)
+	t.Setenv(testGatewayBaseURLEnvVar, gatewaySrv.URL)
+	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
+
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommand([]string{
+		"content", "fetch", "https://example.com/article",
+		"--confirm", "--user-agent", "bad-agent",
+	}, nil, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("expected exit code 1, got %d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), createUserAgentURL) {
-		t.Fatalf("expected create-user-agent URL in stderr, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "user agent bad-agent is not registered") {
+		t.Fatalf("expected problem detail on stderr, got %q", stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "run this command again") {
-		t.Fatalf("expected restart guidance in stderr, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "https://hack.tollbit.com/my-agents") {
+		t.Fatalf("expected registration URL on stderr, got %q", stderr.String())
 	}
 }
 
@@ -435,9 +378,9 @@ func newFetchGatewayServer(t *testing.T, agentToken string, handlers fetchGatewa
 				t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
 			}
 			_ = json.NewEncoder(w).Encode(tollbit.CreateContentAccessTokenResponse{Token: handlers.contentToken})
-		case r.Method == http.MethodGet && r.URL.Path == "/dev/v2/content/example.com/article":
-			if r.Header.Get("TollbitToken") != handlers.contentToken {
-				t.Fatalf("unexpected tollbit token: %q", r.Header.Get("TollbitToken"))
+		case r.Method == http.MethodGet && r.URL.Path == "/agents/v1/content/example.com/article":
+			if r.Header.Get("Tollbit-Token") != handlers.contentToken {
+				t.Fatalf("unexpected tollbit token: %q", r.Header.Get("Tollbit-Token"))
 			}
 			_ = json.NewEncoder(w).Encode(tollbit.GetContentResponse{
 				Content: tollbit.PageContent{Body: handlers.contentBody},

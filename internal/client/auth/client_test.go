@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/tollbit-cli/internal/version"
 )
 
 func TestClientCreatesAgentToken(t *testing.T) {
@@ -28,8 +29,8 @@ func TestClientCreatesAgentToken(t *testing.T) {
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Fatalf("expected Content-Type application/json, got %q", r.Header.Get("Content-Type"))
 		}
-		if r.Header.Get("User-Agent") != "agent-test/0.1" {
-			t.Fatalf("expected User-Agent from credentials, got %q", r.Header.Get("User-Agent"))
+		if r.Header.Get("User-Agent") != version.HTTPUserAgent() {
+			t.Fatalf("expected User-Agent %q, got %q", version.HTTPUserAgent(), r.Header.Get("User-Agent"))
 		}
 
 		var body AgentTokenRequest

@@ -75,14 +75,14 @@ func runPricing(cmd *cobra.Command, factory app.Factory, opts pricingOptions, ur
 	var resp []tollbit.BatchRateResponseV2
 	if app.Config().Auth.RetryOnOBORequired {
 		resp, err = agenttoken.WithOBORetry(cmd, credentials, identity, func(token agent.Token) ([]tollbit.BatchRateResponseV2, error) {
-			return tollbitClient.BatchGetRates(cmd.Context(), urls, token, identity.UserAgent)
+			return tollbitClient.BatchGetRates(cmd.Context(), urls, token)
 		})
 	} else {
 		token, tokenErr := credentials.GetAgentToken(cmd, identity)
 		if tokenErr != nil {
 			return RuntimeError(fmt.Errorf("error fetching agent token: %w", tokenErr))
 		}
-		resp, err = tollbitClient.BatchGetRates(cmd.Context(), urls, token, identity.UserAgent)
+		resp, err = tollbitClient.BatchGetRates(cmd.Context(), urls, token)
 	}
 	if err != nil {
 		return RuntimeError(fmt.Errorf("error fetching rates: %w", err))

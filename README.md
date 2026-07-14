@@ -125,7 +125,7 @@ Price and fetch licensed publisher content:
 
 Known license types show consumer-facing labels (for example `Summarization (ON_DEMAND_LICENSE)`).
 
-**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. Set a registered user agent with `auth set --user-agent` or `--user-agent` on the fetch command.
+**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. When no user agent is configured, the org default `-tbcli-` agent is used. Set a registered user agent with `auth set --user-agent` or `--user-agent` on the fetch command. Content is fetched via `GET /agents/v1/content/{contentUrl}`.
 
 ### Guide
 
