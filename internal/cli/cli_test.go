@@ -136,11 +136,11 @@ func TestRunSearchRendersResults(t *testing.T) {
 	if want := "page-2"; !strings.Contains(stdout.String(), want) {
 		t.Fatalf("expected stdout to contain next-token hint, got %q", stdout.String())
 	}
-	if want := "To get pricing: tollbit content pricing <url>[,<url>...]"; !strings.Contains(stdout.String(), want) {
-		t.Fatalf("expected stdout to contain pricing leading command, got %q", stdout.String())
+	if strings.Contains(stdout.String(), "To get pricing:") {
+		t.Fatalf("expected pricing leading command on stderr, not stdout; got %q", stdout.String())
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("expected empty stderr, got %q", stderr.String())
+	if want := "To get pricing: tollbit content pricing <url>[,<url>...]"; !strings.Contains(stderr.String(), want) {
+		t.Fatalf("expected stderr to contain pricing leading command, got %q", stderr.String())
 	}
 }
 
@@ -171,6 +171,9 @@ func TestRunSearchJSON(t *testing.T) {
 	}
 	if strings.Contains(stdout.String(), "To get pricing:") {
 		t.Fatalf("expected no leading command in --json output, got %q", stdout.String())
+	}
+	if strings.Contains(stderr.String(), "To get pricing:") {
+		t.Fatalf("expected no leading command on stderr for --json, got %q", stderr.String())
 	}
 	var resp tollbit.PagedSearchResultResponse
 	if err := json.NewDecoder(&stdout).Decode(&resp); err != nil {

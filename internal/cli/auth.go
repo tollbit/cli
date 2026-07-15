@@ -112,7 +112,7 @@ func NewAuthStatusCommand(factory app.Factory) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&opts.asJSON, "json", false, "print status as JSON")
-	cmd.Flags().BoolVar(&opts.check, "check", false, "exit with a non-zero code when the token is missing or invalid")
+	cmd.Flags().BoolVar(&opts.check, "check", false, "exit 0 if valid, 1 if invalid/expired, 2 if missing (no stdout)")
 	return cmd
 }
 

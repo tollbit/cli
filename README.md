@@ -64,10 +64,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release instruc
 ## For AI coding agents
 
 - Install `tollbit` so it is on **`PATH`** in every environment where you run shell commands (CI images, local sandboxes, agent runners).
-- Run **`tollbit guide`** for orientation, then **`tollbit guide --install <SKILLS_DIR>`** to persist the bundled skill.
+- Run **`tollbit guide`** for orientation, then **`tollbit guide --install <SKILLS_DIR>`** to persist the bundled skill. The guide is the full automation contract (exit codes, streams, non-interactive fetch).
 - Typical flow: **`search`** → **`content pricing`** → **`content fetch`**. The CLI prompts for authentication when a token is required.
 - Optionally set an agent profile with **`tollbit auth set --name <name>`** (or `TOLLBIT_AGENT_DEFAULT_NAME`) / **`--user-agent`**.
-- Prefer **`--json`** on **`search`**, **`content pricing`**, and **`auth status`** when you need machine-readable output.
+- Prefer **`--json`** on **`search`**, **`content pricing`**, **`content fetch`**, and **`auth status`**. Exit codes: `0` success, `1` runtime, `2` usage; stdout is data-only (hints and errors on stderr).
 
 ## What the CLI can do
 

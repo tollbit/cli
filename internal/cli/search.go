@@ -127,7 +127,7 @@ func runSearch(cmd *cobra.Command, factory app.Factory, opts searchOptions, quer
 	if opts.asJSON {
 		return RuntimeError(writeJSON(cmd.OutOrStdout(), resp))
 	}
-	printSearchResults(cmd.OutOrStdout(), resp)
+	printSearchResults(cmd.OutOrStdout(), cmd.ErrOrStderr(), resp)
 	return nil
 }
 
@@ -144,22 +144,22 @@ func splitCommaSeparated(value string) []string {
 	return out
 }
 
-func printSearchResults(w io.Writer, resp tollbit.PagedSearchResultResponse) {
+func printSearchResults(stdout, stderr io.Writer, resp tollbit.PagedSearchResultResponse) {
 	if len(resp.Items) == 0 {
-		fmt.Fprintln(w, "No results.")
+		fmt.Fprintln(stdout, "No results.")
 	} else {
 		for i, item := range resp.Items {
-			fmt.Fprintf(w, "%d. %s\n", i+1, item.Title)
-			fmt.Fprintf(w, "   %s\n", item.URL)
-			fmt.Fprintf(w, "   %s (%s) · %s\n", item.Publisher.Name, item.Publisher.Domain, item.PublishedDate)
-			fmt.Fprintf(w, "   %s\n", formatAvailabilityLabels(item.Availability))
+			fmt.Fprintf(stdout, "%d. %s\n", i+1, item.Title)
+			fmt.Fprintf(stdout, "   %s\n", item.URL)
+			fmt.Fprintf(stdout, "   %s (%s) · %s\n", item.Publisher.Name, item.Publisher.Domain, item.PublishedDate)
+			fmt.Fprintf(stdout, "   %s\n", formatAvailabilityLabels(item.Availability))
 		}
 	}
 	if next := strings.TrimSpace(resp.NextToken); next != "" {
-		fmt.Fprintf(w, "\nMore results available. Pass --next-token %q to continue.\n", next)
+		fmt.Fprintf(stdout, "\nMore results available. Pass --next-token %q to continue.\n", next)
 	}
 	if len(resp.Items) > 0 {
-		printLeadingCommand(w, "To get pricing: tollbit content pricing <url>[,<url>...]")
+		printLeadingCommand(stderr, "To get pricing: tollbit content pricing <url>[,<url>...]")
 	}
 }
 

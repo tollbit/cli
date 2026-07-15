@@ -13,9 +13,10 @@ func writeJSON(stdout io.Writer, value any) error {
 	return enc.Encode(value)
 }
 
-// printLeadingCommand writes a blank line then a next-step command hint on stdout.
-func printLeadingCommand(w io.Writer, text string) {
-	fmt.Fprintf(w, "\n%s\n", text)
+// printLeadingCommand writes a blank line then a next-step command hint on stderr
+// so stdout stays data-only for agents and redirects.
+func printLeadingCommand(stderr io.Writer, text string) {
+	fmt.Fprintf(stderr, "\n%s\n", text)
 }
 
 func trim(s string, n int) string {

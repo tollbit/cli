@@ -6,6 +6,8 @@ Development and release notes for the Tollbit CLI (`tollbit/cli`).
 
 **CI:** `go test ./...` runs on pull requests and on pushes to `main` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Go version from [`go.mod`](go.mod)).
 
+`tollbit guide` is an embedded copy of [`skill/tollbit-cli/SKILL.md`](skill/tollbit-cli/SKILL.md) — edit that file only; do not maintain a separate guide.
+
 The repo includes a small `Makefile`:
 
 | Target | What it runs |
