@@ -1,19 +1,18 @@
-# Release pipeline DISABLED — restore automatic releases when the repo is public:
-# uncomment `on.push.tags` below and remove `if: false` from each job.
+# Publishes GitHub Releases on this repo and the @tollbit/tollbit-cli npm package
+# when a version tag (v*) is pushed.
 name: release
 
 on:
   workflow_dispatch: {}
-  # push:
-  #   tags:
-  #     - "v*"
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
   goreleaser:
-    if: false # release pipeline disabled
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,7 +36,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   npm-publish:
-    if: false # release pipeline disabled
     needs: goreleaser
     runs-on: ubuntu-latest
     permissions:
