@@ -34,7 +34,7 @@ func TestRenderErrorUpdateRequired(t *testing.T) {
 	if got != want {
 		t.Fatalf("RenderError = %q, want %q", got, want)
 	}
-	if !strings.Contains(got, "npm update -g @tollbit/cli") {
+	if !strings.Contains(got, "npm update -g @tollbit/tollbit-cli") {
 		t.Fatalf("RenderError %q should carry the npm update command", got)
 	}
 }

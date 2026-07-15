@@ -1,5 +1,5 @@
-# Release pipeline DISABLED — restore automatic releases by uncommenting `on.push.tags`
-# below and removing `if: false` from each job.
+# Release pipeline DISABLED — restore automatic releases when the repo is public:
+# uncomment `on.push.tags` below and remove `if: false` from each job.
 name: release
 
 on:
@@ -12,25 +12,8 @@ permissions:
   contents: write
 
 jobs:
-  # Seed tollbit-cli-releases with README + install scripts *before* GoReleaser.
-  # GitHub returns 422 "Repository is empty" when publishing releases to a repo with no commits.
-  sync-public-release:
-    if: false # release pipeline disabled
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout tollbit-cli at tag
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Sync public README and install scripts to tollbit-cli-releases
-        env:
-          RELEASES_GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
-        run: bash scripts/ci/sync-install-scripts-to-releases.sh
-
   goreleaser:
     if: false # release pipeline disabled
-    needs: sync-public-release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -43,9 +26,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # Publish releases to https://github.com/tollbit/tollbit-cli-releases (public).
-      # Secret RELEASES_GITHUB_TOKEN: fine-grained PAT (Contents: Read and write on that repo)
-      # or classic PAT with repo scope. GitHub App installation tokens also work.
+      # Publishes GitHub Releases on this repo (tollbit/cli).
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -53,7 +34,7 @@ jobs:
           version: "~> v2"
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   npm-publish:
     if: false # release pipeline disabled

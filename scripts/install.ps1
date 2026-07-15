@@ -5,7 +5,7 @@ param(
     [switch]$Force,
     [switch]$NoModifyPath,
     [switch]$PrintPathInstructions,
-    [string]$Repo = "tollbit/tollbit-cli-releases"
+    [string]$Repo = "tollbit/cli"
 )
 
 Set-StrictMode -Version Latest
@@ -40,7 +40,7 @@ function Install-Tollbit {
         [switch]$Force,
         [switch]$NoModifyPath,
         [switch]$PrintPathInstructions,
-        [string]$Repo = "tollbit/tollbit-cli-releases"
+        [string]$Repo = "tollbit/cli"
     )
 
     $binaryName = "tollbit.exe"

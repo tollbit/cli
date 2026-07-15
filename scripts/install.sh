@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${REPO:-tollbit/tollbit-cli-releases}"
+REPO="${REPO:-tollbit/cli}"
 BINARY_NAME="tollbit"
 DEFAULT_INSTALL_DIR="${HOME}/.local/bin"
 VERSION="latest"
@@ -23,7 +23,7 @@ Options:
   --force                       Overwrite an existing binary
   --no-modify-path              Do not update shell profile PATH
   --print-path-instructions     Print PATH instructions even if PATH is updated
-  --repo <owner/repo>           GitHub repository (default: tollbit/tollbit-cli-releases)
+  --repo <owner/repo>           GitHub repository (default: tollbit/cli)
   -h, --help                    Show this help
 EOF
 }

@@ -46,9 +46,9 @@ func TestUpdateInstructions(t *testing.T) {
 		latest   string
 		contains []string
 	}{
-		{MethodNPM, "0.2.0", []string{"(0.2.0)", "npm update -g @tollbit/cli"}},
+		{MethodNPM, "0.2.0", []string{"(0.2.0)", "npm update -g @tollbit/tollbit-cli"}},
 		{MethodInstaller, "0.2.0", []string{"(0.2.0)", "install.sh", "--force"}},
-		{MethodUnknown, "", []string{"tollbit-cli-releases"}},
+		{MethodUnknown, "", []string{"github.com/tollbit/cli"}},
 	}
 	for _, tc := range testCases {
 		got := UpdateInstructions(tc.method, tc.latest)
@@ -67,9 +67,9 @@ func TestRequiredInstructions(t *testing.T) {
 		latest   string
 		contains []string
 	}{
-		{MethodNPM, "0.1.0", "0.2.0", []string{"minimum: 0.1.0", "version 0.2.0", "npm update -g @tollbit/cli"}},
+		{MethodNPM, "0.1.0", "0.2.0", []string{"minimum: 0.1.0", "version 0.2.0", "npm update -g @tollbit/tollbit-cli"}},
 		{MethodInstaller, "0.1.0", "", []string{"minimum: 0.1.0", "the latest version", "install.sh"}},
-		{MethodUnknown, "", "", []string{"no longer supported", "tollbit-cli-releases"}},
+		{MethodUnknown, "", "", []string{"no longer supported", "github.com/tollbit/cli"}},
 	}
 	for _, tc := range testCases {
 		got := RequiredInstructions(tc.method, tc.minimum, tc.latest)
