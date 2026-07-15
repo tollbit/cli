@@ -50,21 +50,32 @@ For local development, a `.env` file in the current working directory is loaded 
 
 Publishing is triggered by pushing a **version tag** whose name starts with **`v`**. The semver must match [`internal/version/version.go`](internal/version/version.go); [`skill/tollbit-cli/SKILL.md`](skill/tollbit-cli/SKILL.md) must stay aligned (`go test ./...` enforces this).
 
-Bump the repo together (CLI const, skill frontmatter/body, and pinned **`v…`** install examples in [README.md](README.md)):
+Do this in two steps: land the version bump on `main` via PR, then tag and push from `main`. Do **not** create or push the release tag from a feature branch — if the PR is squashed or rebased, that tag may not point at the commit that ends up on `main`.
+
+### 1. Version bump PR
+
+On a branch from an up-to-date `main`, bump the repo together (CLI const, skill frontmatter/body, and pinned **`v…`** install examples in [README.md](README.md)):
 
 ```bash
+git checkout -b release/v0.2.0
 make bump VERSION=0.2.0
 make test
 ```
 
-Then commit the version bump (and any other release commits). Create the tag from [`internal/version/version.go`](internal/version/version.go) (must match — refuses if the tag already exists or the tree is dirty; override with `ALLOW_DIRTY=1` if you must):
+Commit the bump, open a PR, and merge it to `main` after CI is green.
+
+### 2. Tag from `main`
+
+After the bump is on `main`, check out `main`, pull, and create the tag from [`internal/version/version.go`](internal/version/version.go) (must match — refuses if the tag already exists or the tree is dirty; override with `ALLOW_DIRTY=1` if you must):
 
 ```bash
+git checkout main
+git pull origin main
 make tag
 git push origin vX.Y.Z
 ```
 
-Use the printed tag name in the push (same as `v` + `Version` in code).
+Use the printed tag name in the push (same as `v` + `Version` in code). Only the **push of the tag** starts the release workflow.
 
 ### Release workflow
 
@@ -85,3 +96,4 @@ git tag v0.1.0
 ```
 
 If you already pushed the wrong tag, fix it on the remote only if your policy allows force-deleting release tags.
+

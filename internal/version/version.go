@@ -2,4 +2,4 @@
 // Bump this when shipping; keep skill frontmatter `version` in sync (tests enforce it).
 package version
 
-const Version = "0.0.1"
+const Version = "0.2.0"

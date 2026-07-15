@@ -1,6 +1,6 @@
 ---
 name: tollbit-cli
-version: 0.0.1
+version: 0.2.0
 description: Manage Tollbit agent profile, authorization, content search, pricing, and paid content fetch with the tollbit CLI.
 ---
 
