@@ -44,7 +44,7 @@ That defines `tollbit` for the rest of the session (for example: `tollbit --help
 
 ### Local configuration
 
-For local development, a `.env` file in the current working directory is loaded at startup (existing shell variables are not overwritten). Override the path with `TOLLBIT_ENV_FILE`. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
+For local development, point `TOLLBIT_ENV_FILE` at a dotenv file to load it at startup — for example `export TOLLBIT_ENV_FILE=.env` in your shell or direnv (a relative path resolves against the current directory). A `.env` is **not** auto-discovered from the working directory, so a stray `.env` in an unrelated repo can never take effect. Only `TOLLBIT_`-prefixed keys are honored, and existing shell variables are not overwritten. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
 
 ## Release
 

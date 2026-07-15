@@ -4,26 +4,29 @@ import (
 	"bufio"
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
 const EnvFilePathVar = "TOLLBIT_ENV_FILE"
 
-// LoadDefault reads TOLLBIT_ENV_FILE or .env in the current working directory.
+// keyPrefix limits dotenv files to the CLI's own namespace so a loaded file
+// cannot inject unrelated process variables (PATH, AWS_*, ...).
+const keyPrefix = "TOLLBIT_"
+
+// LoadDefault loads the dotenv file named by TOLLBIT_ENV_FILE, if set. It does
+// not auto-discover a .env in the current working directory: loading is
+// explicit so a stray .env in an unrelated directory can never take effect.
 // Variables already set in the process environment are not overwritten.
 func LoadDefault() error {
-	if path := strings.TrimSpace(os.Getenv(EnvFilePathVar)); path != "" {
-		return Load(path)
-	}
-	wd, err := os.Getwd()
-	if err != nil {
+	path := strings.TrimSpace(os.Getenv(EnvFilePathVar))
+	if path == "" {
 		return nil
 	}
-	return Load(filepath.Join(wd, ".env"))
+	return Load(path)
 }
 
-// Load parses a dotenv file and sets variables that are not already set.
+// Load parses a dotenv file and sets TOLLBIT_-prefixed variables that are not
+// already set. Non-TOLLBIT_ keys are ignored. A missing file is a no-op.
 func Load(path string) error {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -55,6 +58,9 @@ func applyLine(line string) error {
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
+		return nil
+	}
+	if !strings.HasPrefix(key, keyPrefix) {
 		return nil
 	}
 	if os.Getenv(key) != "" {

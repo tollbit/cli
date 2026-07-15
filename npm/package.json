@@ -16,7 +16,8 @@
   },
   "files": [
     "cli.js",
-    "install.js"
+    "install.js",
+    "README.md"
   ],
   "scripts": {
     "postinstall": "node install.js"
