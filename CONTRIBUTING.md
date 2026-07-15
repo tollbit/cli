@@ -75,14 +75,7 @@ The release pipeline lives in [`.github/workflows/release.yml`](.github/workflow
 
 Install scripts live at `scripts/install.{sh,ps1}` on `main` in this repo; users and the npm postinstall step download binaries from this repo's GitHub Releases.
 
-**The workflow is currently disabled** (`if: false` on jobs; tag trigger commented out) until the repo is public. To re-enable:
-
-1. Make the repository public.
-2. Uncomment `on.push.tags` in [`.github/workflows/release.yml`](.github/workflows/release.yml).
-3. Remove `if: false` from the `goreleaser` and `npm-publish` jobs.
-4. Confirm npm **trusted publishing** is linked to `tollbit/cli` and this workflow.
-
-The old dual-repo model (`tollbit-cli-releases` + `RELEASES_GITHUB_TOKEN` + `release-public/` sync) has been removed. New releases publish only to `tollbit/cli`.
+npm **trusted publishing** must be linked to `tollbit/cli` and this workflow (`release.yml`). The old dual-repo model (`tollbit-cli-releases` + `RELEASES_GITHUB_TOKEN` + `release-public/` sync) has been removed. New releases publish only to `tollbit/cli`.
 
 To move or reuse a tag locally before pushing:
 

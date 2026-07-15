@@ -3,6 +3,14 @@
   "version": "0.0.1",
   "description": "Tollbit CLI wrapper that installs the native tollbit binary",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tollbit/cli.git"
+  },
+  "homepage": "https://github.com/tollbit/cli#readme",
+  "bugs": {
+    "url": "https://github.com/tollbit/cli/issues"
+  },
   "bin": {
     "tollbit": "cli.js"
   },
