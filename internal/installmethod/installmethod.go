@@ -61,11 +61,11 @@ func UpdateInstructions(method Method, latest string) string {
 
 	switch method {
 	case MethodNPM:
-		return available + ". Run: npm update -g @tollbit/cli"
+		return available + ". Run: npm update -g @tollbit/tollbit-cli"
 	case MethodInstaller:
-		return available + `. Run: curl -fsSL "https://raw.githubusercontent.com/tollbit/tollbit-cli-releases/main/scripts/install.sh" | bash -s -- --force`
+		return available + `. Run: curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --force`
 	default:
-		return available + ". See https://github.com/tollbit/tollbit-cli-releases for install instructions."
+		return available + ". See https://github.com/tollbit/cli for install instructions."
 	}
 }
 
@@ -85,11 +85,11 @@ func RequiredInstructions(method Method, minimum, latest string) string {
 
 	switch method {
 	case MethodNPM:
-		return msg + "Update to " + target + " with: npm update -g @tollbit/cli"
+		return msg + "Update to " + target + " with: npm update -g @tollbit/tollbit-cli"
 	case MethodInstaller:
-		return msg + "Update to " + target + ` with: curl -fsSL "https://raw.githubusercontent.com/tollbit/tollbit-cli-releases/main/scripts/install.sh" | bash -s -- --force`
+		return msg + "Update to " + target + ` with: curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --force`
 	default:
-		return msg + "Update to " + target + ": see https://github.com/tollbit/tollbit-cli-releases for install instructions."
+		return msg + "Update to " + target + ": see https://github.com/tollbit/cli for install instructions."
 	}
 }
 

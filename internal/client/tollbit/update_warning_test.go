@@ -77,7 +77,7 @@ func TestUpdateWarningPrintedOncePerProcess(t *testing.T) {
 	if got := buf.String(); got != want {
 		t.Fatalf("warning output = %q, want it printed exactly once as %q", got, want)
 	}
-	if !strings.Contains(buf.String(), "npm update -g @tollbit/cli") {
+	if !strings.Contains(buf.String(), "npm update -g @tollbit/tollbit-cli") {
 		t.Fatalf("warning %q should carry the npm update command", buf.String())
 	}
 }

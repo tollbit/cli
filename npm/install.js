@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const repo = process.env.TOLLBIT_NPM_REPO || "tollbit/tollbit-cli-releases";
+const repo = process.env.TOLLBIT_NPM_REPO || "tollbit/cli";
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
 const version = process.env.TOLLBIT_VERSION_OVERRIDE || `v${pkg.version}`;
 

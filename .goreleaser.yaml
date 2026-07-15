@@ -33,12 +33,6 @@ archives:
 checksum:
   name_template: "tollbit_{{ .Version }}_checksums.txt"
 
-# Binaries and checksums are published on the public distribution repo (not the private source repo).
-release:
-  github:
-    owner: tollbit
-    name: tollbit-cli-releases
-
 changelog:
   use: git
   sort: asc
