@@ -45,11 +45,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Node 24 ships npm >= 11.5.1, required for Trusted Publishing (OIDC).
+      # Do not set registry-url: setup-node would write an empty _authToken line
+      # that short-circuits OIDC and surfaces as a misleading E404 on publish.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
+          node-version: "24"
 
       - name: Set npm package version from git tag
         working-directory: npm
@@ -62,7 +64,7 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
-      # Trusted publishing (OIDC): no NPM_TOKEN secret required once npm trust is configured.
+      # Trusted publishing (OIDC): no NPM_TOKEN / NODE_AUTH_TOKEN required.
       - name: Publish npm package
         working-directory: npm
         run: npm publish --provenance --access public
