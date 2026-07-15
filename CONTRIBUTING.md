@@ -6,6 +6,8 @@ Development and release notes for the Tollbit CLI (`tollbit/cli`).
 
 **CI:** `go test ./...` runs on pull requests and on pushes to `main` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Go version from [`go.mod`](go.mod)).
 
+`tollbit guide` is an embedded copy of [`skill/tollbit-cli/SKILL.md`](skill/tollbit-cli/SKILL.md) — edit that file only; do not maintain a separate guide.
+
 The repo includes a small `Makefile`:
 
 | Target | What it runs |
@@ -44,7 +46,7 @@ That defines `tollbit` for the rest of the session (for example: `tollbit --help
 
 ### Local configuration
 
-For local development, a `.env` file in the current working directory is loaded at startup (existing shell variables are not overwritten). Override the path with `TOLLBIT_ENV_FILE`. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
+For local development, point `TOLLBIT_ENV_FILE` at a dotenv file to load it at startup — for example `export TOLLBIT_ENV_FILE=.env` in your shell or direnv (a relative path resolves against the current directory). A `.env` is **not** auto-discovered from the working directory, so a stray `.env` in an unrelated repo can never take effect. Only `TOLLBIT_`-prefixed keys are honored, and existing shell variables are not overwritten. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
 
 ## Release
 

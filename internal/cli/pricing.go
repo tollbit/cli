@@ -91,7 +91,7 @@ func runPricing(cmd *cobra.Command, factory app.Factory, opts pricingOptions, ur
 	if opts.asJSON {
 		return RuntimeError(writeJSON(cmd.OutOrStdout(), resp))
 	}
-	printPricingResults(cmd.OutOrStdout(), resp)
+	printPricingResults(cmd.OutOrStdout(), cmd.ErrOrStderr(), resp)
 	return nil
 }
 
@@ -136,15 +136,15 @@ func normalizeArticleURL(raw string) (string, error) {
 	return parsed.String(), nil
 }
 
-func printPricingResults(w io.Writer, resp []tollbit.BatchRateResponseV2) {
+func printPricingResults(stdout, stderr io.Writer, resp []tollbit.BatchRateResponseV2) {
 	var firstPricedURL string
 	for i, item := range resp {
 		if i > 0 {
-			fmt.Fprintln(w)
+			fmt.Fprintln(stdout)
 		}
-		fmt.Fprintln(w, item.URL)
+		fmt.Fprintln(stdout, item.URL)
 		if len(item.Rates) == 0 {
-			fmt.Fprintln(w, "  (no rates)")
+			fmt.Fprintln(stdout, "  (no rates)")
 			continue
 		}
 		if firstPricedURL == "" {
@@ -157,16 +157,16 @@ func printPricingResults(w io.Writer, resp []tollbit.BatchRateResponseV2) {
 			if msg := strings.TrimSpace(rate.Error); msg != "" {
 				line += " · error: " + msg
 			}
-			fmt.Fprintln(w, line)
+			fmt.Fprintln(stdout, line)
 			if display.description != "" {
-				fmt.Fprintf(w, "    %s\n", display.description)
+				fmt.Fprintf(stdout, "    %s\n", display.description)
 			} else if display.licenseURL != "" {
-				fmt.Fprintf(w, "    %s\n", display.licenseURL)
+				fmt.Fprintf(stdout, "    %s\n", display.licenseURL)
 			}
 		}
 	}
 	if firstPricedURL != "" {
-		printLeadingCommand(w, "To fetch content: tollbit content fetch "+firstPricedURL)
+		printLeadingCommand(stderr, "To fetch content: tollbit content fetch "+firstPricedURL)
 	}
 }
 

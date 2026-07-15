@@ -1,10 +1,10 @@
 # Tollbit CLI
 
-Command-line client for [Tollbit](https://tollbit.com) agent identity, authorization, and publisher content search.
+CLI client for searching and grounding content for agents, allows access to all content in the [TollBit](https://tollbit.com) network.
 
 Binaries and installers are published on **[GitHub Releases](https://github.com/tollbit/cli/releases)**.
 
-Primary workflow: `auth login` → confirm with `auth status` → search content with `search`.
+Primary workflow: install → `search` → `content pricing` → `content fetch`. Authentication is triggered automatically by the CLI when needed.
 
 ## Install
 
@@ -21,7 +21,7 @@ curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.s
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.2.0
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.2.1
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
@@ -37,7 +37,7 @@ Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
 irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
-Install-Tollbit -Version v0.2.0 -Force
+Install-Tollbit -Version v0.2.1 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -61,35 +61,55 @@ go build ./cmd/tollbit
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release instructions.
 
-## Configure
-
-Agent credentials are stored under `TOLLBIT_CREDENTIALS_STORAGE_DIR` (default platform path): `agent-identity.json` and `agent-token.jwt`.
-
-For local development, a `.env` file in the current working directory is loaded at startup (existing shell variables are not overwritten). Override the path with `TOLLBIT_ENV_FILE`. Useful vars include `TOLLBIT_AUTH_BASE_URL`, `TOLLBIT_GATEWAY_BASE_URL`, `TOLLBIT_AGENT_DEFAULT_NAME`, `TOLLBIT_CREDENTIALS_STORAGE_DIR`, and `TOLLBIT_LOG_LEVEL`.
-
 ## For AI coding agents
 
 - Install `tollbit` so it is on **`PATH`** in every environment where you run shell commands (CI images, local sandboxes, agent runners).
-- Run **`tollbit guide`** for orientation, then **`tollbit guide --install <SKILLS_DIR>`** to persist the bundled skill.
-- Configure agent profile: **`tollbit auth set --name <name>`** (or `TOLLBIT_AGENT_DEFAULT_NAME`), then confirm with **`tollbit auth status`** before search calls.
-- Use **`tollbit auth login`** when user/org authorization is required.
-- Prefer **`--json`** on **`search`** and **`auth status`** when you need machine-readable output.
+- Run **`tollbit guide`** for orientation, then **`tollbit guide --install <SKILLS_DIR>`** to persist the bundled skill. The guide is the full automation contract (exit codes, streams, non-interactive fetch).
+- Typical flow: **`search`** → **`content pricing`** → **`content fetch`**. The CLI prompts for authentication when a token is required.
+- Optionally set an agent profile with **`tollbit auth set --name <name>`** (or `TOLLBIT_AGENT_DEFAULT_NAME`) / **`--user-agent`**.
+- Prefer **`--json`** on **`search`**, **`content pricing`**, **`content fetch`**, and **`auth status`**. Exit codes: `0` success, `1` runtime, `2` usage; stdout is data-only (hints and errors on stderr).
 
 ## What the CLI can do
 
 | Command | Purpose |
 |--------|---------|
-| **`auth login/logout/status/set`** | Agent profile and OAuth authorization token. |
 | **`search "query"`** | Search publisher content via the gateway API. |
 | **`content pricing/fetch`** | Price and fetch licensed publisher content. |
+| **`auth login/logout/status/set`** | Agent profile and OAuth authorization token (also run automatically when needed). |
 | **`guide`** | Print the agent guide; optionally install bundled skill markdown. |
 | **`version`** | Print the CLI version string. |
 
-Typical flow: **`auth login`** → **`auth status`** → **`search "query"`**. Use **`--help`** on each command for flags.
+Typical flow: **`search "query"`** → **`content pricing <url>`** → **`content fetch <url>`**. Use **`--help`** on each command for flags.
 
 ## Commands
 
+### Search
+
+Search first; the CLI will prompt for authentication if your session is not ready yet.
+
+```bash
+tollbit search "climate policy"
+tollbit search "climate policy" --size 10 --json
+tollbit search "query" --properties example.com,cnn.com --programmatic-only
+```
+
+### Content
+
+Price and fetch licensed publisher content:
+
+```bash
+tollbit content pricing https://example.com/article-1,https://example.com/article-2
+tollbit content pricing https://example.com/article --json
+tollbit content fetch https://example.com/article
+tollbit content fetch https://example.com/article --confirm --toDisk ./article.md
+tollbit content fetch https://example.com/article --confirm --json --rate-index 1
+```
+
+**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. When no user agent is configured, the org default `-tbcli-` agent is used. Set a registered user agent with `auth set --user-agent` or `--user-agent` on the fetch command.
+
 ### Auth
+
+Auth runs automatically when a command needs a token. Use these commands to inspect or manage the profile explicitly:
 
 ```bash
 tollbit auth login --name my-agent --user-agent MyAgent-User
@@ -105,35 +125,7 @@ tollbit auth logout --all
 
 `auth status --check` exits `0` when the token is valid, `1` when invalid/expired, and `2` when missing (no stdout).
 
-Set `TOLLBIT_AUTH_BROWSER_CONSENT_AUTO_OPEN_BROWSER=false` in headless environments. Confirm readiness with `auth status` before search calls.
-
-### Search
-
-```bash
-tollbit auth status
-
-tollbit search "climate policy"
-tollbit search "climate policy" --size 10 --json
-tollbit search "query" --properties example.com,cnn.com --programmatic-only
-```
-
-Environment:
-
-- `TOLLBIT_GATEWAY_BASE_URL` — gateway base URL (default `https://gateway.tollbit.com`)
-
-### Content
-
-Price and fetch licensed publisher content:
-
-```bash
-tollbit content pricing https://example.com/article-1,https://example.com/article-2
-tollbit content pricing https://example.com/article --json
-tollbit content fetch https://example.com/article
-tollbit content fetch https://example.com/article --confirm --toDisk ./article.md
-tollbit content fetch https://example.com/article --confirm --json --rate-index 1
-```
-
-**Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. When no user agent is configured, the org default `-tbcli-` agent is used. Set a registered user agent with `auth set --user-agent` or `--user-agent` on the fetch command.
+Set `TOLLBIT_AUTH_BROWSER_CONSENT_AUTO_OPEN_BROWSER=false` in headless environments.
 
 ### Guide
 
@@ -162,7 +154,7 @@ Installer channel updates:
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.2.0 --force
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.2.1 --force
 ```
 
 ```powershell
@@ -178,3 +170,7 @@ Other channels:
 
 - Gateway API base URL defaults to `https://gateway.tollbit.com` (agent search).
 - Agent identity tokens are minted via the auth service (`TOLLBIT_AUTH_BASE_URL`).
+
+## Configure
+
+Agent credentials are stored under `TOLLBIT_CREDENTIALS_STORAGE_DIR` (default platform path): `agent-identity.json` and `agent-token.jwt`.

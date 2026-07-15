@@ -57,11 +57,11 @@ func TestRunPricingRendersResults(t *testing.T) {
 	if !strings.Contains(out, "standard") {
 		t.Fatalf("expected stdout to contain license type, got %q", out)
 	}
-	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(out, want) {
-		t.Fatalf("expected stdout to contain fetch leading command, got %q", out)
+	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(stderr.String(), want) {
+		t.Fatalf("expected stderr to contain fetch leading command, got %q", stderr.String())
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("expected empty stderr, got %q", stderr.String())
+	if strings.Contains(out, "To fetch content:") {
+		t.Fatalf("expected fetch leading command on stderr, not stdout; got %q", out)
 	}
 }
 
@@ -102,11 +102,11 @@ func TestRunContentPricingRendersResults(t *testing.T) {
 	if !strings.Contains(out, "USD 0.05") {
 		t.Fatalf("expected stdout to contain formatted price, got %q", out)
 	}
-	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(out, want) {
-		t.Fatalf("expected stdout to contain fetch leading command, got %q", out)
+	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(stderr.String(), want) {
+		t.Fatalf("expected stderr to contain fetch leading command, got %q", stderr.String())
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("expected empty stderr, got %q", stderr.String())
+	if strings.Contains(out, "To fetch content:") {
+		t.Fatalf("expected fetch leading command on stderr, not stdout; got %q", out)
 	}
 }
 
@@ -138,6 +138,9 @@ func TestRunPricingJSON(t *testing.T) {
 	}
 	if strings.Contains(stdout.String(), "To fetch content:") {
 		t.Fatalf("expected no leading command in --json output, got %q", stdout.String())
+	}
+	if strings.Contains(stderr.String(), "To fetch content:") {
+		t.Fatalf("expected no leading command on stderr for --json, got %q", stderr.String())
 	}
 	var resp []tollbit.BatchRateResponseV2
 	if err := json.NewDecoder(&stdout).Decode(&resp); err != nil {
@@ -249,8 +252,8 @@ func TestFormatPricingLicenseLabel(t *testing.T) {
 }
 
 func TestPrintPricingResultsLicenseDetails(t *testing.T) {
-	var buf bytes.Buffer
-	printPricingResults(&buf, []tollbit.BatchRateResponseV2{{
+	var stdout, stderr bytes.Buffer
+	printPricingResults(&stdout, &stderr, []tollbit.BatchRateResponseV2{{
 		URL: "https://example.com/article",
 		Rates: []tollbit.BatchDeveloperRateResponse{
 			{
@@ -271,7 +274,7 @@ func TestPrintPricingResultsLicenseDetails(t *testing.T) {
 		},
 	}})
 
-	out := buf.String()
+	out := stdout.String()
 	if !strings.Contains(out, "Summarization (ON_DEMAND_LICENSE)") || !strings.Contains(out, "summaries and citations") {
 		t.Fatalf("expected summarization detail, got %q", out)
 	}
@@ -281,7 +284,10 @@ func TestPrintPricingResultsLicenseDetails(t *testing.T) {
 	if !strings.Contains(out, "premium") || !strings.Contains(out, "https://example.com/licenses/premium") {
 		t.Fatalf("expected premium license URL, got %q", out)
 	}
-	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(out, want) {
-		t.Fatalf("expected fetch leading command, got %q", out)
+	if strings.Contains(out, "To fetch content:") {
+		t.Fatalf("expected fetch leading command on stderr, not stdout; got %q", out)
+	}
+	if want := "To fetch content: tollbit content fetch https://example.com/article"; !strings.Contains(stderr.String(), want) {
+		t.Fatalf("expected fetch leading command on stderr, got %q", stderr.String())
 	}
 }
