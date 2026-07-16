@@ -1,6 +1,6 @@
 ---
 name: tollbit-cli
-version: 0.2.1
+version: 0.2.2
 description: Search for news and articles and ground answers in licensed publisher content on the TollBit network. Use whenever the user wants to find news, articles, reporting, or sources on a topic or current event — searches the catalog, then prices and fetches full article content (paid) with the tollbit CLI.
 ---
 
