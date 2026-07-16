@@ -50,7 +50,7 @@ For local development, point `TOLLBIT_ENV_FILE` at a dotenv file to load it at s
 
 ## Release
 
-Publishing is triggered by pushing a **version tag** whose name starts with **`v`**. The semver must match [`internal/version/version.go`](internal/version/version.go); [`skill/tollbit-cli/SKILL.md`](skill/tollbit-cli/SKILL.md) must stay aligned (`go test ./...` enforces this).
+Publishing is triggered by pushing a **version tag** whose name starts with **`v`**. The semver must match [`internal/version/version.go`](internal/version/version.go) — the release workflow fails the job if the tag (without the leading `v`) does not equal that const. [`skill/tollbit-cli/SKILL.md`](skill/tollbit-cli/SKILL.md) must stay aligned (`go test ./...` enforces this).
 
 Do this in two steps: land the version bump on `main` via PR, then tag and push from `main`. Do **not** create or push the release tag from a feature branch — if the PR is squashed or rebased, that tag may not point at the commit that ends up on `main`.
 
@@ -83,8 +83,9 @@ Use the printed tag name in the push (same as `v` + `Version` in code). Only the
 
 The release pipeline lives in [`.github/workflows/release.yml`](.github/workflows/release.yml). On each tag push it:
 
-1. Runs [GoReleaser](.goreleaser.yaml) to build cross-platform binaries and publish a **GitHub Release on this repo** (`tollbit/cli`).
-2. Publishes the npm wrapper [`@tollbit/tollbit-cli`](https://www.npmjs.com/package/@tollbit/tollbit-cli) (OIDC trusted publishing; no separate npm token when configured).
+1. Checks that the tag (without `v`) equals [`internal/version/version.go`](internal/version/version.go); fails the job on mismatch.
+2. Runs [GoReleaser](.goreleaser.yaml) to build cross-platform binaries and publish a **GitHub Release on this repo** (`tollbit/cli`).
+3. Publishes the npm wrapper [`@tollbit/tollbit-cli`](https://www.npmjs.com/package/@tollbit/tollbit-cli) (OIDC trusted publishing; no separate npm token when configured).
 
 Install scripts live at `scripts/install.{sh,ps1}` on `main` in this repo; users and the npm postinstall step download binaries from this repo's GitHub Releases.
 

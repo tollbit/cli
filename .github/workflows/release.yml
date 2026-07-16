@@ -20,6 +20,21 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify tag matches version.go
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          CODE="$(sed -n 's/^const Version = "\(.*\)"/\1/p' internal/version/version.go)"
+          if [ -z "$CODE" ]; then
+            echo "error: could not read Version from internal/version/version.go"
+            exit 1
+          fi
+          if [ "$TAG" != "$CODE" ]; then
+            echo "error: git tag '${GITHUB_REF_NAME}' does not match internal/version/version.go (${CODE})"
+            echo "tag the commit that contains the matching Version const (see make tag)"
+            exit 1
+          fi
+          echo "ok: tag ${GITHUB_REF_NAME} matches version.go (${CODE})"
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
