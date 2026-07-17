@@ -16,6 +16,7 @@ func TestParse(t *testing.T) {
 		{"Installer", MethodInstaller},
 		{"", MethodUnknown},
 		{"homebrew", MethodUnknown},
+		{"go-install", MethodUnknown},
 	}
 	for _, tc := range testCases {
 		if got := parse(tc.raw); got != tc.want {
@@ -33,10 +34,30 @@ func TestDetectEnvVarWins(t *testing.T) {
 
 func TestDetectUnknownWithoutSignals(t *testing.T) {
 	t.Setenv(EnvVar, "")
-	// Test binaries run from a temp build dir with no marker file and no
-	// node_modules in the path, so detection should fall through to unknown.
+	// Force no build-info version so detection deterministically falls through
+	// past the go-install check to unknown, regardless of how the test binary
+	// was built.
+	orig := readMainVersion
+	t.Cleanup(func() { readMainVersion = orig })
+	readMainVersion = func() string { return "" }
+	// No marker file and no node_modules in the temp build-dir path either.
 	if got := Detect(); got != MethodUnknown {
 		t.Fatalf("Detect() = %q, want unknown", got)
+	}
+}
+
+func TestDetectGoInstall(t *testing.T) {
+	t.Setenv(EnvVar, "")
+	orig := readMainVersion
+	t.Cleanup(func() { readMainVersion = orig })
+	readMainVersion = func() string { return "v0.2.2" }
+	if got := Detect(); got != MethodGoInstall {
+		t.Fatalf("Detect() = %q, want go-install", got)
+	}
+
+	readMainVersion = func() string { return "(devel)" }
+	if got := Detect(); got == MethodGoInstall {
+		t.Fatalf("Detect() = go-install for a (devel) build, want non-go-install")
 	}
 }
 
@@ -48,6 +69,7 @@ func TestUpdateInstructions(t *testing.T) {
 	}{
 		{MethodNPM, "0.2.0", []string{"(0.2.0)", "npm update -g @tollbit/tollbit-cli"}},
 		{MethodInstaller, "0.2.0", []string{"(0.2.0)", "install.sh", "--force"}},
+		{MethodGoInstall, "0.2.0", []string{"(0.2.0)", "go install github.com/tollbit/cli/cmd/tollbit@latest"}},
 		{MethodUnknown, "", []string{"github.com/tollbit/cli"}},
 	}
 	for _, tc := range testCases {
@@ -69,6 +91,7 @@ func TestRequiredInstructions(t *testing.T) {
 	}{
 		{MethodNPM, "0.1.0", "0.2.0", []string{"minimum: 0.1.0", "version 0.2.0", "npm update -g @tollbit/tollbit-cli"}},
 		{MethodInstaller, "0.1.0", "", []string{"minimum: 0.1.0", "the latest version", "install.sh"}},
+		{MethodGoInstall, "0.1.0", "0.2.0", []string{"minimum: 0.1.0", "version 0.2.0", "go install github.com/tollbit/cli/cmd/tollbit@latest"}},
 		{MethodUnknown, "", "", []string{"no longer supported", "github.com/tollbit/cli"}},
 	}
 	for _, tc := range testCases {
