@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tollbit/tollbit-cli/internal/agentauth"
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
-	"github.com/tollbit/tollbit-cli/internal/client/tollbit"
-	"github.com/tollbit/tollbit-cli/internal/configuration"
-	"github.com/tollbit/tollbit-cli/internal/credentials/agenttoken"
+	"github.com/tollbit/cli/internal/agentauth"
+	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/client/tollbit"
+	"github.com/tollbit/cli/internal/configuration"
+	"github.com/tollbit/cli/internal/credentials/agenttoken"
 )
 
 type Dependencies struct {

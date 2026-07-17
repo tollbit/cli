@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/rs/zerolog"
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 func (m *CredentialManager) CurrentAgentToken(ctx context.Context) (agent.Token, bool, error) {

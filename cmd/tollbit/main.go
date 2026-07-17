@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	tollbitcli "github.com/tollbit/tollbit-cli"
-	"github.com/tollbit/tollbit-cli/internal/app"
-	"github.com/tollbit/tollbit-cli/internal/cli"
-	"github.com/tollbit/tollbit-cli/internal/configuration"
-	"github.com/tollbit/tollbit-cli/internal/envfile"
-	"github.com/tollbit/tollbit-cli/internal/logging"
+	tollbitcli "github.com/tollbit/cli"
+	"github.com/tollbit/cli/internal/app"
+	"github.com/tollbit/cli/internal/cli"
+	"github.com/tollbit/cli/internal/configuration"
+	"github.com/tollbit/cli/internal/envfile"
+	"github.com/tollbit/cli/internal/logging"
 )
 
 func main() {

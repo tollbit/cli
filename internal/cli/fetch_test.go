@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tollbit/tollbit-cli/internal/client/tollbit"
-	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
+	"github.com/tollbit/cli/internal/client/tollbit"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
 )
 
 func TestRunFetchRendersBody(t *testing.T) {

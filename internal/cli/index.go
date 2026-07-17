@@ -2,7 +2,7 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tollbit/tollbit-cli/internal/app"
+	"github.com/tollbit/cli/internal/app"
 )
 
 func NewCommandTree(factory app.Factory) *cobra.Command {

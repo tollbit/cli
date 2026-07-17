@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/tollbit/tollbit-cli/internal/errorsx"
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
-	"github.com/tollbit/tollbit-cli/internal/version"
+	"github.com/tollbit/cli/internal/errorsx"
+	"github.com/tollbit/cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/version"
 )
 
 type (

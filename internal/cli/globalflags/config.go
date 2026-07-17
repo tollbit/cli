@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/tollbit/tollbit-cli/internal/configuration"
+	"github.com/tollbit/cli/internal/configuration"
 )
 
 const ShowDevFlagsEnvVar = "TOLLBIT_SHOW_DEV_FLAGS"

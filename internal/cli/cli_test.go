@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/tollbit/tollbit-cli/internal/app"
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
-	"github.com/tollbit/tollbit-cli/internal/client/tollbit"
-	"github.com/tollbit/tollbit-cli/internal/configuration"
-	"github.com/tollbit/tollbit-cli/internal/version"
+	"github.com/tollbit/cli/internal/app"
+	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/client/tollbit"
+	"github.com/tollbit/cli/internal/configuration"
+	"github.com/tollbit/cli/internal/version"
 )
 
 const testGatewayBaseURLEnvVar = "TOLLBIT_GATEWAY_BASE_URL"

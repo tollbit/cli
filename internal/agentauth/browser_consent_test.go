@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 
 	mapstructure "github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
-	"github.com/tollbit/tollbit-cli/internal/configuration/platformdefaults"
+	"github.com/tollbit/cli/internal/configuration/platformdefaults"
 )
 
 const (

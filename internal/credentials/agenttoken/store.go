@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 const refreshTokenExpirySkew = time.Minute

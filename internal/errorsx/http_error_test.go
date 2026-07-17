@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
 )
 
 func TestParseResponseErrorReturnsProblemJSON(t *testing.T) {

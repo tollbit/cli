@@ -1,8 +1,8 @@
 package agentauth
 
 import (
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 type OBOAuthorizer interface {

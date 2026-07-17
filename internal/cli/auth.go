@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tollbit/tollbit-cli/internal/app"
-	"github.com/tollbit/tollbit-cli/internal/cli/globalflags"
-	"github.com/tollbit/tollbit-cli/internal/credentials/agenttoken"
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/app"
+	"github.com/tollbit/cli/internal/cli/globalflags"
+	"github.com/tollbit/cli/internal/credentials/agenttoken"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 type (
