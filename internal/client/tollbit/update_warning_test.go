@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
-	"github.com/tollbit/tollbit-cli/internal/installmethod"
-	"github.com/tollbit/tollbit-cli/internal/version"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
+	"github.com/tollbit/cli/internal/installmethod"
+	"github.com/tollbit/cli/internal/version"
 )
 
 func captureUpdateWarnings(t *testing.T) *bytes.Buffer {

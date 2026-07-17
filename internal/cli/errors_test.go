@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
-	"github.com/tollbit/tollbit-cli/internal/installmethod"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
+	"github.com/tollbit/cli/internal/installmethod"
 )
 
 func updateRequiredProblem() problemjson.Problem {

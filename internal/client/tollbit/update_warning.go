@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/tollbit/tollbit-cli/internal/installmethod"
+	"github.com/tollbit/cli/internal/installmethod"
 )
 
 // latestVersionHeader is set by the backend when this CLI version is outdated

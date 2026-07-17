@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog"
-	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
 )
 
 // ParseResponseError parses an HTTP error response body.

@@ -3,10 +3,10 @@ package agenttoken
 import (
 	"errors"
 
-	"github.com/tollbit/tollbit-cli/internal/agentauth"
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
-	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/agentauth"
+	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 func WithOBORetry[T any](inv agentauth.Invocation, mgr *CredentialManager, identity auth.AgentIdentity, call func(agent.Token) (T, error)) (T, error) {

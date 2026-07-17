@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/client/auth"
 )
 
 func (m *CredentialManager) SaveIdentity(ctx context.Context, identity auth.AgentIdentity) error {

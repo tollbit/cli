@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
-	"github.com/tollbit/tollbit-cli/internal/version"
+	"github.com/tollbit/cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/version"
 )
 
 func TestClientCreatesAgentToken(t *testing.T) {

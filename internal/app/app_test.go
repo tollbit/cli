@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/tollbit/tollbit-cli/internal/configuration"
+	"github.com/tollbit/cli/internal/configuration"
 )
 
 func TestNewExposesConfigAndBuildsClients(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/tollbit/tollbit-cli/internal/configuration"
+	"github.com/tollbit/cli/internal/configuration"
 )
 
 func TestDevFlagsHiddenByDefault(t *testing.T) {

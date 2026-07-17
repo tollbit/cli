@@ -3,7 +3,7 @@ package agenttoken
 import (
 	"time"
 
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 type OBOStatus struct {

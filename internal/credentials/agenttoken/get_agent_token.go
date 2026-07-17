@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	"github.com/rs/zerolog"
-	"github.com/tollbit/tollbit-cli/internal/agentauth"
-	"github.com/tollbit/tollbit-cli/internal/client/auth"
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/agentauth"
+	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 func (m *CredentialManager) GetAgentToken(inv agentauth.Invocation, identity auth.AgentIdentity, options ...GetAgentTokenOption) (agent.Token, error) {

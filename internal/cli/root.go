@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/tollbit/tollbit-cli/internal/app"
-	"github.com/tollbit/tollbit-cli/internal/cli/globalflags"
-	"github.com/tollbit/tollbit-cli/internal/version"
+	"github.com/tollbit/cli/internal/app"
+	"github.com/tollbit/cli/internal/cli/globalflags"
+	"github.com/tollbit/cli/internal/version"
 )
 
 func NewRootCommand(factory app.Factory) *cobra.Command {

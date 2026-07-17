@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/tollbit/tollbit-cli/internal/configuration"
+	"github.com/tollbit/cli/internal/configuration"
 )
 
 type Option func(*options)

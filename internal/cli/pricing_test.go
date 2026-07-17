@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tollbit/tollbit-cli/internal/client/tollbit"
+	"github.com/tollbit/cli/internal/client/tollbit"
 )
 
 func TestRunPricingRendersResults(t *testing.T) {

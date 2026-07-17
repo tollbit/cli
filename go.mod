@@ -1,4 +1,4 @@
-module github.com/tollbit/tollbit-cli
+module github.com/tollbit/cli
 
 go 1.25.5
 

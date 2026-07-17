@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/tollbit/tollbit-cli/internal/errorsx/problemjson"
-	"github.com/tollbit/tollbit-cli/internal/tokens/agent"
-	"github.com/tollbit/tollbit-cli/internal/version"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
+	"github.com/tollbit/cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/version"
 )
 
 func TestConfigNormalize(t *testing.T) {
