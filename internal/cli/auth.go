@@ -31,7 +31,8 @@ type (
 	}
 
 	authLogoutOptions struct {
-		all bool
+		all   bool
+		force bool
 	}
 )
 
@@ -93,6 +94,7 @@ func NewAuthLogoutCommand(factory app.Factory) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&opts.all, "all", false, "also clear the persisted agent profile")
+	cmd.Flags().BoolVar(&opts.force, "force", false, "clear local credentials even if the server token could not be revoked")
 	return cmd
 }
 
@@ -201,18 +203,33 @@ func runAuthLogout(cmd *cobra.Command, factory app.Factory, opts authLogoutOptio
 		return RuntimeError(err)
 	}
 	ctx := cmd.Context()
+
+	var clearErr error
+	successMsg := "Cleared agent token."
 	if opts.all {
-		if err := credentials.ClearIdentity(ctx); err != nil {
-			return RuntimeError(err)
-		}
-		fmt.Fprintln(cmd.OutOrStdout(), "Cleared agent profile and token.")
+		clearErr = credentials.ClearIdentity(ctx, opts.force)
+		successMsg = "Cleared agent profile and token."
+	} else {
+		clearErr = credentials.ClearAgentTokens(ctx, opts.force)
+	}
+
+	switch {
+	case clearErr == nil:
+		fmt.Fprintln(cmd.OutOrStdout(), successMsg)
 		return nil
+	case errors.Is(clearErr, agenttoken.ErrRevokeFailed) && opts.force:
+		fmt.Fprintln(cmd.OutOrStdout(), successMsg)
+		fmt.Fprintln(cmd.ErrOrStderr(),
+			"warning: could not revoke the token on the server. It will be revoked the next time you log in, or expires within 30 days.")
+		return nil
+	case errors.Is(clearErr, agenttoken.ErrRevokeFailed):
+		return RuntimeError(errors.New(
+			"could not reach the server to revoke your token; you are still logged in. " +
+				"Check your connection and run `tollbit auth logout` again. " +
+				"To clear local credentials without revoking, use --force (the token is revoked at your next login or expires within 30 days)."))
+	default:
+		return RuntimeError(clearErr)
 	}
-	if err := credentials.ClearAgentTokens(ctx); err != nil {
-		return RuntimeError(err)
-	}
-	fmt.Fprintln(cmd.OutOrStdout(), "Cleared agent token.")
-	return nil
 }
 
 func runAuthStatus(cmd *cobra.Command, factory app.Factory, opts authStatusOptions) error {

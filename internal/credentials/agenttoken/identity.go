@@ -15,7 +15,7 @@ func (m *CredentialManager) SaveIdentity(ctx context.Context, identity auth.Agen
 	if err := m.WriteIdentity(ctx, identity); err != nil {
 		return err
 	}
-	return m.ClearAuthTokens(ctx)
+	return m.ClearAuthTokens(ctx, false)
 }
 
 func (m *CredentialManager) WriteIdentity(ctx context.Context, identity auth.AgentIdentity) error {
@@ -84,21 +84,25 @@ func (m *CredentialManager) GetStoredIdentity(ctx context.Context) (auth.AgentId
 	return identity, true, nil
 }
 
-func (m *CredentialManager) ClearIdentity(ctx context.Context) error {
+func (m *CredentialManager) ClearIdentity(ctx context.Context, force bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := m.ClearAuthTokens(ctx); err != nil {
-		return err
+	clearErr := m.ClearAuthTokens(ctx, force)
+	// Fail closed: revoke failed without force → tokens were left intact, so
+	// leave the identity in place too and let the whole logout be retried.
+	if clearErr != nil && errors.Is(clearErr, ErrRevokeFailed) && !force {
+		return clearErr
 	}
-	err := os.Remove(m.identityPath)
-	if os.IsNotExist(err) {
-		err = nil
+	// A non-revoke error is a real filesystem failure — surface it.
+	if clearErr != nil && !errors.Is(clearErr, ErrRevokeFailed) {
+		return clearErr
 	}
-	if err != nil {
+	// Tokens were cleared (success, or force): remove the identity file.
+	if err := os.Remove(m.identityPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("clear agent identity credential: %w", err)
 	}
-	return nil
+	return clearErr // nil on full success; ErrRevokeFailed signal on force
 }
 
 func validIdentity(id auth.AgentIdentity) (auth.AgentIdentity, error) {
