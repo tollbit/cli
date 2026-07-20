@@ -29,7 +29,7 @@ const testAgentDefaultNameEnvVar = "TOLLBIT_AGENT_DEFAULT_NAME"
 const testAgentDefaultUserAgentEnvVar = "TOLLBIT_AGENT_DEFAULT_USER_AGENT"
 
 func executeTestCommand(args []string, stdin io.Reader, stdout, stderr *bytes.Buffer) int {
-	cmd := NewCommandTree(app.Factory{Config: testConfig()})
+	cmd := NewCommandTree(app.Factory{Config: testConfig(), SkipPinEndpoints: true})
 	cmd.SetArgs(args)
 	cmd.SetIn(stdin)
 	cmd.SetOut(stdout)

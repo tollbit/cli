@@ -171,8 +171,19 @@ func randomURLToken(size int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
+func validateBrowserURL(rawURL string) error {
+	u, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("refusing to open URL with scheme %q; only http and https are allowed", u.Scheme)
+	}
+	return nil
+}
+
 func openBrowser(rawURL string) error {
-	if _, err := url.ParseRequestURI(rawURL); err != nil {
+	if err := validateBrowserURL(rawURL); err != nil {
 		return err
 	}
 	switch runtime.GOOS {

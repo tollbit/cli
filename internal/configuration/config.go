@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	mapstructure "github.com/go-viper/mapstructure/v2"
@@ -13,10 +12,7 @@ import (
 	"github.com/tollbit/cli/internal/configuration/platformdefaults"
 )
 
-const (
-	developmentConfigFile = "tb-cli.config.development.yaml"
-	envPrefix             = "TOLLBIT"
-)
+const envPrefix = "TOLLBIT"
 
 func AssembleConfiguration(defaultConfig []byte) (Config, error) {
 	return assembleConfiguration(defaultConfig, os.Getwd)
@@ -41,7 +37,7 @@ func assembleConfiguration(defaultConfig []byte, getwd func() (string, error)) (
 	if err != nil {
 		return Config{}, fmt.Errorf("get working directory: %w", err)
 	}
-	if err := mergeConfigIfExists(v, filepath.Join(wd, developmentConfigFile)); err != nil {
+	if err := mergeDevConfig(v, wd); err != nil {
 		return Config{}, err
 	}
 
@@ -57,6 +53,25 @@ func assembleConfiguration(defaultConfig []byte, getwd func() (string, error)) (
 		return Config{}, err
 	}
 
+	return config, nil
+}
+
+// parseEmbeddedYAML unmarshals YAML defaults with no AutomaticEnv and no
+// development-config merge. Used by release PinEndpoints so pins match
+// tb-cli.config.yaml exactly.
+func parseEmbeddedYAML(data []byte) (Config, error) {
+	if len(data) == 0 {
+		return Config{}, errors.New("default config is required")
+	}
+	v := viper.New()
+	v.SetConfigType("yaml")
+	if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
+		return Config{}, fmt.Errorf("read embedded config: %w", err)
+	}
+	var config Config
+	if err := v.Unmarshal(&config, viper.DecodeHook(mapstructure.StringToTimeDurationHookFunc())); err != nil {
+		return Config{}, fmt.Errorf("unmarshal config: %w", err)
+	}
 	return config, nil
 }
 
@@ -96,21 +111,6 @@ func validate(config Config) error {
 	}
 	if strings.TrimSpace(config.Credentials.StorageDir) == "" {
 		return errors.New("credentials.storage_dir is required")
-	}
-	return nil
-}
-
-func mergeConfigIfExists(v *viper.Viper, path string) error {
-	if _, err := os.Stat(path); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return fmt.Errorf("stat development config: %w", err)
-	}
-
-	v.SetConfigFile(path)
-	if err := v.MergeInConfig(); err != nil {
-		return fmt.Errorf("merge development config: %w", err)
 	}
 	return nil
 }

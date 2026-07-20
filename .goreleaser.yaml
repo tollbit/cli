@@ -11,6 +11,8 @@ builds:
   - id: tollbit
     main: ./cmd/tollbit
     binary: tollbit
+    # No `-tags dev`: release binaries MUST be the locked-down build (pinned
+    # endpoints, no development-config merge). Never add the dev tag here.
     env:
       - CGO_ENABLED=0
     goos:
