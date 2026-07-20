@@ -207,3 +207,25 @@ func newTestAuthClient(t *testing.T) *auth.Client {
 	}
 	return c
 }
+
+func TestValidateBrowserURL(t *testing.T) {
+	t.Parallel()
+
+	for _, rawURL := range []string{"http://x", "https://x"} {
+		if err := validateBrowserURL(rawURL); err != nil {
+			t.Fatalf("expected %q to be allowed, got %v", rawURL, err)
+		}
+	}
+
+	for _, rawURL := range []string{
+		"file:///etc/passwd",
+		"javascript:alert(1)",
+		"custom://x",
+		"",
+		"example.com/path",
+	} {
+		if err := validateBrowserURL(rawURL); err == nil {
+			t.Fatalf("expected %q to be rejected", rawURL)
+		}
+	}
+}

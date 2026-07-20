@@ -20,6 +20,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tags: ["", "dev"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,4 +34,4 @@ jobs:
           cache: true
 
       - name: Test
-        run: go test ./...
+        run: go test -tags '${{ matrix.tags }}' ./...

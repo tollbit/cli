@@ -1,9 +1,13 @@
-.PHONY: test build alias dev-install dev-uninstall bump tag
+.PHONY: test build build-release alias dev-install dev-uninstall bump tag
 
 test:
 	go run gotest.tools/gotestsum@latest
 
 build:
+	go build -tags dev -o tollbit ./cmd/tollbit
+
+# Untagged build matching release/GoReleaser (pinned production endpoints).
+build-release:
 	go build -o tollbit ./cmd/tollbit
 
 # Prints an alias for the repo-local binary; use: eval "$(make alias)"
