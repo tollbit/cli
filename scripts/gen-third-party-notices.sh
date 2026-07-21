@@ -7,7 +7,11 @@ cd "$(dirname "$0")/.."
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
-go run github.com/google/go-licenses@v1.6.0 save ./cmd/tollbit --save_path="${TMP}/licenses" --force
+# Build go-licenses for the host, then run its ANALYSIS against the linux target
+# (GOOS on the run, not the build) so output is identical on macOS and Linux CI.
+# Module licenses are OS-independent, so the linux view covers every build target.
+GOBIN="${TMP}/bin" go install github.com/google/go-licenses@v1.6.0
+GOOS=linux GOARCH=amd64 "${TMP}/bin/go-licenses" save ./cmd/tollbit --save_path="${TMP}/licenses" --force
 
 OUT=THIRD-PARTY-NOTICES.md
 {
