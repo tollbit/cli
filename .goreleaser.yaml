@@ -35,10 +35,11 @@ archives:
 checksum:
   name_template: "tollbit_{{ .Version }}_checksums.txt"
 
-# Allow re-running a tag release (e.g. after fixing npm publish) without 422s on existing assets.
+# Published artifacts are immutable: re-running a release keeps existing assets
+# rather than overwriting them (checksums included). To fix a bad release, cut a
+# new version — do not mutate a published one. Mirrors the immutable tag ruleset.
 release:
-  replace_existing_artifacts: true
-  mode: replace
+  mode: keep-existing
 
 changelog:
   use: git
