@@ -1,0 +1,16 @@
+# Routine version-update PRs are intentionally minimal to keep noise low.
+# CVE fixes for Go and npm are handled by Dependabot security updates (a repo
+# setting, event-driven), not by this file. This file only keeps the
+# SHA-pinned GitHub Actions fresh, batched into a single monthly PR.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch", "major"]
+    commit-message:
+      prefix: ci
