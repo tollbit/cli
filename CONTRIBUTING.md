@@ -91,12 +91,15 @@ Install scripts live at `scripts/install.{sh,ps1}` on `main` in this repo; users
 
 npm **trusted publishing** must be linked to `tollbit/cli` and this workflow (`release.yml`). The old dual-repo model (`tollbit-cli-releases` + `RELEASES_GITHUB_TOKEN` + `release-public/` sync) has been removed. New releases publish only to `tollbit/cli`.
 
-To move or reuse a tag locally before pushing:
+To move or reuse a tag **locally, before pushing**, delete and recreate it:
 
 ```bash
 git tag -d v0.1.0
 git tag v0.1.0
 ```
 
-If you already pushed the wrong tag, fix it on the remote only if your policy allows force-deleting release tags.
+Once pushed, a `v*` tag is **immutable**: a repository ruleset blocks deleting or moving published release
+tags (only `tollbit-devs` can create them, and only a repository admin can bypass the rule to remove one).
+If you push a wrong tag, do **not** try to force it — bump to the next patch version and tag that commit
+instead. This mirrors the immutable release artifacts configured in [`.goreleaser.yaml`](.goreleaser.yaml).
 
