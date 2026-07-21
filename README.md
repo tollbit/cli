@@ -176,3 +176,7 @@ Other channels:
 ## Configure
 
 Agent credentials are stored under `TOLLBIT_CREDENTIALS_STORAGE_DIR` (default platform path): `agent-identity.json` and `agent-token.jwt`.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Binary distributions include third-party license notices in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

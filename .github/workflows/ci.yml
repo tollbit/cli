@@ -35,3 +35,25 @@ jobs:
 
       - name: Test
         run: go test -tags '${{ matrix.tags }}' ./...
+
+  notices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Fails if THIRD-PARTY-NOTICES.md is out of date vs the current deps.
+      - name: Verify THIRD-PARTY-NOTICES.md is up to date
+        run: |
+          go mod download
+          make third-party-notices
+          if ! git diff --exit-code THIRD-PARTY-NOTICES.md; then
+            echo "::error::THIRD-PARTY-NOTICES.md is out of date. Run 'make third-party-notices' and commit the result."
+            exit 1
+          fi

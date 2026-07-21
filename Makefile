@@ -1,4 +1,4 @@
-.PHONY: test build build-release alias dev-install dev-uninstall bump tag
+.PHONY: test build build-release alias dev-install dev-uninstall bump tag third-party-notices
 
 test:
 	go run gotest.tools/gotestsum@latest
@@ -9,6 +9,10 @@ build:
 # Untagged build matching release/GoReleaser (pinned production endpoints).
 build-release:
 	go build -o tollbit ./cmd/tollbit
+
+# Regenerate THIRD-PARTY-NOTICES.md from the linked Go dependencies' licenses.
+third-party-notices:
+	bash scripts/gen-third-party-notices.sh
 
 # Prints an alias for the repo-local binary; use: eval "$(make alias)"
 alias:
