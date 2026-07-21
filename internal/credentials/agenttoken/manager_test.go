@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -233,7 +234,7 @@ func TestClearAuthTokensRemovesAgentAndRefreshTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mgr.ClearAuthTokens(context.Background()); err != nil {
+	if err := mgr.ClearAuthTokens(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -264,14 +265,50 @@ func TestClearAuthTokensKeepsRefreshTokenWhenRevokeFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mgr.ClearAuthTokens(context.Background()); err == nil {
+	err := mgr.ClearAuthTokens(context.Background(), false)
+	if err == nil {
 		t.Fatal("expected revoke error")
+	}
+	if !errors.Is(err, ErrRevokeFailed) {
+		t.Fatalf("expected ErrRevokeFailed, got %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected agent token to remain after revoke failure, got err=%v", err)
 	}
 	if _, err := os.Stat(mgr.refreshPath); err != nil {
 		t.Fatalf("expected refresh token to remain after revoke failure, got err=%v", err)
+	}
+}
+
+func TestClearAuthTokensForceClearsWhenRevokeFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, tokenFilename)
+	if err := os.WriteFile(path, []byte(testJWT(t, validClaims())), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/agent/v1/tokens/refresh/revoke" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"detail": "revoke failed"})
+	}))
+	if err := mgr.writeJSON(context.Background(), mgr.refreshPath, refreshCredential{RefreshToken: "agrt_old"}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := mgr.ClearAuthTokens(context.Background(), true)
+	if err == nil {
+		t.Fatal("expected ErrRevokeFailed signal")
+	}
+	if !errors.Is(err, ErrRevokeFailed) {
+		t.Fatalf("expected ErrRevokeFailed, got %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected agent token removed under force, got err=%v", err)
+	}
+	if _, err := os.Stat(mgr.refreshPath); !os.IsNotExist(err) {
+		t.Fatalf("expected refresh token removed under force, got err=%v", err)
 	}
 }
 
@@ -581,7 +618,7 @@ func TestCanonicalAgentTokenRoundTrip(t *testing.T) {
 		t.Fatalf("expected token file mode 0600, got %#o", got)
 	}
 
-	if err := mgr.ClearAgentTokens(context.Background()); err != nil {
+	if err := mgr.ClearAgentTokens(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
 	if _, exists, err := mgr.CurrentAgentToken(context.Background()); err != nil || exists {
@@ -884,7 +921,7 @@ func TestClearIdentityRemovesIdentityAndToken(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, tokenFilename), []byte(testJWT(t, validClaims())), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := mgr.ClearIdentity(context.Background()); err != nil {
+	if err := mgr.ClearIdentity(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, identityFilename)); !os.IsNotExist(err) {
@@ -892,6 +929,82 @@ func TestClearIdentityRemovesIdentityAndToken(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, tokenFilename)); !os.IsNotExist(err) {
 		t.Fatalf("expected token to be cleared, got err=%v", err)
+	}
+}
+
+func TestClearIdentityKeepsFilesWhenRevokeFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, tokenFilename)
+	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/agent/v1/tokens/refresh/revoke" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"detail": "revoke failed"})
+	}))
+	if err := mgr.WriteIdentity(context.Background(), testAgentIdentity()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(testJWT(t, validClaims())), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := mgr.writeJSON(context.Background(), mgr.refreshPath, refreshCredential{RefreshToken: "agrt_old"}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := mgr.ClearIdentity(context.Background(), false)
+	if err == nil {
+		t.Fatal("expected revoke error")
+	}
+	if !errors.Is(err, ErrRevokeFailed) {
+		t.Fatalf("expected ErrRevokeFailed, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, identityFilename)); err != nil {
+		t.Fatalf("expected identity to remain, got err=%v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected agent token to remain, got err=%v", err)
+	}
+	if _, err := os.Stat(mgr.refreshPath); err != nil {
+		t.Fatalf("expected refresh token to remain, got err=%v", err)
+	}
+}
+
+func TestClearIdentityForceClearsWhenRevokeFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, tokenFilename)
+	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/agent/v1/tokens/refresh/revoke" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"detail": "revoke failed"})
+	}))
+	if err := mgr.WriteIdentity(context.Background(), testAgentIdentity()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(testJWT(t, validClaims())), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := mgr.writeJSON(context.Background(), mgr.refreshPath, refreshCredential{RefreshToken: "agrt_old"}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := mgr.ClearIdentity(context.Background(), true)
+	if err == nil {
+		t.Fatal("expected ErrRevokeFailed signal")
+	}
+	if !errors.Is(err, ErrRevokeFailed) {
+		t.Fatalf("expected ErrRevokeFailed, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, identityFilename)); !os.IsNotExist(err) {
+		t.Fatalf("expected identity removed under force, got err=%v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected agent token removed under force, got err=%v", err)
+	}
+	if _, err := os.Stat(mgr.refreshPath); !os.IsNotExist(err) {
+		t.Fatalf("expected refresh token removed under force, got err=%v", err)
 	}
 }
 

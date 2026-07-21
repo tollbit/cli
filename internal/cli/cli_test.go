@@ -364,6 +364,68 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 	}
 }
 
+func TestRunAuthLogoutFailClosedAndForce(t *testing.T) {
+	storageDir := t.TempDir()
+	tokenPath := filepath.Join(storageDir, "agent-token.jwt")
+	refreshPath := filepath.Join(storageDir, "refresh-token.json")
+	if err := os.WriteFile(tokenPath, []byte(testAgentJWT(t)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	refreshRaw, err := json.Marshal(map[string]string{"refresh_token": "agrt_cli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(refreshPath, refreshRaw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RequestURI() != "/agent/v1/tokens/refresh/revoke" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"detail": "revoke failed"})
+	}))
+	defer authSrv.Close()
+
+	t.Setenv(testAuthBaseURLEnvVar, authSrv.URL)
+	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
+
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommand([]string{"auth", "logout"}, nil, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected non-zero exit on revoke failure, got 0 stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "still logged in") {
+		t.Fatalf("expected fail-closed message, got stderr=%q", stderr.String())
+	}
+	if _, err := os.Stat(tokenPath); err != nil {
+		t.Fatalf("expected agent token to remain, got err=%v", err)
+	}
+	if _, err := os.Stat(refreshPath); err != nil {
+		t.Fatalf("expected refresh token to remain, got err=%v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = executeTestCommand([]string{"auth", "logout", "--force"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("auth logout --force failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Cleared agent token.") {
+		t.Fatalf("unexpected force logout stdout: %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "warning: could not revoke the token on the server") {
+		t.Fatalf("expected force warning on stderr, got %q", stderr.String())
+	}
+	if _, err := os.Stat(tokenPath); !os.IsNotExist(err) {
+		t.Fatalf("expected agent token removed under force, got err=%v", err)
+	}
+	if _, err := os.Stat(refreshPath); !os.IsNotExist(err) {
+		t.Fatalf("expected refresh token removed under force, got err=%v", err)
+	}
+}
+
 func testAgentJWT(t *testing.T) string {
 	t.Helper()
 	claims := struct {

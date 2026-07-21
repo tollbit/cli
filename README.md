@@ -121,6 +121,8 @@ tollbit auth logout
 tollbit auth logout --all
 ```
 
+Logging in again (`tollbit auth login`) mints a new token and revokes all previous ones — use it if you believe a token was exposed. `auth logout` revokes the current token; `auth logout --force` clears local credentials even if the server can't be reached (the token is then revoked at your next login or expires within 30 days).
+
 `TOLLBIT_AGENT_DEFAULT_NAME` and `TOLLBIT_AGENT_DEFAULT_USER_AGENT` set fallback profile defaults. Saved profile overrides those defaults. `search` and `content` accept `--user-agent` as a per-request override.
 
 `auth status --check` exits `0` when the token is valid, `1` when invalid/expired, and `2` when missing (no stdout).
