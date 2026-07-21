@@ -14,6 +14,10 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write      # GoReleaser uploads the GitHub Release
+      id-token: write      # keyless (sigstore) signing for build provenance
+      attestations: write  # record the provenance attestation
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -49,6 +53,13 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Signs the built archives with keyless sigstore provenance, verifiable
+      # with `gh attestation verify <archive> --repo tollbit/cli`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: "dist/*.tar.gz,dist/*.zip"
 
   npm-publish:
     needs: goreleaser
