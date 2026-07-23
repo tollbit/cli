@@ -52,8 +52,8 @@ func TestSearch(t *testing.T) {
 		if r.URL.Query().Get("properties") != "example.com,other.com" {
 			t.Fatalf("unexpected properties: %q", r.URL.Query().Get("properties"))
 		}
-		if r.URL.Query().Get("allowedOnly") != "true" {
-			t.Fatalf("unexpected allowedOnly: %q", r.URL.Query().Get("allowedOnly"))
+		if r.URL.Query().Get("readyToLicense") != "true" {
+			t.Fatalf("unexpected readyToLicense: %q", r.URL.Query().Get("readyToLicense"))
 		}
 		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
 			t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
