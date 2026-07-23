@@ -183,7 +183,7 @@ func (c *client) Search(ctx context.Context, params SearchParams, token agent.To
 		q.Set("properties", properties)
 	}
 	if params.ProgrammaticOnlySet {
-		q.Set("allowedOnly", strconv.FormatBool(params.ProgrammaticOnly))
+		q.Set("readyToLicense", strconv.FormatBool(params.ProgrammaticOnly))
 	}
 
 	u := c.resolve("/agents/v1/search")
