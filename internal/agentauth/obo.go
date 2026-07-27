@@ -12,8 +12,9 @@ import (
 type ConsentMethod string
 
 const (
-	ConsentMethodRedirect          ConsentMethod = "redirect"
-	ConsentMethodBrowserSelectIcon ConsentMethod = "browser_select_icon"
+	ConsentMethodRedirect           ConsentMethod = "redirect"
+	ConsentMethodBrowserSelectIcon  ConsentMethod = "browser_select_icon"
+	ConsentMethodAgentConfirmsIcons ConsentMethod = "agent_confirms_icons"
 )
 
 type (

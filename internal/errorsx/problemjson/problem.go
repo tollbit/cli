@@ -30,6 +30,9 @@ const (
 	// ErrorCodeInvalidGrant means the consent challenge can no longer be
 	// redeemed.
 	ErrorCodeInvalidGrant ErrorCode = "invalid_grant"
+	// ErrorCodeUnrecognizedIcon means a submitted icon name did not match the
+	// icon manifest; no consent attempt is consumed.
+	ErrorCodeUnrecognizedIcon ErrorCode = "unrecognized_icon"
 )
 
 // Problem is the CLI-local representation of the ProblemJSON shape returned by

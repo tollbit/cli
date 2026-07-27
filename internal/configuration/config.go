@@ -21,8 +21,9 @@ const (
 	RuntimeEndUserProximityLocal      = "local"
 	RuntimeEndUserProximityRemote     = "remote"
 
-	ConsentStrategyRedirect          = "redirect"
-	ConsentStrategyBrowserSelectIcon = "browser_select_icon"
+	ConsentStrategyRedirect           = "redirect"
+	ConsentStrategyBrowserSelectIcon  = "browser_select_icon"
+	ConsentStrategyAgentConfirmsIcons = "agent_confirms_icons"
 )
 
 func AssembleConfiguration(defaultConfig []byte) (Config, error) {
@@ -170,9 +171,9 @@ func ResolveConsentStrategy(config Config) string {
 
 func validateConsentStrategy(name, strategy string) error {
 	switch strategy {
-	case ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon:
+	case ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons:
 		return nil
 	default:
-		return fmt.Errorf("%s must be %q or %q", name, ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon)
+		return fmt.Errorf("%s must be %q, %q, or %q", name, ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons)
 	}
 }

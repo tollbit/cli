@@ -394,3 +394,103 @@ func TestClientRedeemAgentConsentBrowserSelectIcon(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
 }
+
+func TestClientStartAgentConsentAgentConfirmsIcons(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/consent/agent-confirms-icons/start" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		if r.Header.Get("Authorization") != "Bearer unlinked-token" {
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+		var body ConsentAgentConfirmsIconsStartRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.CodeChallenge != "challenge" || body.CodeChallengeMethod != "S256" || body.Scope != "offline_access" {
+			t.Fatalf("unexpected body: %#v", body)
+		}
+		sawRequest = true
+		_ = json.NewEncoder(w).Encode(ConsentAgentConfirmsIconsStartResponse{
+			ChallengeID: "ach_123",
+			ConsentURL:  "https://auth.example.test/oauth/consent/agent-confirms-icons?consent_challenge=ach_123",
+			ExpiresAt:   "2026-06-02T12:00:00Z",
+			IconNames:   []string{"ANCHOR", "FOX", "STAR"},
+		})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.StartAgentConsentAgentConfirmsIcons(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentAgentConfirmsIconsStartRequest{
+		CodeChallenge: "challenge",
+		Scope:         "offline_access",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawRequest || resp.ChallengeID != "ach_123" || len(resp.IconNames) != 3 || resp.IconNames[1] != "FOX" {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+}
+
+func TestClientRedeemAgentConsentAgentConfirmsIcons(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/tokens/identity" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		if r.Header.Get("Authorization") != "Bearer unlinked-token" {
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+		var body identityTokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.GrantType != grantTypeConsentAgentConfirmsIcons || body.AgentIdentifier != "agent-test" || body.ChallengeID != "ach_123" || body.CodeVerifier != "verifier" {
+			t.Fatalf("unexpected body: %#v", body)
+		}
+		if len(body.IconNames) != 3 || body.IconNames[0] != "FOX" || body.IconNames[1] != "ANCHOR" || body.IconNames[2] != "STAR" {
+			t.Fatalf("unexpected icon names: %#v", body.IconNames)
+		}
+		sawRequest = true
+		_ = json.NewEncoder(w).Encode(AgentTokenResponse{Token: "linked-token"})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.RedeemAgentConsentAgentConfirmsIcons(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentAgentConfirmsIconsTokenRequest{
+		AgentIdentifier: "agent-test",
+		ChallengeID:     "ach_123",
+		IconNames:       []string{"FOX", "ANCHOR", "STAR"},
+		CodeVerifier:    "verifier",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawRequest || resp.Token != "linked-token" {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+}
+
+func TestClientRedeemAgentConsentAgentConfirmsIconsRequiresThreeIcons(t *testing.T) {
+	c, err := New(ClientConfig{BaseURL: "https://auth.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.RedeemAgentConsentAgentConfirmsIcons(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentAgentConfirmsIconsTokenRequest{
+		AgentIdentifier: "agent-test",
+		ChallengeID:     "ach_123",
+		IconNames:       []string{"FOX", "ANCHOR"},
+		CodeVerifier:    "verifier",
+	})
+	if err == nil || !strings.Contains(err.Error(), "exactly 3 icon names are required") {
+		t.Fatalf("expected exactly-3 error, got %v", err)
+	}
+}

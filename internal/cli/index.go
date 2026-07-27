@@ -12,7 +12,7 @@ func NewCommandTree(factory app.Factory) *cobra.Command {
 		NewContentCommand(factory),
 		NewSearchCommand(factory),
 		NewRuntimeCommand(factory),
-		NewGuideCommand(),
+		NewGuideCommand(factory),
 		NewVersionCommand(),
 	)
 	return rootCmd

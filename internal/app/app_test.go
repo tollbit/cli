@@ -132,3 +132,23 @@ func testConfig(t *testing.T) configuration.Config {
 		Gateway:     configuration.GatewayConfig{BaseURL: "https://gateway.example.com"},
 	}
 }
+
+func TestBuildConsentStrategyAgentConfirmsIcons(t *testing.T) {
+	config := testConfig(t)
+	config.Runtime.EndUserProximity = configuration.RuntimeEndUserProximityRemote
+	config.Auth.Consent.Strategy.Remote = configuration.ConsentStrategyAgentConfirmsIcons
+	app, err := New(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	strategy, err := app.ConsentStrategy(agentauth.ConsentMethodAgentConfirmsIcons)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strategy.Method() != agentauth.ConsentMethodAgentConfirmsIcons {
+		t.Fatalf("expected agent_confirms_icons method, got %q", strategy.Method())
+	}
+	if strategy.Guidance().FlowLabel != "detached icon confirmation" {
+		t.Fatalf("unexpected guidance: %#v", strategy.Guidance())
+	}
+}

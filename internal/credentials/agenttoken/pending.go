@@ -39,6 +39,9 @@ func (m *CredentialManager) savePendingConsent(ctx context.Context, pending agen
 	if strings.TrimSpace(pending.CodeVerifier) == "" {
 		return fmt.Errorf("pending consent code verifier is required")
 	}
+	if pending.Method == agentauth.ConsentMethodAgentConfirmsIcons && len(pending.IconNames) == 0 {
+		return fmt.Errorf("pending consent icon names are required")
+	}
 	return m.writeJSON(ctx, m.pendingPath, pending)
 }
 

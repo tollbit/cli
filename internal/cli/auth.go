@@ -68,8 +68,8 @@ func NewAuthCompleteCommand(factory app.Factory) *cobra.Command {
 		Short: "Complete a pending detached agent authorization",
 		Long:  authCompleteLongHelp(factory),
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				return UsageError("auth complete does not accept arguments")
+			if len(args) > 3 {
+				return UsageError("auth complete accepts at most 3 icon name arguments")
 			}
 			return nil
 		},
@@ -323,6 +323,13 @@ func runAuthComplete(cmd *cobra.Command, factory app.Factory, args []string) err
 	if !exists {
 		return RuntimeError(errors.New("no pending authorization found"))
 	}
+	if pending.Method == agentauth.ConsentMethodAgentConfirmsIcons {
+		if len(args) == 0 {
+			return UsageError("auth complete requires icon names for this authorization flow; run `tollbit auth complete <first> <second> <third>`. Valid icon names: %s", strings.Join(pending.IconNames, " "))
+		}
+	} else if len(args) != 0 {
+		return UsageError("auth complete does not accept arguments for this authorization flow")
+	}
 	strategy, err := application.ConsentStrategy(pending.Method)
 	if err != nil {
 		return RuntimeError(err)
@@ -334,6 +341,12 @@ func runAuthComplete(cmd *cobra.Command, factory app.Factory, args []string) err
 	if err != nil {
 		if isAuthorizationPending(err) {
 			return ExitError{Code: ExitCodeAuthorizationPending, Err: errors.New("authorization still pending")}
+		}
+		if isUnrecognizedIcon(err) {
+			if len(pending.IconNames) > 0 {
+				return RuntimeError(fmt.Errorf("%w\nValid icon names: %s", err, strings.Join(pending.IconNames, " ")))
+			}
+			return RuntimeError(err)
 		}
 		if isPendingConsentInvalidated(err) {
 			if clearErr := credentials.ClearPendingConsent(ctx); clearErr != nil {
@@ -352,6 +365,11 @@ func runAuthComplete(cmd *cobra.Command, factory app.Factory, args []string) err
 	}
 	fmt.Fprintln(cmd.ErrOrStderr(), authorizedMessage(pending.AgentIdentity.Name, claims))
 	return nil
+}
+
+func isUnrecognizedIcon(err error) bool {
+	var problem problemjson.Problem
+	return errors.As(err, &problem) && problem.Code != nil && *problem.Code == problemjson.ErrorCodeUnrecognizedIcon
 }
 
 func isAuthorizationPending(err error) bool {

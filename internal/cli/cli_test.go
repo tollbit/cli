@@ -590,13 +590,13 @@ func TestRunGuideInstallWritesSkillUnderSkillName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read installed skill at %s: %v", wantPath, err)
 	}
-	skillPath := filepath.Join("..", "..", "skill", "tollbit-cli", "SKILL.md")
-	want, err := os.ReadFile(skillPath)
-	if err != nil {
-		t.Fatalf("read source skill file: %v", err)
+	for _, want := range []string{"Configured remote flow: detached browser relay", "relay the printed URL and verification icon", "Auth instructions rendered for local=redirect, remote=browser_select_icon"} {
+		if !strings.Contains(string(got), want) {
+			t.Fatalf("expected installed skill to contain %q, got %q", want, string(got))
+		}
 	}
-	if string(got) != string(want) {
-		t.Fatal("installed skill differs from embedded markdown")
+	if strings.Contains(string(got), "{{") {
+		t.Fatalf("installed skill contains unrendered template syntax: %q", string(got))
 	}
 }
 
@@ -668,13 +668,28 @@ func TestRunGuideOutputsEmbeddedSkill(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", stderr.String())
 	}
 
-	skillPath := filepath.Join("..", "..", "skill", "tollbit-cli", "SKILL.md")
-	want, err := os.ReadFile(skillPath)
-	if err != nil {
-		t.Fatalf("read skill file: %v", err)
+	for _, want := range []string{"Configured remote flow: detached browser relay", "relay the printed URL and verification icon", "`auth complete` takes: pending auth", "Auth instructions rendered for local=redirect, remote=browser_select_icon"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected guide output to contain %q, got %q", want, stdout.String())
+		}
 	}
-	if stdout.String() != string(want) {
-		t.Fatalf("guide output differs from embedded skill markdown")
+	if strings.Contains(stdout.String(), "{{") {
+		t.Fatalf("guide output contains unrendered template syntax: %q", stdout.String())
+	}
+}
+
+func TestRunGuideRendersAgentConfirmsIconsCompleteInputs(t *testing.T) {
+	config := testConfig()
+	config.Auth.Consent.Strategy.Remote = configuration.ConsentStrategyAgentConfirmsIcons
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"guide"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+	for _, want := range []string{"Configured remote flow: detached icon confirmation", "relay only the printed consent URL", "`auth complete` takes: pending auth plus three icon names"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected guide output to contain %q, got %q", want, stdout.String())
+		}
 	}
 }
 
@@ -997,5 +1012,239 @@ func TestRunAuthCompletePendingUsesRetryExitCode(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(storageDir, "pending-auth.json")); err != nil {
 		t.Fatalf("expected pending authorization to be preserved: %v", err)
+	}
+}
+
+func writePendingConsentForTest(t *testing.T, storageDir string, pending agentauth.PendingConsent) {
+	t.Helper()
+	pendingJSON, err := json.Marshal(pending)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(storageDir, "pending-auth.json"), pendingJSON, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunAuthLoginRemoteAgentConfirmsIconsPendingUsesRetryExitCode(t *testing.T) {
+	storageDir := t.TempDir()
+	baseToken := testAgentJWT(t)
+	var sawStart bool
+
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/agent/v1/tokens/identity":
+			_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
+		case "/agent/v1/consent/agent-confirms-icons/start":
+			if r.Header.Get("Authorization") != "Bearer "+baseToken {
+				t.Fatalf("unexpected start authorization: %q", r.Header.Get("Authorization"))
+			}
+			var body auth.ConsentAgentConfirmsIconsStartRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.CodeChallenge == "" || body.CodeChallengeMethod != "S256" || body.Scope != "offline_access" {
+				t.Fatalf("unexpected start body: %#v", body)
+			}
+			sawStart = true
+			_ = json.NewEncoder(w).Encode(auth.ConsentAgentConfirmsIconsStartResponse{
+				ChallengeID: "ach_pending",
+				ConsentURL:  "https://auth.example.test/oauth/consent/agent-confirms-icons?consent_challenge=ach_pending",
+				ExpiresAt:   time.Now().Add(time.Minute).UTC().Format(time.RFC3339),
+				IconNames:   []string{"ANCHOR", "FOX", "STAR"},
+			})
+		default:
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.RequestURI())
+		}
+	}))
+	defer authSrv.Close()
+
+	config := testConfig()
+	config.Auth.BaseURL = authSrv.URL
+	config.Runtime.StateDir = storageDir
+	config.Credentials.StorageDir = storageDir
+	config.Auth.Consent.Strategy.Remote = configuration.ConsentStrategyAgentConfirmsIcons
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"--end-user-proximity", "remote", "auth", "login", "--name", "agent-test"}, nil, &stdout, &stderr)
+	if code != ExitCodeAuthorizationPending {
+		t.Fatalf("expected pending exit code %d, got %d stdout=%q stderr=%q", ExitCodeAuthorizationPending, code, stdout.String(), stderr.String())
+	}
+	if !sawStart {
+		t.Fatal("expected agent-confirms-icons start request")
+	}
+	for _, want := range []string{"Authorization flow: detached icon confirmation", "Relay ONLY this URL", "VALID ICON NAMES", "ANCHOR FOX STAR", "tollbit auth complete <first> <second> <third>"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected login stdout to contain %q, got %q", want, stdout.String())
+		}
+	}
+	pendingRaw, err := os.ReadFile(filepath.Join(storageDir, "pending-auth.json"))
+	if err != nil {
+		t.Fatalf("expected pending auth saved: %v", err)
+	}
+	var pending agentauth.PendingConsent
+	if err := json.Unmarshal(pendingRaw, &pending); err != nil {
+		t.Fatal(err)
+	}
+	if len(pending.IconNames) != 3 || pending.IconNames[0] != "ANCHOR" || pending.IconNames[1] != "FOX" || pending.IconNames[2] != "STAR" {
+		t.Fatalf("expected pending auth to contain icon names, got %#v", pending.IconNames)
+	}
+}
+
+func TestRunAuthCompleteAgentConfirmsIconsSucceedsWithIconNames(t *testing.T) {
+	storageDir := t.TempDir()
+	baseToken := testAgentJWT(t)
+	successToken := testAgentJWTWithOBO(t)
+	var sawRedeem bool
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/agent/v1/tokens/identity" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		icons, ok := body["icon_names"].([]any)
+		if !ok || len(icons) != 3 || icons[0] != "FOX" || icons[1] != "ANCHOR" || icons[2] != "STAR" {
+			t.Fatalf("unexpected icon_names: %#v", body["icon_names"])
+		}
+		if body["grant_type"] != "consent:agent_confirms_icons" || body["challenge_id"] != "ach_pending" || body["code_verifier"] != "verifier-1" {
+			t.Fatalf("unexpected redeem body: %#v", body)
+		}
+		sawRedeem = true
+		_ = json.NewEncoder(w).Encode(map[string]string{"token": successToken})
+	}))
+	defer authSrv.Close()
+
+	config := testConfig()
+	config.Auth.BaseURL = authSrv.URL
+	config.Runtime.StateDir = storageDir
+	config.Credentials.StorageDir = storageDir
+	config.Auth.Consent.Strategy.Remote = configuration.ConsentStrategyAgentConfirmsIcons
+	writePendingConsentForTest(t, storageDir, agentauth.PendingConsent{
+		Method:        agentauth.ConsentMethodAgentConfirmsIcons,
+		ChallengeID:   "ach_pending",
+		AgentIdentity: auth.AgentIdentity{Name: "pending-agent"},
+		BaseToken:     baseToken,
+		CodeVerifier:  "verifier-1",
+		CreatedAt:     time.Now().UTC(),
+		ExpiresAt:     time.Now().Add(time.Minute).UTC().Format(time.RFC3339),
+		IconNames:     []string{"ANCHOR", "FOX", "STAR"},
+	})
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"--end-user-proximity", "remote", "auth", "complete", "fox,", "Anchor", " STAR "}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected success, got code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !sawRedeem {
+		t.Fatal("expected redeem request")
+	}
+	if !strings.Contains(stderr.String(), "authorized as pending-agent") {
+		t.Fatalf("expected authorized message, got stderr=%q", stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(storageDir, "pending-auth.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected pending auth cleared, stat err=%v", err)
+	}
+}
+
+func TestRunAuthCompleteAgentConfirmsIconsUnrecognizedIconKeepsPending(t *testing.T) {
+	storageDir := t.TempDir()
+	baseToken := testAgentJWT(t)
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"type":   "https://errors.tollbit.com/unrecognized-icon",
+			"title":  "Unrecognized icon",
+			"status": http.StatusBadRequest,
+			"detail": "unrecognized icon: FXX",
+			"code":   "unrecognized_icon",
+		})
+	}))
+	defer authSrv.Close()
+
+	config := testConfig()
+	config.Auth.BaseURL = authSrv.URL
+	config.Runtime.StateDir = storageDir
+	config.Credentials.StorageDir = storageDir
+	config.Auth.Consent.Strategy.Remote = configuration.ConsentStrategyAgentConfirmsIcons
+	writePendingConsentForTest(t, storageDir, agentauth.PendingConsent{
+		Method:        agentauth.ConsentMethodAgentConfirmsIcons,
+		ChallengeID:   "ach_pending",
+		AgentIdentity: auth.AgentIdentity{Name: "pending-agent"},
+		BaseToken:     baseToken,
+		CodeVerifier:  "verifier-1",
+		CreatedAt:     time.Now().UTC(),
+		ExpiresAt:     time.Now().Add(time.Minute).UTC().Format(time.RFC3339),
+		IconNames:     []string{"ANCHOR", "FOX", "STAR"},
+	})
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"--end-user-proximity", "remote", "auth", "complete", "fxx", "anchor", "star"}, nil, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "unrecognized icon: FXX") || !strings.Contains(stderr.String(), "Valid icon names: ANCHOR FOX STAR") {
+		t.Fatalf("expected unrecognized icon guidance, got stderr=%q", stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(storageDir, "pending-auth.json")); err != nil {
+		t.Fatalf("expected pending authorization to be preserved: %v", err)
+	}
+}
+
+func TestRunAuthCompleteHelpRendersBothConfiguredFlows(t *testing.T) {
+	tests := []struct {
+		name           string
+		remoteStrategy string
+		want           []string
+	}{
+		{
+			name:           "browser select icon",
+			remoteStrategy: configuration.ConsentStrategyBrowserSelectIcon,
+			want: []string{
+				"Configured local completion flow (local browser):",
+				"No detached completion command is used for the local browser flow",
+				"Configured remote completion flow (detached browser relay):",
+				"run `tollbit auth complete` with no arguments",
+			},
+		},
+		{
+			name:           "agent confirms icons",
+			remoteStrategy: configuration.ConsentStrategyAgentConfirmsIcons,
+			want: []string{
+				"Configured local completion flow (local browser):",
+				"No detached completion command is used for the local browser flow",
+				"Configured remote completion flow (detached icon confirmation):",
+				"tollbit auth complete <first> <second> <third>",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := testConfig()
+			config.Auth.Consent.Strategy.Remote = tt.remoteStrategy
+			var stdout, stderr bytes.Buffer
+			code := executeTestCommandWithConfig(config, []string{"auth", "complete", "--help"}, nil, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(stdout.String(), want) {
+					t.Fatalf("expected help to contain %q, got %q", want, stdout.String())
+				}
+			}
+		})
+	}
+}
+
+func TestRunAuthHelpFallsBackOnBrokenConfig(t *testing.T) {
+	config := testConfig()
+	config.Auth.Consent.Strategy.Remote = "unknown"
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"auth", "complete", "--help"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Run `tollbit guide` for flow instructions.") {
+		t.Fatalf("expected fallback guide pointer, got %q", stdout.String())
 	}
 }
