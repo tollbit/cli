@@ -4,6 +4,7 @@ import "time"
 
 type Config struct {
 	App         AppConfig
+	Runtime     RuntimeConfig
 	Auth        AuthConfig
 	Agent       AgentConfig
 	Credentials CredentialsConfig
@@ -14,32 +15,47 @@ type AppConfig struct {
 	Name string
 }
 
+type RuntimeConfig struct {
+	EndUserProximity string `mapstructure:"end_user_proximity" configurable:"release"`
+	StateDir         string `mapstructure:"state_dir" configurable:"release"`
+}
+
 type AuthConfig struct {
-	BaseURL            string               `mapstructure:"base_url"`
-	RetryOnOBORequired bool                 `mapstructure:"retry_on_obo_required"`
-	TokenTTLSeconds    int32                `mapstructure:"token_ttl_seconds"`
-	UseRefreshTokens   bool                 `mapstructure:"use_refresh_tokens"`
+	BaseURL            string               `mapstructure:"base_url" configurable:"dev"`
+	RetryOnOBORequired bool                 `mapstructure:"retry_on_obo_required" configurable:"release"`
+	TokenTTLSeconds    int32                `mapstructure:"token_ttl_seconds" configurable:"release"`
+	UseRefreshTokens   bool                 `mapstructure:"use_refresh_tokens" configurable:"release"`
+	Consent            ConsentConfig        `mapstructure:"consent"`
 	BrowserConsent     BrowserConsentConfig `mapstructure:"browser_consent"`
 }
 
+type ConsentConfig struct {
+	Strategy ConsentStrategyConfig `mapstructure:"strategy"`
+}
+
+type ConsentStrategyConfig struct {
+	Local  string `mapstructure:"local" configurable:"dev"`
+	Remote string `mapstructure:"remote" configurable:"dev"`
+}
+
 type AgentConfig struct {
-	DefaultName          string `mapstructure:"default_name"`
-	DefaultUserAgent     string `mapstructure:"default_user_agent"`
-	RegisterUserAgentURL string `mapstructure:"register_user_agent_url"`
+	DefaultName          string `mapstructure:"default_name" configurable:"release"`
+	DefaultUserAgent     string `mapstructure:"default_user_agent" configurable:"release"`
+	RegisterUserAgentURL string `mapstructure:"register_user_agent_url" configurable:"dev"`
 }
 
 type CredentialsConfig struct {
-	StorageDir string `mapstructure:"storage_dir"`
+	StorageDir string `mapstructure:"storage_dir" configurable:"release"`
 }
 
 type GatewayConfig struct {
-	BaseURL string `mapstructure:"base_url"`
+	BaseURL string `mapstructure:"base_url" configurable:"dev"`
 }
 
 type BrowserConsentConfig struct {
-	CallbackAddress string        `mapstructure:"callback_address"`
-	Timeout         time.Duration `mapstructure:"timeout"`
-	AutoOpenBrowser bool          `mapstructure:"auto_open_browser"`
+	CallbackAddress string        `mapstructure:"callback_address" configurable:"dev"`
+	Timeout         time.Duration `mapstructure:"timeout" configurable:"release"`
+	AutoOpenBrowser bool          `mapstructure:"auto_open_browser" configurable:"release"`
 }
 
 type OverrideOptions struct {
@@ -47,6 +63,8 @@ type OverrideOptions struct {
 	AuthRetryOnOBORequired            *bool
 	AuthTokenTTLSeconds               *int32
 	AuthUseRefreshTokens              *bool
+	RuntimeEndUserProximity           *string
+	RuntimeStateDir                   *string
 	AuthBrowserConsentCallbackAddress *string
 	AuthBrowserConsentTimeout         *time.Duration
 	AuthBrowserConsentAutoOpenBrowser *bool
@@ -57,6 +75,12 @@ type OverrideOptions struct {
 func (c Config) WithOverrides(opts OverrideOptions) (Config, error) {
 	if opts.AuthBaseURL != nil {
 		c.Auth.BaseURL = *opts.AuthBaseURL
+	}
+	if opts.RuntimeEndUserProximity != nil {
+		c.Runtime.EndUserProximity = *opts.RuntimeEndUserProximity
+	}
+	if opts.RuntimeStateDir != nil {
+		c.Runtime.StateDir = *opts.RuntimeStateDir
 	}
 	if opts.AuthRetryOnOBORequired != nil {
 		c.Auth.RetryOnOBORequired = *opts.AuthRetryOnOBORequired

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	mapstructure "github.com/go-viper/mapstructure/v2"
@@ -12,7 +13,18 @@ import (
 	"github.com/tollbit/cli/internal/configuration/platformdefaults"
 )
 
-const envPrefix = "TOLLBIT"
+const (
+	developmentConfigFile = "tb-cli.config.development.yaml"
+	envPrefix             = "TOLLBIT"
+
+	RuntimeEndUserProximityAutoDetect = "auto-detect"
+	RuntimeEndUserProximityLocal      = "local"
+	RuntimeEndUserProximityRemote     = "remote"
+
+	ConsentStrategyRedirect           = "redirect"
+	ConsentStrategyBrowserSelectIcon  = "browser_select_icon"
+	ConsentStrategyAgentConfirmsIcons = "agent_confirms_icons"
+)
 
 func AssembleConfiguration(defaultConfig []byte) (Config, error) {
 	return assembleConfiguration(defaultConfig, os.Getwd)
@@ -25,9 +37,6 @@ func assembleConfiguration(defaultConfig []byte, getwd func() (string, error)) (
 
 	v := viper.New()
 	v.SetConfigType("yaml")
-	v.SetEnvPrefix(envPrefix)
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	v.AutomaticEnv()
 
 	if err := v.ReadConfig(bytes.NewReader(defaultConfig)); err != nil {
 		return Config{}, fmt.Errorf("read embedded config: %w", err)
@@ -37,13 +46,18 @@ func assembleConfiguration(defaultConfig []byte, getwd func() (string, error)) (
 	if err != nil {
 		return Config{}, fmt.Errorf("get working directory: %w", err)
 	}
-	if err := mergeDevConfig(v, wd); err != nil {
-		return Config{}, err
+	if IsDev {
+		if err := mergeConfigIfExists(v, filepath.Join(wd, developmentConfigFile)); err != nil {
+			return Config{}, err
+		}
 	}
 
 	var config Config
 	if err := v.Unmarshal(&config, viper.DecodeHook(mapstructure.StringToTimeDurationHookFunc())); err != nil {
 		return Config{}, fmt.Errorf("unmarshal config: %w", err)
+	}
+	if err := applyEnv(&config); err != nil {
+		return Config{}, err
 	}
 	config, err = resolveDefaults(config)
 	if err != nil {
@@ -56,26 +70,41 @@ func assembleConfiguration(defaultConfig []byte, getwd func() (string, error)) (
 	return config, nil
 }
 
-// parseEmbeddedYAML unmarshals YAML defaults with no AutomaticEnv and no
-// development-config merge. Used by release PinEndpoints so pins match
-// tb-cli.config.yaml exactly.
-func parseEmbeddedYAML(data []byte) (Config, error) {
-	if len(data) == 0 {
-		return Config{}, errors.New("default config is required")
+func mergeConfigIfExists(v *viper.Viper, path string) error {
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("stat development config: %w", err)
 	}
-	v := viper.New()
-	v.SetConfigType("yaml")
-	if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
-		return Config{}, fmt.Errorf("read embedded config: %w", err)
+	v.SetConfigFile(path)
+	if err := v.MergeInConfig(); err != nil {
+		return fmt.Errorf("merge development config: %w", err)
 	}
-	var config Config
-	if err := v.Unmarshal(&config, viper.DecodeHook(mapstructure.StringToTimeDurationHookFunc())); err != nil {
-		return Config{}, fmt.Errorf("unmarshal config: %w", err)
-	}
-	return config, nil
+	return nil
 }
 
 func resolveDefaults(config Config) (Config, error) {
+	config.Runtime.EndUserProximity = strings.TrimSpace(config.Runtime.EndUserProximity)
+	if config.Runtime.EndUserProximity == "" {
+		config.Runtime.EndUserProximity = RuntimeEndUserProximityAutoDetect
+	}
+	runtimeStateDir, err := platformdefaults.StateDir(config.Runtime.StateDir)
+	if err != nil {
+		return Config{}, fmt.Errorf("resolve runtime.state_dir: %w", err)
+	}
+	config.Runtime.StateDir = runtimeStateDir
+	// Blank strategy defaults mirror tollbit-cli's resolveDefaults; the shipped
+	// remote strategy comes from tb-cli.config.yaml, which may differ.
+	config.Auth.Consent.Strategy.Local = strings.TrimSpace(config.Auth.Consent.Strategy.Local)
+	if config.Auth.Consent.Strategy.Local == "" {
+		config.Auth.Consent.Strategy.Local = ConsentStrategyRedirect
+	}
+	config.Auth.Consent.Strategy.Remote = strings.TrimSpace(config.Auth.Consent.Strategy.Remote)
+	if config.Auth.Consent.Strategy.Remote == "" {
+		config.Auth.Consent.Strategy.Remote = ConsentStrategyBrowserSelectIcon
+	}
+
 	storageDir, err := platformdefaults.CredentialsStorageDir(config.Credentials.StorageDir)
 	if err != nil {
 		return Config{}, fmt.Errorf("resolve credentials.storage_dir: %w", err)
@@ -90,6 +119,20 @@ func validate(config Config) error {
 	}
 	if strings.TrimSpace(config.Auth.BaseURL) == "" {
 		return errors.New("auth.base_url is required")
+	}
+	switch config.Runtime.EndUserProximity {
+	case RuntimeEndUserProximityAutoDetect, RuntimeEndUserProximityLocal, RuntimeEndUserProximityRemote:
+	default:
+		return fmt.Errorf("runtime.end_user_proximity must be %q, %q, or %q", RuntimeEndUserProximityAutoDetect, RuntimeEndUserProximityLocal, RuntimeEndUserProximityRemote)
+	}
+	if strings.TrimSpace(config.Runtime.StateDir) == "" {
+		return errors.New("runtime.state_dir is required")
+	}
+	if err := validateConsentStrategy("auth.consent.strategy.local", config.Auth.Consent.Strategy.Local); err != nil {
+		return err
+	}
+	if err := validateConsentStrategy("auth.consent.strategy.remote", config.Auth.Consent.Strategy.Remote); err != nil {
+		return err
 	}
 	if strings.TrimSpace(config.Agent.DefaultName) == "" {
 		return errors.New("agent.default_name is required")
@@ -113,4 +156,24 @@ func validate(config Config) error {
 		return errors.New("credentials.storage_dir is required")
 	}
 	return nil
+}
+
+func ResolveConsentStrategy(config Config) string {
+	switch config.Runtime.EndUserProximity {
+	case RuntimeEndUserProximityLocal:
+		return config.Auth.Consent.Strategy.Local
+	case RuntimeEndUserProximityAutoDetect, RuntimeEndUserProximityRemote:
+		return config.Auth.Consent.Strategy.Remote
+	default:
+		return config.Auth.Consent.Strategy.Remote
+	}
+}
+
+func validateConsentStrategy(name, strategy string) error {
+	switch strategy {
+	case ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons:
+		return nil
+	default:
+		return fmt.Errorf("%s must be %q, %q, or %q", name, ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons)
+	}
 }

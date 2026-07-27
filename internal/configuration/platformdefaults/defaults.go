@@ -8,7 +8,7 @@ import (
 
 const DefaultSentinel = "__default__"
 
-func CredentialsStorageDir(value string) (string, error) {
+func StateDir(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value != "" && value != DefaultSentinel {
 		return value, nil
@@ -18,4 +18,8 @@ func CredentialsStorageDir(value string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, ".config", "tollbit"), nil
+}
+
+func CredentialsStorageDir(value string) (string, error) {
+	return StateDir(value)
 }

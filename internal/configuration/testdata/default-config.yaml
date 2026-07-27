@@ -8,7 +8,7 @@ auth:
   consent:
     strategy:
       local: redirect
-      remote: agent_confirms_icons
+      remote: browser_select_icon
   retry_on_obo_required: true
   token_ttl_seconds: 0
   use_refresh_tokens: true

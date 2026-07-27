@@ -41,6 +41,9 @@ func (m *CredentialManager) ClearAuthTokens(ctx context.Context, force bool) err
 	if err := m.clearRefreshCredential(ctx); err != nil {
 		return err
 	}
+	if err := m.ClearPendingConsent(ctx); err != nil {
+		return err
+	}
 	if revokeErr != nil {
 		// force: local credentials cleared, but revocation failed — signal it.
 		return fmt.Errorf("%w: %w", ErrRevokeFailed, revokeErr)

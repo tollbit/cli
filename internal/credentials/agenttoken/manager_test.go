@@ -1072,12 +1072,21 @@ type fakeOBOAuthorizer struct {
 	token     string
 	baseToken agent.Token
 	callCount int
+	noRetry   bool
+}
+
+func (a *fakeOBOAuthorizer) SupportsOBORetry() bool {
+	return !a.noRetry
 }
 
 func (a *fakeOBOAuthorizer) AuthorizeOBO(inv agentauth.Invocation, identity auth.AgentIdentity, baseToken agent.Token) (auth.AgentTokenResponse, error) {
 	a.callCount++
 	a.baseToken = baseToken
 	return auth.AgentTokenResponse{Token: a.token}, nil
+}
+
+func (a *fakeOBOAuthorizer) CompleteDetached(inv agentauth.Invocation, pending agentauth.PendingConsent, input agentauth.CompleteDetachedInput) (auth.AgentTokenResponse, error) {
+	return auth.AgentTokenResponse{}, errors.New("not implemented")
 }
 
 func testAgentIdentity() auth.AgentIdentity {
@@ -1127,4 +1136,139 @@ func encodeJSONSegment(t *testing.T, value any) string {
 		t.Fatal(err)
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func TestPendingConsentCredentialRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	pending := agentauth.PendingConsent{
+		Method:        agentauth.ConsentMethodBrowserSelectIcon,
+		ChallengeID:   "ach_123",
+		AgentIdentity: testAgentIdentity(),
+		BaseToken:     testJWT(t, validClaims()),
+		CodeVerifier:  "verifier-1",
+		CreatedAt:     time.Now().UTC(),
+		ExpiresAt:     "2026-07-20T12:00:00Z",
+	}
+
+	if err := mgr.savePendingConsent(context.Background(), pending); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(dir, pendingFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("expected pending credential mode 0600, got %#o", got)
+	}
+	got, exists, err := mgr.GetPendingConsent(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists || got.ChallengeID != pending.ChallengeID || got.AgentIdentity.Name != pending.AgentIdentity.Name || got.CodeVerifier != pending.CodeVerifier {
+		t.Fatalf("unexpected pending credential: exists=%v got=%#v", exists, got)
+	}
+	if err := mgr.ClearPendingConsent(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists, err := mgr.GetPendingConsent(context.Background()); err != nil || exists {
+		t.Fatalf("expected pending credential cleared, exists=%v err=%v", exists, err)
+	}
+}
+
+func TestCompletePendingConsentSavesTokenIdentityAndClearsPending(t *testing.T) {
+	dir := t.TempDir()
+	mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	pending := agentauth.PendingConsent{
+		Method:           agentauth.ConsentMethodBrowserSelectIcon,
+		ChallengeID:      "ach_123",
+		AgentIdentity:    testAgentIdentity(),
+		BaseToken:        testJWT(t, validClaims()),
+		CodeVerifier:     "verifier-1",
+		UseRefreshTokens: true,
+		CreatedAt:        time.Now().UTC(),
+		ExpiresAt:        "2026-07-20T12:00:00Z",
+	}
+	if err := mgr.savePendingConsent(context.Background(), pending); err != nil {
+		t.Fatal(err)
+	}
+	refreshToken := "refresh-token"
+	refreshExpiresAt := "2026-07-20T13:00:00Z"
+	resp := auth.AgentTokenResponse{
+		Token: testJWT(t, validClaims(func(claims agent.Claims) agent.Claims {
+			claims.OBO = &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_123", Org: "org_456"}
+			return claims
+		})),
+		RefreshToken:          &refreshToken,
+		RefreshTokenExpiresAt: &refreshExpiresAt,
+	}
+
+	token, err := mgr.CompletePendingConsent(context.Background(), pending, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token.RawToken != resp.Token {
+		t.Fatalf("expected saved token, got %q", token.RawToken)
+	}
+	identity, exists, err := mgr.GetStoredIdentity(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists || identity.Name != pending.AgentIdentity.Name || identity.UserAgent != pending.AgentIdentity.UserAgent {
+		t.Fatalf("expected pending identity saved, exists=%v identity=%#v", exists, identity)
+	}
+	if _, exists, err := mgr.GetPendingConsent(context.Background()); err != nil || exists {
+		t.Fatalf("expected pending credential cleared, exists=%v err=%v", exists, err)
+	}
+	refresh, exists, err := mgr.readRefreshCredential(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists || refresh.RefreshToken != refreshToken || refresh.RefreshTokenExpiresAt != refreshExpiresAt {
+		t.Fatalf("expected refresh credential saved, exists=%v refresh=%#v", exists, refresh)
+	}
+}
+
+func TestGetAgentTokenSavesPendingConsentOnAuthorizationPending(t *testing.T) {
+	dir := t.TempDir()
+	baseToken := testJWT(t, validClaims())
+	pending := agentauth.PendingConsent{
+		Method:        agentauth.ConsentMethodBrowserSelectIcon,
+		ChallengeID:   "ach_pending",
+		AgentIdentity: testAgentIdentity(),
+		BaseToken:     baseToken,
+		CodeVerifier:  "verifier-1",
+		CreatedAt:     time.Now().UTC(),
+	}
+	authorizer := &pendingOBOAuthorizer{pending: pending}
+	mgr := newTestManagerWithConfig(t, dir, CredentialManagerConfig{OBOAuthorizer: authorizer}, testMintHandler(t, baseToken))
+
+	_, err := mgr.GetAgentToken(testInvocation{}, testAgentIdentity(), WithOBO())
+	var pendingErr agentauth.AuthorizationPendingError
+	if !errors.As(err, &pendingErr) {
+		t.Fatalf("expected authorization pending error, got %v", err)
+	}
+	got, exists, err := mgr.GetPendingConsent(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists || got.ChallengeID != "ach_pending" {
+		t.Fatalf("expected pending consent saved, exists=%v got=%#v", exists, got)
+	}
+}
+
+type pendingOBOAuthorizer struct {
+	pending agentauth.PendingConsent
+}
+
+func (a *pendingOBOAuthorizer) SupportsOBORetry() bool {
+	return false
+}
+
+func (a *pendingOBOAuthorizer) AuthorizeOBO(inv agentauth.Invocation, identity auth.AgentIdentity, baseToken agent.Token) (auth.AgentTokenResponse, error) {
+	return auth.AgentTokenResponse{}, agentauth.AuthorizationPendingError{Pending: a.pending}
+}
+
+func (a *pendingOBOAuthorizer) CompleteDetached(inv agentauth.Invocation, pending agentauth.PendingConsent, input agentauth.CompleteDetachedInput) (auth.AgentTokenResponse, error) {
+	return auth.AgentTokenResponse{}, errors.New("not implemented")
 }

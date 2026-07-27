@@ -1,11 +1,13 @@
 package configuration
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
-)
 
-var testDefaultConfig = []byte("app:\n  name: tollbit\nauth:\n  base_url: https://oauth.tollbit.com\n  retry_on_obo_required: true\n  token_ttl_seconds: 0\n  use_refresh_tokens: true\n  browser_consent:\n    callback_address: 127.0.0.1:54321\n    timeout: 3m\n    auto_open_browser: true\nagent:\n  default_name: anonymous\n  default_user_agent: \"\"\n  register_user_agent_url: https://hack.tollbit.com/my-agents\ncredentials:\n  storage_dir: __default__\ngateway:\n  base_url: https://gateway.tollbit.com\n")
+	tollbitcli "github.com/tollbit/cli"
+)
 
 func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
 	config := assembleTestConfiguration(t, t.TempDir())
@@ -22,8 +24,23 @@ func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
 	if !config.Auth.UseRefreshTokens {
 		t.Fatal("expected refresh tokens enabled by default")
 	}
+	if config.Runtime.EndUserProximity != RuntimeEndUserProximityAutoDetect {
+		t.Fatalf("expected auto-detect end-user proximity default, got %#v", config.Runtime)
+	}
+	if config.Auth.Consent.Strategy.Local != ConsentStrategyRedirect || config.Auth.Consent.Strategy.Remote != ConsentStrategyBrowserSelectIcon {
+		t.Fatalf("expected default consent strategy mapping, got %#v", config.Auth.Consent)
+	}
+	if got := ResolveConsentStrategy(config); got != ConsentStrategyBrowserSelectIcon {
+		t.Fatalf("expected auto-detect consent strategy %q, got %q", ConsentStrategyBrowserSelectIcon, got)
+	}
 	if config.Credentials.StorageDir == "" || config.Credentials.StorageDir == "__default__" {
 		t.Fatalf("expected resolved credentials storage dir, got %q", config.Credentials.StorageDir)
+	}
+	if config.Runtime.StateDir == "" || config.Runtime.StateDir == "__default__" {
+		t.Fatalf("expected resolved runtime state dir, got %q", config.Runtime.StateDir)
+	}
+	if config.Runtime.StateDir != config.Credentials.StorageDir {
+		t.Fatalf("expected default runtime and credentials dirs to match, got runtime=%q credentials=%q", config.Runtime.StateDir, config.Credentials.StorageDir)
 	}
 }
 
@@ -31,6 +48,44 @@ func TestAssembleConfigurationRequiresDefaultConfig(t *testing.T) {
 	_, err := assembleConfiguration(nil, func() (string, error) { return t.TempDir(), nil })
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestAssembleConfigurationAppliesCommonEnv(t *testing.T) {
+	t.Setenv("TOLLBIT_AGENT_DEFAULT_NAME", "env-agent")
+	t.Setenv("TOLLBIT_AUTH_BROWSER_CONSENT_TIMEOUT", "30s")
+
+	config := assembleTestConfiguration(t, t.TempDir())
+
+	if config.Agent.DefaultName != "env-agent" {
+		t.Fatalf("expected env agent name, got %q", config.Agent.DefaultName)
+	}
+	if config.Auth.BrowserConsent.Timeout != 30*time.Second {
+		t.Fatalf("expected env browser timeout, got %s", config.Auth.BrowserConsent.Timeout)
+	}
+}
+
+func TestIsConfigurableReportsCommonFields(t *testing.T) {
+	if !IsConfigurable("agent.default_name") {
+		t.Fatal("expected agent.default_name to be configurable")
+	}
+	if !IsConfigurable("runtime.end_user_proximity") || !IsConfigurable("runtime.state_dir") {
+		t.Fatal("expected runtime fields to be configurable")
+	}
+	if IsConfigurable("auth.consent.strategy.local") != IsDev {
+		t.Fatalf("expected auth.consent.strategy.local configurability to match IsDev=%v", IsDev)
+	}
+	if !IsConfigurable("auth.browser_consent.timeout") {
+		t.Fatal("expected auth.browser_consent.timeout to be configurable")
+	}
+	if !IsConfigurable("credentials.storage_dir") {
+		t.Fatal("expected credentials.storage_dir to be configurable")
+	}
+	if IsConfigurable("auth.base_url") != IsDev {
+		t.Fatalf("expected auth.base_url configurability to match IsDev=%v", IsDev)
+	}
+	if IsConfigurable("app.name") {
+		t.Fatal("expected untagged app.name to never be configurable")
 	}
 }
 
@@ -65,18 +120,88 @@ func TestConfigWithOverridesAppliesAndValidates(t *testing.T) {
 func TestConfigWithOverridesRejectsInvalidConfig(t *testing.T) {
 	config := assembleTestConfiguration(t, t.TempDir())
 	blank := ""
+	invalidEndUserProximity := "invalid"
 
-	_, err := config.WithOverrides(OverrideOptions{AuthBaseURL: &blank})
-	if err == nil {
-		t.Fatal("expected error")
+	tests := []struct {
+		name      string
+		overrides OverrideOptions
+	}{
+		{
+			name:      "blank auth base URL",
+			overrides: OverrideOptions{AuthBaseURL: &blank},
+		},
+		{
+			name:      "invalid end-user proximity value",
+			overrides: OverrideOptions{RuntimeEndUserProximity: &invalidEndUserProximity},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := config.WithOverrides(tt.overrides)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestConfigWithOverridesAppliesRuntimeProximity(t *testing.T) {
+	config := assembleTestConfiguration(t, t.TempDir())
+	endUserProximity := RuntimeEndUserProximityLocal
+
+	got, err := config.WithOverrides(OverrideOptions{RuntimeEndUserProximity: &endUserProximity})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Runtime.EndUserProximity != RuntimeEndUserProximityLocal {
+		t.Fatalf("expected runtime end-user proximity override, got %#v", got.Runtime)
+	}
+	if strategy := ResolveConsentStrategy(got); strategy != ConsentStrategyRedirect {
+		t.Fatalf("expected local consent strategy %q, got %q", ConsentStrategyRedirect, strategy)
+	}
+}
+
+func TestShippedRemoteConsentStrategyIsAgentConfirmsIcons(t *testing.T) {
+	config, err := assembleConfiguration(tollbitcli.DefaultConfig, func() (string, error) { return t.TempDir(), nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Auth.Consent.Strategy.Local != ConsentStrategyRedirect {
+		t.Fatalf("expected shipped local strategy redirect, got %q", config.Auth.Consent.Strategy.Local)
+	}
+	if config.Auth.Consent.Strategy.Remote != ConsentStrategyAgentConfirmsIcons {
+		t.Fatalf("expected shipped remote strategy agent_confirms_icons, got %q", config.Auth.Consent.Strategy.Remote)
+	}
+}
+
+func TestValidateConsentStrategyAcceptsAgentConfirmsIcons(t *testing.T) {
+	config := assembleTestConfiguration(t, t.TempDir())
+	config.Auth.Consent.Strategy.Local = ConsentStrategyAgentConfirmsIcons
+	config.Auth.Consent.Strategy.Remote = ConsentStrategyAgentConfirmsIcons
+	if err := validate(config); err != nil {
+		t.Fatalf("expected agent_confirms_icons to be valid: %v", err)
+	}
+	config.Auth.Consent.Strategy.Remote = "unknown"
+	if err := validate(config); err == nil {
+		t.Fatal("expected unknown consent strategy to be rejected")
 	}
 }
 
 func assembleTestConfiguration(t *testing.T, wd string) Config {
 	t.Helper()
-	config, err := assembleConfiguration(testDefaultConfig, func() (string, error) { return wd, nil })
+	config, err := assembleConfiguration(readTestdata(t, "default-config.yaml"), func() (string, error) { return wd, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
 	return config
+}
+
+func readTestdata(t *testing.T, name string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

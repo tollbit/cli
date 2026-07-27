@@ -62,10 +62,16 @@ tollbit auth status
 tollbit auth set --name my-agent --user-agent MyAgent-User
 ```
 
+End-user proximity describes where the agent environment running the CLI is located relative to the end user's browser. The CLI uses that context to present either the local or the detached (remote) authorization flow. Follow the flow the CLI presents.
+
+{{ .AuthInstructions }}
+
+If `auth login` or `auth complete` reports that authorization is still pending, it exits with code 3 and keeps the pending authorization. Wait for the end user to finish and run `auth complete` again (`auth complete` takes: {{ .AuthCompleteInputs }}). After authorization succeeds, retry the command that required user/org authorization. Use `tollbit runtime status` to inspect the current setting. When the agent environment is known, prefer `tollbit runtime set --end-user-proximity local|remote` so future commands use the right flow automatically. Use `--end-user-proximity local|remote` only for a one-off override.
+
 ## For automation
 
 - Prefer `--json` for machine-readable output on `search`, `content pricing`, `content fetch`, and `auth status`.
-- **Exit codes:** `0` success · `1` runtime error · `2` usage error. `auth status --check` → `0` valid · `1` invalid/expired · `2` missing. Before paid `fetch`, prefer `auth status --check` (or `auth status --json`) so you fail fast instead of hanging on interactive consent.
+- **Exit codes:** `0` success · `1` runtime error · `2` usage error · `3` authorization pending (`auth login` / `auth complete` in a detached flow). `auth status --check` → `0` valid · `1` invalid/expired · `2` missing. Before paid `fetch`, prefer `auth status --check` (or `auth status --json`) so you fail fast instead of hanging on interactive consent.
 - **Streams:** stdout carries data only; prompts, spinners, next-step hints, and errors go to stderr. Parse stdout for success data; treat non-zero exit as failure and read stderr when diagnosing.
 - **Non-interactive fetch:** never call `content fetch` without `--confirm`. Pass `--rate-index N` when multiple rates exist (required with `--json` in that case). Every fetch still charges.
 - **Licensable results:** only **Programmatic** results can be priced and fetched; use `--programmatic-only` or skip Enterprise hits.
@@ -73,3 +79,5 @@ tollbit auth set --name my-agent --user-agent MyAgent-User
 
 Install this skill: `tollbit guide --install <SKILLS_DIR>`.
 Compare frontmatter `version` with `tollbit version` when updating.
+
+{{ .AuthRenderedFooter }}

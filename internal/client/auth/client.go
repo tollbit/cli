@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
 	"github.com/tollbit/cli/internal/tokens/agent"
 	"github.com/tollbit/cli/internal/version"
 )
@@ -51,6 +52,55 @@ type (
 		Code            string      `json:"code"`
 		CodeVerifier    string      `json:"code_verifier"`
 		RedirectURI     string      `json:"redirect_uri"`
+		UA              *string     `json:"ua,omitempty"`
+		WBA             *WebBotAuth `json:"wba,omitempty"`
+	}
+
+	ConsentBrowserSelectIconStartRequest struct {
+		CodeChallenge       string `json:"code_challenge"`
+		CodeChallengeMethod string `json:"code_challenge_method"`
+		Scope               string `json:"scope,omitempty"`
+	}
+
+	AgentConsentIcon struct {
+		ID   int32  `json:"id"`
+		Name string `json:"name"`
+		Art  string `json:"art"`
+	}
+
+	ConsentBrowserSelectIconStartResponse struct {
+		ChallengeID string           `json:"challenge_id"`
+		ConsentURL  string           `json:"consent_url"`
+		ExpiresAt   string           `json:"expires_at"`
+		CorrectIcon AgentConsentIcon `json:"correct_icon"`
+	}
+
+	ConsentBrowserSelectIconTokenRequest struct {
+		AgentIdentifier string      `json:"agent_identifier"`
+		ChallengeID     string      `json:"challenge_id"`
+		CodeVerifier    string      `json:"code_verifier"`
+		UA              *string     `json:"ua,omitempty"`
+		WBA             *WebBotAuth `json:"wba,omitempty"`
+	}
+
+	ConsentAgentConfirmsIconsStartRequest struct {
+		CodeChallenge       string `json:"code_challenge"`
+		CodeChallengeMethod string `json:"code_challenge_method"`
+		Scope               string `json:"scope,omitempty"`
+	}
+
+	ConsentAgentConfirmsIconsStartResponse struct {
+		ChallengeID string   `json:"challenge_id"`
+		ConsentURL  string   `json:"consent_url"`
+		ExpiresAt   string   `json:"expires_at"`
+		IconNames   []string `json:"icon_names"`
+	}
+
+	ConsentAgentConfirmsIconsTokenRequest struct {
+		AgentIdentifier string      `json:"agent_identifier"`
+		ChallengeID     string      `json:"challenge_id"`
+		IconNames       []string    `json:"icon_names"`
+		CodeVerifier    string      `json:"code_verifier"`
 		UA              *string     `json:"ua,omitempty"`
 		WBA             *WebBotAuth `json:"wba,omitempty"`
 	}
@@ -96,6 +146,8 @@ type (
 		Code            string      `json:"code,omitempty"`
 		CodeVerifier    string      `json:"code_verifier,omitempty"`
 		RedirectURI     string      `json:"redirect_uri,omitempty"`
+		ChallengeID     string      `json:"challenge_id,omitempty"`
+		IconNames       []string    `json:"icon_names,omitempty"`
 		RefreshToken    string      `json:"refresh_token,omitempty"`
 		UA              *string     `json:"ua,omitempty"`
 		WBA             *WebBotAuth `json:"wba,omitempty"`
@@ -107,6 +159,14 @@ type (
 	}
 
 	requestOption func(*http.Request)
+)
+
+const (
+	grantTypeSelfAttested              = "self_attested"
+	grantTypeRefreshToken              = "refresh_token"
+	grantTypeConsentRedirect           = "consent:redirect"
+	grantTypeConsentBrowserSelectIcon  = "consent:browser_select_icon"
+	grantTypeConsentAgentConfirmsIcons = "consent:agent_confirms_icons"
 )
 
 func New(cfg ClientConfig) (*Client, error) {
@@ -135,7 +195,7 @@ func (c *Client) CreateAgentToken(ctx context.Context, identity AgentIdentity, o
 	}
 
 	req := AgentTokenRequest{
-		GrantType:       "self_attested",
+		GrantType:       grantTypeSelfAttested,
 		AgentIdentifier: identity.Name,
 		TTLSeconds:      opts.TTLSeconds,
 		UA:              ua,
@@ -175,6 +235,116 @@ func (c *Client) StartAgentConsentRedirect(ctx context.Context, token agent.Toke
 	return out, nil
 }
 
+func (c *Client) StartAgentConsentBrowserSelectIcon(ctx context.Context, token agent.Token, req ConsentBrowserSelectIconStartRequest) (ConsentBrowserSelectIconStartResponse, error) {
+	if strings.TrimSpace(token.RawToken) == "" {
+		return ConsentBrowserSelectIconStartResponse{}, errors.New("agent token is required")
+	}
+	if strings.TrimSpace(req.CodeChallenge) == "" {
+		return ConsentBrowserSelectIconStartResponse{}, errors.New("code challenge is required")
+	}
+	if strings.TrimSpace(req.CodeChallengeMethod) == "" {
+		req.CodeChallengeMethod = "S256"
+	}
+
+	u := c.resolve("/agent/v1/consent/browser-select-icon/start")
+	var out ConsentBrowserSelectIconStartResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), req, &out, withBearerToken(token)); err != nil {
+		return ConsentBrowserSelectIconStartResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *Client) RedeemAgentConsentBrowserSelectIcon(ctx context.Context, token agent.Token, req ConsentBrowserSelectIconTokenRequest) (AgentTokenResponse, error) {
+	if strings.TrimSpace(token.RawToken) == "" {
+		return AgentTokenResponse{}, errors.New("agent token is required")
+	}
+	if strings.TrimSpace(req.AgentIdentifier) == "" {
+		return AgentTokenResponse{}, errors.New("agent identifier is required")
+	}
+	if strings.TrimSpace(req.ChallengeID) == "" {
+		return AgentTokenResponse{}, errors.New("challenge id is required")
+	}
+	if strings.TrimSpace(req.CodeVerifier) == "" {
+		return AgentTokenResponse{}, errors.New("code verifier is required")
+	}
+
+	body := identityTokenRequest{
+		GrantType:       grantTypeConsentBrowserSelectIcon,
+		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
+		ChallengeID:     strings.TrimSpace(req.ChallengeID),
+		CodeVerifier:    req.CodeVerifier,
+		UA:              req.UA,
+		WBA:             req.WBA,
+	}
+	u := c.resolve("/agent/v1/tokens/identity")
+	var out AgentTokenResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(token)); err != nil {
+		return AgentTokenResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *Client) StartAgentConsentAgentConfirmsIcons(ctx context.Context, token agent.Token, req ConsentAgentConfirmsIconsStartRequest) (ConsentAgentConfirmsIconsStartResponse, error) {
+	if strings.TrimSpace(token.RawToken) == "" {
+		return ConsentAgentConfirmsIconsStartResponse{}, errors.New("agent token is required")
+	}
+	if strings.TrimSpace(req.CodeChallenge) == "" {
+		return ConsentAgentConfirmsIconsStartResponse{}, errors.New("code challenge is required")
+	}
+	if strings.TrimSpace(req.CodeChallengeMethod) == "" {
+		req.CodeChallengeMethod = "S256"
+	}
+
+	u := c.resolve("/agent/v1/consent/agent-confirms-icons/start")
+	var out ConsentAgentConfirmsIconsStartResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), req, &out, withBearerToken(token)); err != nil {
+		return ConsentAgentConfirmsIconsStartResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *Client) RedeemAgentConsentAgentConfirmsIcons(ctx context.Context, token agent.Token, req ConsentAgentConfirmsIconsTokenRequest) (AgentTokenResponse, error) {
+	if strings.TrimSpace(token.RawToken) == "" {
+		return AgentTokenResponse{}, errors.New("agent token is required")
+	}
+	if strings.TrimSpace(req.AgentIdentifier) == "" {
+		return AgentTokenResponse{}, errors.New("agent identifier is required")
+	}
+	if strings.TrimSpace(req.ChallengeID) == "" {
+		return AgentTokenResponse{}, errors.New("challenge id is required")
+	}
+	if strings.TrimSpace(req.CodeVerifier) == "" {
+		return AgentTokenResponse{}, errors.New("code verifier is required")
+	}
+	if len(req.IconNames) != 3 {
+		return AgentTokenResponse{}, errors.New("exactly 3 icon names are required")
+	}
+	iconNames := make([]string, 0, len(req.IconNames))
+	for _, name := range req.IconNames {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return AgentTokenResponse{}, errors.New("icon names must be non-empty")
+		}
+		iconNames = append(iconNames, name)
+	}
+
+	body := identityTokenRequest{
+		GrantType:       grantTypeConsentAgentConfirmsIcons,
+		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
+		ChallengeID:     strings.TrimSpace(req.ChallengeID),
+		IconNames:       iconNames,
+		CodeVerifier:    req.CodeVerifier,
+		UA:              req.UA,
+		WBA:             req.WBA,
+	}
+	u := c.resolve("/agent/v1/tokens/identity")
+	var out AgentTokenResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(token)); err != nil {
+		return AgentTokenResponse{}, err
+	}
+	return out, nil
+}
+
 func (c *Client) RedeemAgentConsentRedirect(ctx context.Context, token agent.Token, req ConsentRedirectTokenRequest) (AgentTokenResponse, error) {
 	if strings.TrimSpace(token.RawToken) == "" {
 		return AgentTokenResponse{}, errors.New("agent token is required")
@@ -193,7 +363,7 @@ func (c *Client) RedeemAgentConsentRedirect(ctx context.Context, token agent.Tok
 	}
 
 	body := identityTokenRequest{
-		GrantType:       "consent",
+		GrantType:       grantTypeConsentRedirect,
 		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
 		Code:            req.Code,
 		CodeVerifier:    req.CodeVerifier,
@@ -221,7 +391,7 @@ func (c *Client) RefreshAgentToken(ctx context.Context, baseToken agent.Token, r
 	}
 
 	body := identityTokenRequest{
-		GrantType:       "refresh_token",
+		GrantType:       grantTypeRefreshToken,
 		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
 		RefreshToken:    strings.TrimSpace(req.RefreshToken),
 		UA:              req.UA,
@@ -319,15 +489,9 @@ func apiErrorFromBody(status string, body []byte) error {
 	if len(body) == 0 {
 		return fmt.Errorf("request failed: %s", status)
 	}
-	// TODO: Use internal/errorsx.ParseResponseError once client error handling is consolidated.
-	var problem struct {
-		Detail *string `json:"detail"`
-		Title  string  `json:"title"`
-		Status int     `json:"status"`
-		Type   string  `json:"type"`
-	}
-	if err := json.Unmarshal(body, &problem); err == nil && problem.Detail != nil {
-		return fmt.Errorf("%s: %s", status, *problem.Detail)
+	problem, err := problemjson.Parse(body)
+	if err == nil {
+		return problem
 	}
 	return fmt.Errorf("request failed: %s: %s", status, strings.TrimSpace(string(body)))
 }

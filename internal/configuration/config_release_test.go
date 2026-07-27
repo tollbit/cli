@@ -25,80 +25,74 @@ func TestAssembleConfigurationIgnoresDevelopmentConfig(t *testing.T) {
 	}
 }
 
-func TestPinEndpointsOverridesHostileValues(t *testing.T) {
-	pins, err := parseEmbeddedYAML(tollbitcli.DefaultConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestAssembleConfigurationIgnoresEndpointEnv(t *testing.T) {
+	t.Setenv("TOLLBIT_AUTH_BASE_URL", "https://evil.example.com")
+	t.Setenv("TOLLBIT_GATEWAY_BASE_URL", "https://evil.example.com")
+	t.Setenv("TOLLBIT_AGENT_REGISTER_USER_AGENT_URL", "https://evil.example.com/register")
+	t.Setenv("TOLLBIT_AUTH_BROWSER_CONSENT_CALLBACK_ADDRESS", "evil.example.com:9")
 
-	hostile := "https://evil.example.com"
-	config := Config{
-		Auth: AuthConfig{
-			BaseURL: hostile,
-			BrowserConsent: BrowserConsentConfig{
-				CallbackAddress: "evil.example.com:9",
-			},
-		},
-		Agent: AgentConfig{
-			RegisterUserAgentURL: hostile + "/register",
-		},
-		Gateway: GatewayConfig{
-			BaseURL: hostile,
-		},
-	}
+	config := assembleTestConfiguration(t, t.TempDir())
 
-	got, err := PinEndpoints(config)
-	if err != nil {
-		t.Fatal(err)
+	if config.Auth.BaseURL != "https://oauth.tollbit.com" {
+		t.Fatalf("expected embedded auth base URL, got %q", config.Auth.BaseURL)
 	}
-	if got.Auth.BaseURL != pins.Auth.BaseURL {
-		t.Fatalf("auth base URL: got %q want %q", got.Auth.BaseURL, pins.Auth.BaseURL)
+	if config.Gateway.BaseURL != "https://gateway.tollbit.com" {
+		t.Fatalf("expected embedded gateway base URL, got %q", config.Gateway.BaseURL)
 	}
-	if got.Gateway.BaseURL != pins.Gateway.BaseURL {
-		t.Fatalf("gateway base URL: got %q want %q", got.Gateway.BaseURL, pins.Gateway.BaseURL)
+	if config.Agent.RegisterUserAgentURL != "https://hack.tollbit.com/my-agents" {
+		t.Fatalf("expected embedded register URL, got %q", config.Agent.RegisterUserAgentURL)
 	}
-	if got.Agent.RegisterUserAgentURL != pins.Agent.RegisterUserAgentURL {
-		t.Fatalf("register URL: got %q want %q", got.Agent.RegisterUserAgentURL, pins.Agent.RegisterUserAgentURL)
-	}
-	if got.Auth.BrowserConsent.CallbackAddress != pins.Auth.BrowserConsent.CallbackAddress {
-		t.Fatalf("callback address: got %q want %q", got.Auth.BrowserConsent.CallbackAddress, pins.Auth.BrowserConsent.CallbackAddress)
+	if config.Auth.BrowserConsent.CallbackAddress != "127.0.0.1:54321" {
+		t.Fatalf("expected embedded callback address, got %q", config.Auth.BrowserConsent.CallbackAddress)
 	}
 }
 
-func TestReleasePinsMatchEmbeddedConfig(t *testing.T) {
-	pins, err := parseEmbeddedYAML(tollbitcli.DefaultConfig)
-	if err != nil {
+func TestAssembleConfigurationIgnoresConsentStrategyOverrides(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "tb-cli.config.development.yaml")
+	if err := os.WriteFile(path, []byte("auth:\n  consent:\n    strategy:\n      local: browser_select_icon\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("TOLLBIT_AUTH_CONSENT_STRATEGY_LOCAL", ConsentStrategyBrowserSelectIcon)
 
-	onDisk, err := os.ReadFile(filepath.Join("..", "..", "tb-cli.config.yaml"))
-	if err != nil {
-		t.Fatal(err)
+	config := assembleTestConfiguration(t, dir)
+	if config.Auth.Consent.Strategy.Local != ConsentStrategyRedirect {
+		t.Fatalf("expected embedded local strategy in release, got %q", config.Auth.Consent.Strategy.Local)
 	}
-	fromDisk, err := parseEmbeddedYAML(onDisk)
-	if err != nil {
-		t.Fatal(err)
-	}
+}
 
-	if pins.Auth.BaseURL != fromDisk.Auth.BaseURL {
-		t.Fatalf("auth.base_url embed %q != disk %q", pins.Auth.BaseURL, fromDisk.Auth.BaseURL)
-	}
-	if pins.Gateway.BaseURL != fromDisk.Gateway.BaseURL {
-		t.Fatalf("gateway.base_url embed %q != disk %q", pins.Gateway.BaseURL, fromDisk.Gateway.BaseURL)
-	}
-	if pins.Agent.RegisterUserAgentURL != fromDisk.Agent.RegisterUserAgentURL {
-		t.Fatalf("register_user_agent_url embed %q != disk %q", pins.Agent.RegisterUserAgentURL, fromDisk.Agent.RegisterUserAgentURL)
-	}
-	if pins.Auth.BrowserConsent.CallbackAddress != fromDisk.Auth.BrowserConsent.CallbackAddress {
-		t.Fatalf("callback_address embed %q != disk %q", pins.Auth.BrowserConsent.CallbackAddress, fromDisk.Auth.BrowserConsent.CallbackAddress)
-	}
-
-	for _, u := range []string{pins.Auth.BaseURL, pins.Gateway.BaseURL, pins.Agent.RegisterUserAgentURL} {
-		if !strings.HasPrefix(u, "https://") {
-			t.Fatalf("expected https pin, got %q", u)
+func TestIsConfigurableRejectsDevEndpointFields(t *testing.T) {
+	for _, path := range []string{"auth.base_url", "gateway.base_url", "agent.register_user_agent_url", "auth.browser_consent.callback_address", "auth.consent.strategy.local", "auth.consent.strategy.remote"} {
+		if IsConfigurable(path) {
+			t.Fatalf("expected %s not to be configurable in release build", path)
 		}
 	}
-	if pins.Auth.BrowserConsent.CallbackAddress == "" {
-		t.Fatal("expected non-empty callback address pin")
+}
+
+// TestReleaseEmbeddedEndpointsAreProduction preserves the endpoint-pinning
+// invariant: release builds cannot override endpoints, so the embedded config
+// they lock to must carry the production https endpoints.
+func TestReleaseEmbeddedEndpointsAreProduction(t *testing.T) {
+	config, err := assembleConfiguration(tollbitcli.DefaultConfig, func() (string, error) { return t.TempDir(), nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if config.Auth.BaseURL != "https://oauth.tollbit.com" {
+		t.Fatalf("auth.base_url: got %q", config.Auth.BaseURL)
+	}
+	if config.Gateway.BaseURL != "https://gateway.tollbit.com" {
+		t.Fatalf("gateway.base_url: got %q", config.Gateway.BaseURL)
+	}
+	if config.Agent.RegisterUserAgentURL != "https://hack.tollbit.com/my-agents" {
+		t.Fatalf("agent.register_user_agent_url: got %q", config.Agent.RegisterUserAgentURL)
+	}
+	if config.Auth.BrowserConsent.CallbackAddress != "127.0.0.1:54321" {
+		t.Fatalf("auth.browser_consent.callback_address: got %q", config.Auth.BrowserConsent.CallbackAddress)
+	}
+	for _, u := range []string{config.Auth.BaseURL, config.Gateway.BaseURL, config.Agent.RegisterUserAgentURL} {
+		if !strings.HasPrefix(u, "https://") {
+			t.Fatalf("expected https endpoint, got %q", u)
+		}
 	}
 }

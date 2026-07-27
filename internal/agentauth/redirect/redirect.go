@@ -1,46 +1,46 @@
-package agentauth
+package redirect
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/url"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
+	"github.com/tollbit/cli/internal/agentauth"
+	"github.com/tollbit/cli/internal/agentauth/common"
 	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/cliruntime"
 	"github.com/tollbit/cli/internal/oauth/loopback"
 	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
-const (
-	pkceChallengeMethod = "S256"
+type (
+	ConsentStrategyConfig struct {
+		AuthClient       *auth.Client
+		Runtime          *cliruntime.Runtime
+		CallbackAddress  string
+		AutoOpenBrowser  bool
+		Timeout          time.Duration
+		UseRefreshTokens bool
+	}
+
+	ConsentStrategy struct {
+		authClient       *auth.Client
+		runtime          *cliruntime.Runtime
+		callbackAddress  string
+		autoOpenBrowser  bool
+		timeout          time.Duration
+		useRefreshTokens bool
+	}
 )
 
-type BrowserConsentAuthorizerConfig struct {
-	AuthClient       *auth.Client
-	CallbackAddress  string
-	AutoOpenBrowser  bool
-	Timeout          time.Duration
-	UseRefreshTokens bool
-}
-
-type BrowserConsentAuthorizer struct {
-	authClient       *auth.Client
-	callbackAddress  string
-	autoOpenBrowser  bool
-	timeout          time.Duration
-	useRefreshTokens bool
-}
-
-func NewBrowserConsentAuthorizer(cfg BrowserConsentAuthorizerConfig) (*BrowserConsentAuthorizer, error) {
+func NewConsentStrategy(cfg ConsentStrategyConfig) (*ConsentStrategy, error) {
 	if cfg.AuthClient == nil {
 		return nil, errors.New("auth client is required")
+	}
+	if cfg.Runtime == nil {
+		return nil, errors.New("runtime is required")
 	}
 	if strings.TrimSpace(cfg.CallbackAddress) == "" {
 		return nil, errors.New("callback address is required")
@@ -48,8 +48,9 @@ func NewBrowserConsentAuthorizer(cfg BrowserConsentAuthorizerConfig) (*BrowserCo
 	if cfg.Timeout < 0 {
 		return nil, errors.New("timeout must be non-negative")
 	}
-	return &BrowserConsentAuthorizer{
+	return &ConsentStrategy{
 		authClient:       cfg.AuthClient,
+		runtime:          cfg.Runtime,
 		callbackAddress:  strings.TrimSpace(cfg.CallbackAddress),
 		autoOpenBrowser:  cfg.AutoOpenBrowser,
 		timeout:          cfg.Timeout,
@@ -57,7 +58,36 @@ func NewBrowserConsentAuthorizer(cfg BrowserConsentAuthorizerConfig) (*BrowserCo
 	}, nil
 }
 
-func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.AgentIdentity, baseToken agent.Token) (auth.AgentTokenResponse, error) {
+func (a ConsentStrategy) Method() agentauth.ConsentMethod {
+	return agentauth.ConsentMethodRedirect
+}
+
+func (a ConsentStrategy) AutoOpensBrowser() bool {
+	return a.autoOpenBrowser
+}
+
+func (a ConsentStrategy) SupportsOBORetry() bool {
+	return true
+}
+
+func (a ConsentStrategy) SupportsDetachedCompletion() bool {
+	return false
+}
+
+func (a ConsentStrategy) Guidance() agentauth.ConsentGuidance {
+	return agentauth.ConsentGuidance{
+		FlowLabel:            "local browser",
+		LoginInstructions:    "For local authorization, run `tollbit auth login` in the same environment as the end user's browser. The CLI opens the browser when configured to do so, waits for the loopback callback, and completes authorization automatically.",
+		CompleteInstructions: "No detached completion command is used for the local browser flow; if authorization is interrupted, rerun `tollbit auth login`.",
+		CompleteArgsLabel:    "not used (completion is automatic)",
+		Troubleshooting: []agentauth.ConsentGuidanceRow{
+			{Symptom: "browser did not open", Meaning: "automatic browser launch failed or is disabled", Action: "open the printed URL manually in the local browser"},
+			{Symptom: "authorization timed out", Meaning: "the loopback callback did not complete before the timeout", Action: "rerun `tollbit auth login`"},
+		},
+	}
+}
+
+func (a ConsentStrategy) AuthorizeOBO(inv agentauth.Invocation, identity auth.AgentIdentity, baseToken agent.Token) (auth.AgentTokenResponse, error) {
 	ctx := inv.Context()
 
 	callback, err := loopback.Start(ctx, a.callbackAddress)
@@ -66,11 +96,11 @@ func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.Age
 	}
 	defer callback.Close()
 
-	codeVerifier, codeChallenge, err := generatePKCE()
+	codeVerifier, codeChallenge, err := common.GeneratePKCE()
 	if err != nil {
 		return auth.AgentTokenResponse{}, err
 	}
-	state, err := randomURLToken(32)
+	state, err := common.RandomURLToken(32)
 	if err != nil {
 		return auth.AgentTokenResponse{}, err
 	}
@@ -83,7 +113,7 @@ func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.Age
 		RedirectURI:         callback.RedirectURI,
 		State:               state,
 		CodeChallenge:       codeChallenge,
-		CodeChallengeMethod: pkceChallengeMethod,
+		CodeChallengeMethod: common.PKCEChallengeMethod,
 		Scope:               scope,
 	})
 	if err != nil {
@@ -96,7 +126,7 @@ func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.Age
 	stdout := inv.OutOrStdout()
 	fmt.Fprintf(stdout, "Authorize agent: %s\n\n", identity.Name)
 	if a.autoOpenBrowser {
-		if err := openBrowser(startResp.ConsentURL); err != nil {
+		if err := a.runtime.OpenBrowser(startResp.ConsentURL); err != nil {
 			fmt.Fprintf(stdout, "Could not open your browser automatically: %v\n", err)
 			fmt.Fprintln(stdout, "Open this URL in your browser to continue:")
 		} else {
@@ -153,45 +183,6 @@ func (a BrowserConsentAuthorizer) AuthorizeOBO(inv Invocation, identity auth.Age
 	return resp, nil
 }
 
-func generatePKCE() (string, string, error) {
-	verifier, err := randomURLToken(48)
-	if err != nil {
-		return "", "", err
-	}
-	sum := sha256.Sum256([]byte(verifier))
-	challenge := base64.RawURLEncoding.EncodeToString(sum[:])
-	return verifier, challenge, nil
-}
-
-func randomURLToken(size int) (string, error) {
-	b := make([]byte, size)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-func validateBrowserURL(rawURL string) error {
-	u, err := url.ParseRequestURI(rawURL)
-	if err != nil {
-		return err
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("refusing to open URL with scheme %q; only http and https are allowed", u.Scheme)
-	}
-	return nil
-}
-
-func openBrowser(rawURL string) error {
-	if err := validateBrowserURL(rawURL); err != nil {
-		return err
-	}
-	switch runtime.GOOS {
-	case "darwin":
-		return exec.Command("open", rawURL).Start()
-	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL).Start()
-	default:
-		return exec.Command("xdg-open", rawURL).Start()
-	}
+func (a ConsentStrategy) CompleteDetached(inv agentauth.Invocation, pending agentauth.PendingConsent, input agentauth.CompleteDetachedInput) (auth.AgentTokenResponse, error) {
+	return auth.AgentTokenResponse{}, errors.New("redirect consent does not support detached completion")
 }

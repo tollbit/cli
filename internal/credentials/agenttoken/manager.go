@@ -13,6 +13,7 @@ const (
 	identityFilename = "agent-identity.json"
 	tokenFilename    = "agent-token.jwt"
 	refreshFilename  = "refresh-token.json"
+	pendingFilename  = "pending-auth.json"
 )
 
 type (
@@ -26,6 +27,13 @@ type (
 	ResolveIdentityOptions struct {
 		Name      *string
 		UserAgent *string
+	}
+
+	RefreshTokenStatus struct {
+		Present   bool   `json:"present"`
+		ExpiresAt string `json:"expires_at,omitempty"`
+		Expired   bool   `json:"expired,omitempty"`
+		Error     string `json:"error,omitempty"`
 	}
 
 	CredentialManagerConfig struct {
@@ -43,6 +51,7 @@ type (
 		identityPath     string
 		tokenPath        string
 		refreshPath      string
+		pendingPath      string
 		defaultIdentity  auth.AgentIdentity
 		tokenOptions     auth.AgentTokenOptions
 		authClient       *auth.Client
@@ -88,10 +97,19 @@ func New(cfg CredentialManagerConfig) (*CredentialManager, error) {
 		identityPath:     filepath.Join(dir, identityFilename),
 		tokenPath:        filepath.Join(dir, tokenFilename),
 		refreshPath:      filepath.Join(dir, refreshFilename),
+		pendingPath:      filepath.Join(dir, pendingFilename),
 		defaultIdentity:  defaultIdentity,
 		tokenOptions:     cfg.TokenOptions,
 		authClient:       cfg.AuthClient,
 		oboAuthorizer:    cfg.OBOAuthorizer,
 		useRefreshTokens: cfg.UseRefreshTokens,
 	}, nil
+}
+
+func (m *CredentialManager) SupportsOBORetry() bool {
+	return m.oboAuthorizer.SupportsOBORetry()
+}
+
+func (m *CredentialManager) AutoRefreshEnabled() bool {
+	return m.useRefreshTokens
 }

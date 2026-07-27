@@ -9,6 +9,17 @@ import (
 	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
+type ExplicitLoginRequiredError struct {
+	Reason string
+}
+
+func (e ExplicitLoginRequiredError) Error() string {
+	if e.Reason != "" {
+		return e.Reason
+	}
+	return "explicit auth login is required"
+}
+
 func WithOBORetry[T any](inv agentauth.Invocation, mgr *CredentialManager, identity auth.AgentIdentity, call func(agent.Token) (T, error)) (T, error) {
 	token, err := mgr.GetAgentToken(inv, identity)
 	if err != nil {
@@ -18,6 +29,9 @@ func WithOBORetry[T any](inv agentauth.Invocation, mgr *CredentialManager, ident
 	out, err := call(token)
 	if err == nil || !IsOBORequired(err) {
 		return out, err
+	}
+	if !mgr.SupportsOBORetry() {
+		return out, ExplicitLoginRequiredError{Reason: "operation requires user or organization authorization; run `tollbit auth login`, then retry"}
 	}
 
 	oboToken, err := mgr.GetAgentToken(inv, identity, WithOBO())

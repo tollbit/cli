@@ -1,4 +1,4 @@
-package agentauth
+package redirect
 
 import (
 	"bytes"
@@ -15,10 +15,12 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/tollbit/cli/internal/client/auth"
+	"github.com/tollbit/cli/internal/cliruntime"
+	"github.com/tollbit/cli/internal/configuration"
 	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
-func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
+func TestConsentStrategyAuthorizesOBO(t *testing.T) {
 	baseToken := testAgentJWT(t, nil)
 	oboToken := testAgentJWT(t, &agent.OBOClaims{Ver: 1, Source: "consent", User: "usr_abc", Org: "org_xyz"})
 	callbackCh := make(chan string, 1)
@@ -59,11 +61,14 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 			if r.Header.Get("Authorization") != "Bearer "+baseToken {
 				t.Fatalf("unexpected redeem authorization: %q", r.Header.Get("Authorization"))
 			}
-			var body auth.ConsentRedirectTokenRequest
+			var body map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatal(err)
 			}
-			if body.AgentIdentifier != "agent-test" || body.Code != "code-123" || body.CodeVerifier == "" || body.RedirectURI == "" {
+			if body["grant_type"] == "consent" {
+				t.Fatal("bare consent grant_type is not accepted")
+			}
+			if body["grant_type"] != "consent:redirect" || body["agent_identifier"] != "agent-test" || body["code"] != "code-123" || body["code_verifier"] == "" || body["redirect_uri"] == "" {
 				t.Fatalf("unexpected redeem body: %#v", body)
 			}
 			sawRedeem = true
@@ -78,8 +83,9 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authorizer, err := NewBrowserConsentAuthorizer(BrowserConsentAuthorizerConfig{
+	authorizer, err := NewConsentStrategy(ConsentStrategyConfig{
 		AuthClient:       authClient,
+		Runtime:          newTestRuntime(t),
 		CallbackAddress:  "127.0.0.1:54321",
 		AutoOpenBrowser:  false,
 		Timeout:          2 * time.Second,
@@ -104,6 +110,9 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 	if !sawStart || !sawRedeem {
 		t.Fatalf("expected start and redeem, sawStart=%v sawRedeem=%v", sawStart, sawRedeem)
 	}
+	if authorizer.AutoOpensBrowser() {
+		t.Fatal("redirect should not auto-open when configured false")
+	}
 	stdout := inv.stdout.String()
 	for _, want := range []string{"Authorize agent: agent-test", "Open this URL in your browser", "Waiting for authorization"} {
 		if !strings.Contains(stdout, want) {
@@ -112,31 +121,99 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 	}
 }
 
-func TestNewBrowserConsentAuthorizerValidatesConfig(t *testing.T) {
+func TestConsentStrategyReportsAutoOpenBrowserConfig(t *testing.T) {
+	authorizer, err := NewConsentStrategy(ConsentStrategyConfig{
+		AuthClient:      newTestAuthClient(t),
+		Runtime:         newTestRuntime(t),
+		CallbackAddress: "127.0.0.1:54321",
+		AutoOpenBrowser: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !authorizer.AutoOpensBrowser() {
+		t.Fatal("expected redirect to report auto-open enabled")
+	}
+	if authorizer.Guidance().CompleteArgsLabel == "" {
+		t.Fatal("expected complete args guidance label")
+	}
+}
+
+func TestConsentStrategyOmitsOfflineAccessWhenRefreshTokensDisabled(t *testing.T) {
+	baseToken := testAgentJWT(t, nil)
+	var sawStart bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/agent/v1/consent/redirect/start":
+			var body auth.ConsentRedirectStartRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Scope != "" {
+				t.Fatalf("expected empty scope, got %q", body.Scope)
+			}
+			sawStart = true
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+	authClient, err := auth.New(auth.ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorizer, err := NewConsentStrategy(ConsentStrategyConfig{
+		AuthClient:       authClient,
+		Runtime:          newTestRuntime(t),
+		CallbackAddress:  "127.0.0.1:54321",
+		UseRefreshTokens: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _ = authorizer.AuthorizeOBO(&testInvocation{}, auth.AgentIdentity{Name: "agent-test"}, agent.Token{RawToken: baseToken})
+	if !sawStart {
+		t.Fatal("expected consent start request")
+	}
+}
+
+func TestNewConsentStrategyValidatesConfig(t *testing.T) {
 	authClient := newTestAuthClient(t)
 	tests := []struct {
 		name    string
-		config  BrowserConsentAuthorizerConfig
+		config  ConsentStrategyConfig
 		wantErr string
 	}{
 		{
 			name: "missing auth client",
-			config: BrowserConsentAuthorizerConfig{
+			config: ConsentStrategyConfig{
 				CallbackAddress: "127.0.0.1:54321",
 			},
 			wantErr: "auth client is required",
 		},
 		{
 			name: "missing callback address",
-			config: BrowserConsentAuthorizerConfig{
+			config: ConsentStrategyConfig{
 				AuthClient: authClient,
+				Runtime:    newTestRuntime(t),
 			},
 			wantErr: "callback address is required",
 		},
 		{
-			name: "negative timeout",
-			config: BrowserConsentAuthorizerConfig{
+			name: "missing runtime",
+			config: ConsentStrategyConfig{
 				AuthClient:      authClient,
+				CallbackAddress: "127.0.0.1:54321",
+			},
+			wantErr: "runtime is required",
+		},
+		{
+			name: "negative timeout",
+			config: ConsentStrategyConfig{
+				AuthClient:      authClient,
+				Runtime:         newTestRuntime(t),
 				CallbackAddress: "127.0.0.1:54321",
 				Timeout:         -time.Second,
 			},
@@ -146,7 +223,7 @@ func TestNewBrowserConsentAuthorizerValidatesConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewBrowserConsentAuthorizer(tt.config)
+			_, err := NewConsentStrategy(tt.config)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -208,24 +285,14 @@ func newTestAuthClient(t *testing.T) *auth.Client {
 	return c
 }
 
-func TestValidateBrowserURL(t *testing.T) {
-	t.Parallel()
-
-	for _, rawURL := range []string{"http://x", "https://x"} {
-		if err := validateBrowserURL(rawURL); err != nil {
-			t.Fatalf("expected %q to be allowed, got %v", rawURL, err)
-		}
+func newTestRuntime(t *testing.T) *cliruntime.Runtime {
+	t.Helper()
+	rt, err := cliruntime.New(cliruntime.Config{
+		ConfiguredEndUserProximity: configuration.RuntimeEndUserProximityLocal,
+		StateDir:                   t.TempDir(),
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	for _, rawURL := range []string{
-		"file:///etc/passwd",
-		"javascript:alert(1)",
-		"custom://x",
-		"",
-		"example.com/path",
-	} {
-		if err := validateBrowserURL(rawURL); err == nil {
-			t.Fatalf("expected %q to be rejected", rawURL)
-		}
-	}
+	return rt
 }

@@ -11,7 +11,8 @@ func NewCommandTree(factory app.Factory) *cobra.Command {
 		NewAuthCommand(factory),
 		NewContentCommand(factory),
 		NewSearchCommand(factory),
-		NewGuideCommand(),
+		NewRuntimeCommand(factory),
+		NewGuideCommand(factory),
 		NewVersionCommand(),
 	)
 	return rootCmd

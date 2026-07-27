@@ -74,6 +74,30 @@ func TestWithOBORetryRetriesOBORequiredWithOBOToken(t *testing.T) {
 	}
 }
 
+func TestWithOBORetryRequiresExplicitLoginWhenAuthorizerDoesNotSupportRetry(t *testing.T) {
+	baseToken := testJWT(t, validClaims())
+	authorizer := &retryOBOAuthorizer{noRetry: true}
+	mgr := newTestManagerWithConfig(t, t.TempDir(), CredentialManagerConfig{OBOAuthorizer: authorizer}, testMintHandler(t, baseToken))
+
+	var calls int
+	_, err := WithOBORetry(testInvocation{}, mgr, testAgentIdentity(), func(token agent.Token) (string, error) {
+		calls++
+		code := problemjson.ErrorCodeOboRequired
+		return "", problemjson.Problem{Code: &code}
+	})
+
+	var explicit ExplicitLoginRequiredError
+	if !errors.As(err, &explicit) {
+		t.Fatalf("expected explicit login required error, got %v", err)
+	}
+	if err.Error() != "operation requires user or organization authorization; run `tollbit auth login`, then retry" {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected no retry call, got %d calls", calls)
+	}
+}
+
 func TestWithOBORetryReturnsOBOAuthorizationError(t *testing.T) {
 	baseToken := testJWT(t, validClaims())
 	wantErr := errors.New("consent failed")
@@ -90,8 +114,13 @@ func TestWithOBORetryReturnsOBOAuthorizationError(t *testing.T) {
 }
 
 type retryOBOAuthorizer struct {
-	token string
-	err   error
+	token   string
+	err     error
+	noRetry bool
+}
+
+func (a *retryOBOAuthorizer) SupportsOBORetry() bool {
+	return !a.noRetry
 }
 
 func (a *retryOBOAuthorizer) AuthorizeOBO(inv agentauth.Invocation, identity auth.AgentIdentity, baseToken agent.Token) (auth.AgentTokenResponse, error) {
@@ -99,6 +128,10 @@ func (a *retryOBOAuthorizer) AuthorizeOBO(inv agentauth.Invocation, identity aut
 		return auth.AgentTokenResponse{}, a.err
 	}
 	return auth.AgentTokenResponse{Token: a.token}, nil
+}
+
+func (a *retryOBOAuthorizer) CompleteDetached(inv agentauth.Invocation, pending agentauth.PendingConsent, input agentauth.CompleteDetachedInput) (auth.AgentTokenResponse, error) {
+	return auth.AgentTokenResponse{}, errors.New("not implemented")
 }
 
 func testMintHandler(t *testing.T, token string) http.HandlerFunc {
