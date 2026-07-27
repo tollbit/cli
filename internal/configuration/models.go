@@ -15,31 +15,31 @@ type AppConfig struct {
 }
 
 type AuthConfig struct {
-	BaseURL            string               `mapstructure:"base_url"`
-	RetryOnOBORequired bool                 `mapstructure:"retry_on_obo_required"`
-	TokenTTLSeconds    int32                `mapstructure:"token_ttl_seconds"`
-	UseRefreshTokens   bool                 `mapstructure:"use_refresh_tokens"`
+	BaseURL            string               `mapstructure:"base_url" configurable:"dev"`
+	RetryOnOBORequired bool                 `mapstructure:"retry_on_obo_required" configurable:"release"`
+	TokenTTLSeconds    int32                `mapstructure:"token_ttl_seconds" configurable:"release"`
+	UseRefreshTokens   bool                 `mapstructure:"use_refresh_tokens" configurable:"release"`
 	BrowserConsent     BrowserConsentConfig `mapstructure:"browser_consent"`
 }
 
 type AgentConfig struct {
-	DefaultName          string `mapstructure:"default_name"`
-	DefaultUserAgent     string `mapstructure:"default_user_agent"`
-	RegisterUserAgentURL string `mapstructure:"register_user_agent_url"`
+	DefaultName          string `mapstructure:"default_name" configurable:"release"`
+	DefaultUserAgent     string `mapstructure:"default_user_agent" configurable:"release"`
+	RegisterUserAgentURL string `mapstructure:"register_user_agent_url" configurable:"dev"`
 }
 
 type CredentialsConfig struct {
-	StorageDir string `mapstructure:"storage_dir"`
+	StorageDir string `mapstructure:"storage_dir" configurable:"release"`
 }
 
 type GatewayConfig struct {
-	BaseURL string `mapstructure:"base_url"`
+	BaseURL string `mapstructure:"base_url" configurable:"dev"`
 }
 
 type BrowserConsentConfig struct {
-	CallbackAddress string        `mapstructure:"callback_address"`
-	Timeout         time.Duration `mapstructure:"timeout"`
-	AutoOpenBrowser bool          `mapstructure:"auto_open_browser"`
+	CallbackAddress string        `mapstructure:"callback_address" configurable:"dev"`
+	Timeout         time.Duration `mapstructure:"timeout" configurable:"release"`
+	AutoOpenBrowser bool          `mapstructure:"auto_open_browser" configurable:"release"`
 }
 
 type OverrideOptions struct {

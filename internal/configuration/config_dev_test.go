@@ -31,6 +31,36 @@ func TestAssembleConfigurationEnvOverridesFiles(t *testing.T) {
 	}
 }
 
+func TestAssembleConfigurationAppliesDevEndpointEnv(t *testing.T) {
+	t.Setenv("TOLLBIT_AUTH_BASE_URL", "https://oauth-development.example")
+	t.Setenv("TOLLBIT_GATEWAY_BASE_URL", "https://gateway-development.example.com")
+	t.Setenv("TOLLBIT_AGENT_REGISTER_USER_AGENT_URL", "https://hack-development.example/my-agents")
+	t.Setenv("TOLLBIT_AUTH_BROWSER_CONSENT_CALLBACK_ADDRESS", "127.0.0.1:65432")
+
+	config := assembleTestConfiguration(t, t.TempDir())
+
+	if config.Auth.BaseURL != "https://oauth-development.example" {
+		t.Fatalf("expected auth env override, got %q", config.Auth.BaseURL)
+	}
+	if config.Gateway.BaseURL != "https://gateway-development.example.com" {
+		t.Fatalf("expected gateway env override, got %q", config.Gateway.BaseURL)
+	}
+	if config.Agent.RegisterUserAgentURL != "https://hack-development.example/my-agents" {
+		t.Fatalf("expected register URL env override, got %q", config.Agent.RegisterUserAgentURL)
+	}
+	if config.Auth.BrowserConsent.CallbackAddress != "127.0.0.1:65432" {
+		t.Fatalf("expected callback env override, got %q", config.Auth.BrowserConsent.CallbackAddress)
+	}
+}
+
+func TestIsConfigurableReportsDevEndpointFields(t *testing.T) {
+	for _, path := range []string{"auth.base_url", "gateway.base_url", "agent.register_user_agent_url", "auth.browser_consent.callback_address"} {
+		if !IsConfigurable(path) {
+			t.Fatalf("expected %s to be configurable in dev build", path)
+		}
+	}
+}
+
 func writeDevelopmentConfig(t *testing.T, dir string, content string) {
 	t.Helper()
 	path := filepath.Join(dir, developmentConfigFile)

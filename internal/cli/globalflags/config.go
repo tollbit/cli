@@ -2,7 +2,6 @@ package globalflags
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -11,50 +10,133 @@ import (
 	"github.com/tollbit/cli/internal/configuration"
 )
 
-const ShowDevFlagsEnvVar = "TOLLBIT_SHOW_DEV_FLAGS"
+type (
+	configFlagOptions struct {
+		authBaseURL                       string
+		gatewayBaseURL                    string
+		authRetryOnOBORequired            bool
+		authTokenTTLSeconds               int32
+		authUseRefreshTokens              bool
+		authBrowserConsentCallbackAddress string
+		authBrowserConsentTimeout         time.Duration
+		authBrowserConsentAutoOpenBrowser bool
+		credentialsStorageDir             string
+	}
 
-const (
-	FlagAuthBaseURL                       = "auth-base-url"
-	FlagAuthRetryOnOBORequired            = "auth-retry-on-obo-required"
-	FlagAuthTokenTTLSeconds               = "auth-token-ttl-seconds"
-	FlagAuthUseRefreshTokens              = "auth-use-refresh-tokens"
-	FlagAuthBrowserConsentCallbackAddress = "auth-browser-consent-callback-address"
-	FlagAuthBrowserConsentTimeout         = "auth-browser-consent-timeout"
-	FlagAuthBrowserConsentAutoOpenBrowser = "auth-browser-consent-auto-open-browser"
-	FlagCredentialsStorageDir             = "credentials-storage-dir"
-	FlagGatewayBaseURL                    = "gateway-base-url"
+	configFlag struct {
+		name        string
+		path        string
+		usage       string
+		takesValue  bool
+		hideDefault bool
+		add         func(*pflag.FlagSet, *configFlagOptions, configFlag)
+		apply       func(*pflag.FlagSet, *configuration.OverrideOptions, configFlag) error
+	}
 )
 
-var devFlagNames = []string{
-	FlagAuthBaseURL,
-	FlagGatewayBaseURL,
-	FlagAuthRetryOnOBORequired,
-	FlagAuthTokenTTLSeconds,
-	FlagAuthUseRefreshTokens,
-	FlagAuthBrowserConsentCallbackAddress,
-	FlagAuthBrowserConsentTimeout,
-	FlagAuthBrowserConsentAutoOpenBrowser,
-	FlagCredentialsStorageDir,
-}
+var (
+	configFlags = []configFlag{
+		// Removing from active flags for now
+		// boolFlag(
+		// 	"auth-retry-on-obo-required",
+		// 	"auth.retry_on_obo_required",
+		// 	"retry once with OBO authorization when required",
+		// 	func(opts *configFlagOptions) bool { return opts.authRetryOnOBORequired },
+		// 	func(overrides *configuration.OverrideOptions, value *bool) {
+		// 		overrides.AuthRetryOnOBORequired = value
+		// 	},
+		// ),
+		// Removing from active flags for now
+		// int32Flag(
+		// 	"auth-token-ttl-seconds",
+		// 	"auth.token_ttl_seconds",
+		// 	"agent token TTL in seconds; 0 uses server default",
+		// 	func(opts *configFlagOptions) int32 { return opts.authTokenTTLSeconds },
+		// 	func(overrides *configuration.OverrideOptions, value *int32) {
+		// 		overrides.AuthTokenTTLSeconds = value
+		// 	},
+		// ),
+		// Removing from active flags for now
+		// boolFlag(
+		// 	"auth-use-refresh-tokens",
+		// 	"auth.use_refresh_tokens",
+		// 	"request and use refresh tokens for OBO authorization",
+		// 	func(opts *configFlagOptions) bool { return opts.authUseRefreshTokens },
+		// 	func(overrides *configuration.OverrideOptions, value *bool) {
+		// 		overrides.AuthUseRefreshTokens = value
+		// 	},
+		// ),
+		// Removing from active flags for now
+		// durationFlag(
+		// 	"auth-browser-consent-timeout",
+		// 	"auth.browser_consent.timeout",
+		// 	"auth browser consent timeout",
+		// 	func(opts *configFlagOptions) time.Duration { return opts.authBrowserConsentTimeout },
+		// 	func(overrides *configuration.OverrideOptions, value *time.Duration) {
+		// 		overrides.AuthBrowserConsentTimeout = value
+		// 	},
+		// ),
+		// Removing from active flags for now
+		// boolFlag(
+		// 	"auth-browser-consent-auto-open-browser",
+		// 	"auth.browser_consent.auto_open_browser",
+		// 	"automatically open browser for auth consent",
+		// 	func(opts *configFlagOptions) bool { return opts.authBrowserConsentAutoOpenBrowser },
+		// 	func(overrides *configuration.OverrideOptions, value *bool) {
+		// 		overrides.AuthBrowserConsentAutoOpenBrowser = value
+		// 	},
+		// ),
+		// Removing from active flags for now
+		// stringFlag(
+		// 	"credentials-storage-dir",
+		// 	"credentials.storage_dir",
+		// 	"credential storage directory; __default__ uses the platform default",
+		// 	func(opts *configFlagOptions) string { return opts.credentialsStorageDir },
+		// 	func(overrides *configuration.OverrideOptions, value *string) {
+		// 		overrides.CredentialsStorageDir = value
+		// 	},
+		// 	false,
+		// ),
+		// Removing from active flags for now
+		// stringFlag(
+		// 	"auth-base-url",
+		// 	"auth.base_url",
+		// 	"Auth API base URL",
+		// 	func(opts *configFlagOptions) string { return opts.authBaseURL },
+		// 	func(overrides *configuration.OverrideOptions, value *string) {
+		// 		overrides.AuthBaseURL = value
+		// 	},
+		// 	false,
+		// ),
+		// Removing from active flags for now
+		// stringFlag(
+		// 	"gateway-base-url",
+		// 	"gateway.base_url",
+		// 	"Gateway API base URL",
+		// 	func(opts *configFlagOptions) string { return opts.gatewayBaseURL },
+		// 	func(overrides *configuration.OverrideOptions, value *string) {
+		// 		overrides.GatewayBaseURL = value
+		// 	},
+		// 	false,
+		// ),
+		// Removing from active flags for now
+		// stringFlag(
+		// 	"auth-browser-consent-callback-address",
+		// 	"auth.browser_consent.callback_address",
+		// 	"auth browser consent callback address",
+		// 	func(opts *configFlagOptions) string {
+		// 		return opts.authBrowserConsentCallbackAddress
+		// 	},
+		// 	func(overrides *configuration.OverrideOptions, value *string) {
+		// 		overrides.AuthBrowserConsentCallbackAddress = value
+		// 	},
+		// 	false,
+		// ),
+	}
+)
 
-type configFlagOptions struct {
-	authBaseURL                       string
-	gatewayBaseURL                    string
-	authRetryOnOBORequired            bool
-	authTokenTTLSeconds               int32
-	authUseRefreshTokens              bool
-	authBrowserConsentCallbackAddress string
-	authBrowserConsentTimeout         time.Duration
-	authBrowserConsentAutoOpenBrowser bool
-	credentialsStorageDir             string
-}
-
-type flagValue interface {
-	~bool | ~int32 | time.Duration
-}
-
-func Add(cmd *cobra.Command, config configuration.Config) {
-	opts := &configFlagOptions{
+func newConfigFlagOptions(config configuration.Config) *configFlagOptions {
+	return &configFlagOptions{
 		authBaseURL:                       config.Auth.BaseURL,
 		gatewayBaseURL:                    config.Gateway.BaseURL,
 		authRetryOnOBORequired:            config.Auth.RetryOnOBORequired,
@@ -65,89 +147,131 @@ func Add(cmd *cobra.Command, config configuration.Config) {
 		authBrowserConsentAutoOpenBrowser: config.Auth.BrowserConsent.AutoOpenBrowser,
 		credentialsStorageDir:             config.Credentials.StorageDir,
 	}
-	flags := cmd.PersistentFlags()
-	flags.StringVar(&opts.authBaseURL, FlagAuthBaseURL, opts.authBaseURL, "Auth API base URL")
-	flags.StringVar(&opts.gatewayBaseURL, FlagGatewayBaseURL, opts.gatewayBaseURL, "Gateway API base URL")
-	flags.BoolVar(&opts.authRetryOnOBORequired, FlagAuthRetryOnOBORequired, opts.authRetryOnOBORequired, "retry once with OBO authorization when required")
-	flags.Int32Var(&opts.authTokenTTLSeconds, FlagAuthTokenTTLSeconds, opts.authTokenTTLSeconds, "agent token TTL in seconds; 0 uses server default")
-	flags.BoolVar(&opts.authUseRefreshTokens, FlagAuthUseRefreshTokens, opts.authUseRefreshTokens, "request and use refresh tokens for OBO authorization")
-	flags.StringVar(&opts.authBrowserConsentCallbackAddress, FlagAuthBrowserConsentCallbackAddress, opts.authBrowserConsentCallbackAddress, "auth browser consent callback address")
-	flags.DurationVar(&opts.authBrowserConsentTimeout, FlagAuthBrowserConsentTimeout, opts.authBrowserConsentTimeout, "auth browser consent timeout")
-	flags.BoolVar(&opts.authBrowserConsentAutoOpenBrowser, FlagAuthBrowserConsentAutoOpenBrowser, opts.authBrowserConsentAutoOpenBrowser, "automatically open browser for auth consent")
-	flags.StringVar(&opts.credentialsStorageDir, FlagCredentialsStorageDir, opts.credentialsStorageDir, "credential storage directory; __default__ uses the platform default")
-	if !DevFlagsVisible() {
-		for _, name := range devFlagNames {
-			if flag := flags.Lookup(name); flag != nil {
-				flag.Hidden = true
+}
+
+func stringFlag(name string, path string, usage string, defaultValue func(*configFlagOptions) string, setOverride func(*configuration.OverrideOptions, *string), hideDefault bool) configFlag {
+	return configFlag{
+		name:        name,
+		path:        path,
+		usage:       usage,
+		takesValue:  true,
+		hideDefault: hideDefault,
+		add: func(flags *pflag.FlagSet, opts *configFlagOptions, flag configFlag) {
+			value := defaultValue(opts)
+			flags.StringVar(&value, flag.name, value, flag.usage)
+		},
+		apply: func(flags *pflag.FlagSet, overrides *configuration.OverrideOptions, flag configFlag) error {
+			value, err := changedStr(flags, flag.name)
+			if err != nil {
+				return err
 			}
-		}
+			setOverride(overrides, value)
+			return nil
+		},
 	}
 }
 
-func DevFlagsVisible() bool {
-	value := strings.TrimSpace(os.Getenv(ShowDevFlagsEnvVar))
-	switch strings.ToLower(value) {
-	case "", "0", "false", "no", "off":
-		return false
-	default:
-		return true
+func boolFlag(name string, path string, usage string, defaultValue func(*configFlagOptions) bool, setOverride func(*configuration.OverrideOptions, *bool)) configFlag {
+	return configFlag{
+		name:       name,
+		path:       path,
+		usage:      usage,
+		takesValue: false,
+		add: func(flags *pflag.FlagSet, opts *configFlagOptions, flag configFlag) {
+			value := defaultValue(opts)
+			flags.BoolVar(&value, flag.name, value, flag.usage)
+		},
+		apply: func(flags *pflag.FlagSet, overrides *configuration.OverrideOptions, flag configFlag) error {
+			if !flags.Changed(flag.name) {
+				setOverride(overrides, nil)
+				return nil
+			}
+			value, err := flags.GetBool(flag.name)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", flag.name, err)
+			}
+			setOverride(overrides, &value)
+			return nil
+		},
+	}
+}
+
+func int32Flag(name string, path string, usage string, defaultValue func(*configFlagOptions) int32, setOverride func(*configuration.OverrideOptions, *int32)) configFlag {
+	return configFlag{
+		name:       name,
+		path:       path,
+		usage:      usage,
+		takesValue: true,
+		add: func(flags *pflag.FlagSet, opts *configFlagOptions, flag configFlag) {
+			value := defaultValue(opts)
+			flags.Int32Var(&value, flag.name, value, flag.usage)
+		},
+		apply: func(flags *pflag.FlagSet, overrides *configuration.OverrideOptions, flag configFlag) error {
+			if !flags.Changed(flag.name) {
+				setOverride(overrides, nil)
+				return nil
+			}
+			value, err := flags.GetInt32(flag.name)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", flag.name, err)
+			}
+			setOverride(overrides, &value)
+			return nil
+		},
+	}
+}
+
+func durationFlag(name string, path string, usage string, defaultValue func(*configFlagOptions) time.Duration, setOverride func(*configuration.OverrideOptions, *time.Duration)) configFlag {
+	return configFlag{
+		name:       name,
+		path:       path,
+		usage:      usage,
+		takesValue: true,
+		add: func(flags *pflag.FlagSet, opts *configFlagOptions, flag configFlag) {
+			value := defaultValue(opts)
+			flags.DurationVar(&value, flag.name, value, flag.usage)
+		},
+		apply: func(flags *pflag.FlagSet, overrides *configuration.OverrideOptions, flag configFlag) error {
+			if !flags.Changed(flag.name) {
+				setOverride(overrides, nil)
+				return nil
+			}
+			value, err := flags.GetDuration(flag.name)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", flag.name, err)
+			}
+			setOverride(overrides, &value)
+			return nil
+		},
 	}
 }
 
 func OverridesFromCommand(cmd *cobra.Command) (configuration.OverrideOptions, error) {
 	var overrides configuration.OverrideOptions
 	flags := cmd.Root().PersistentFlags()
-	var err error
-
-	overrides.AuthBaseURL, err = changedStr(flags, FlagAuthBaseURL)
-	if err != nil {
-		return overrides, err
+	for _, flag := range configFlags {
+		if !configuration.IsConfigurable(flag.path) {
+			continue
+		}
+		if err := flag.apply(flags, &overrides, flag); err != nil {
+			return overrides, err
+		}
 	}
-	overrides.GatewayBaseURL, err = changedStr(flags, FlagGatewayBaseURL)
-	if err != nil {
-		return overrides, err
-	}
-	overrides.AuthRetryOnOBORequired, err = changedValue(flags, FlagAuthRetryOnOBORequired, flags.GetBool)
-	if err != nil {
-		return overrides, err
-	}
-	overrides.AuthTokenTTLSeconds, err = changedValue(flags, FlagAuthTokenTTLSeconds, flags.GetInt32)
-	if err != nil {
-		return overrides, err
-	}
-	overrides.AuthUseRefreshTokens, err = changedValue(flags, FlagAuthUseRefreshTokens, flags.GetBool)
-	if err != nil {
-		return overrides, err
-	}
-	overrides.AuthBrowserConsentCallbackAddress, err = changedStr(flags, FlagAuthBrowserConsentCallbackAddress)
-	if err != nil {
-		return overrides, err
-	}
-	overrides.AuthBrowserConsentTimeout, err = changedValue(flags, FlagAuthBrowserConsentTimeout, flags.GetDuration)
-	if err != nil {
-		return overrides, err
-	}
-	overrides.AuthBrowserConsentAutoOpenBrowser, err = changedValue(flags, FlagAuthBrowserConsentAutoOpenBrowser, flags.GetBool)
-	if err != nil {
-		return overrides, err
-	}
-	overrides.CredentialsStorageDir, err = changedStr(flags, FlagCredentialsStorageDir)
-	if err != nil {
-		return overrides, err
-	}
-
 	return overrides, nil
 }
 
-func changedValue[T flagValue](flags *pflag.FlagSet, name string, get func(string) (T, error)) (*T, error) {
-	if !flags.Changed(name) {
-		return nil, nil
+func Add(cmd *cobra.Command, config configuration.Config) {
+	opts := newConfigFlagOptions(config)
+	flags := cmd.PersistentFlags()
+	for _, flag := range configFlags {
+		if !configuration.IsConfigurable(flag.path) {
+			continue
+		}
+		flag.add(flags, opts, flag)
+		if flag.hideDefault {
+			flags.Lookup(flag.name).DefValue = ""
+		}
 	}
-	value, err := get(name)
-	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", name, err)
-	}
-	return &value, nil
 }
 
 func changedStr(flags *pflag.FlagSet, name string) (*string, error) {

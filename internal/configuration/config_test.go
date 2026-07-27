@@ -1,11 +1,11 @@
 package configuration
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
-
-var testDefaultConfig = []byte("app:\n  name: tollbit\nauth:\n  base_url: https://oauth.tollbit.com\n  retry_on_obo_required: true\n  token_ttl_seconds: 0\n  use_refresh_tokens: true\n  browser_consent:\n    callback_address: 127.0.0.1:54321\n    timeout: 3m\n    auto_open_browser: true\nagent:\n  default_name: anonymous\n  default_user_agent: \"\"\n  register_user_agent_url: https://hack.tollbit.com/my-agents\ncredentials:\n  storage_dir: __default__\ngateway:\n  base_url: https://gateway.tollbit.com\n")
 
 func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
 	config := assembleTestConfiguration(t, t.TempDir())
@@ -31,6 +31,38 @@ func TestAssembleConfigurationRequiresDefaultConfig(t *testing.T) {
 	_, err := assembleConfiguration(nil, func() (string, error) { return t.TempDir(), nil })
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestAssembleConfigurationAppliesCommonEnv(t *testing.T) {
+	t.Setenv("TOLLBIT_AGENT_DEFAULT_NAME", "env-agent")
+	t.Setenv("TOLLBIT_AUTH_BROWSER_CONSENT_TIMEOUT", "30s")
+
+	config := assembleTestConfiguration(t, t.TempDir())
+
+	if config.Agent.DefaultName != "env-agent" {
+		t.Fatalf("expected env agent name, got %q", config.Agent.DefaultName)
+	}
+	if config.Auth.BrowserConsent.Timeout != 30*time.Second {
+		t.Fatalf("expected env browser timeout, got %s", config.Auth.BrowserConsent.Timeout)
+	}
+}
+
+func TestIsConfigurableReportsCommonFields(t *testing.T) {
+	if !IsConfigurable("agent.default_name") {
+		t.Fatal("expected agent.default_name to be configurable")
+	}
+	if !IsConfigurable("auth.browser_consent.timeout") {
+		t.Fatal("expected auth.browser_consent.timeout to be configurable")
+	}
+	if !IsConfigurable("credentials.storage_dir") {
+		t.Fatal("expected credentials.storage_dir to be configurable")
+	}
+	if IsConfigurable("auth.base_url") != IsDev {
+		t.Fatalf("expected auth.base_url configurability to match IsDev=%v", IsDev)
+	}
+	if IsConfigurable("app.name") {
+		t.Fatal("expected untagged app.name to never be configurable")
 	}
 }
 
@@ -74,9 +106,18 @@ func TestConfigWithOverridesRejectsInvalidConfig(t *testing.T) {
 
 func assembleTestConfiguration(t *testing.T, wd string) Config {
 	t.Helper()
-	config, err := assembleConfiguration(testDefaultConfig, func() (string, error) { return wd, nil })
+	config, err := assembleConfiguration(readTestdata(t, "default-config.yaml"), func() (string, error) { return wd, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
 	return config
+}
+
+func readTestdata(t *testing.T, name string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
