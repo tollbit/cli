@@ -168,11 +168,14 @@ func TestClientRedeemAgentConsentRedirect(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer unlinked-token" {
 			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
 		}
-		var body ConsentRedirectTokenRequest
+		var body identityTokenRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if body.AgentIdentifier != "agent-test" || body.Code != "code" || body.CodeVerifier != "verifier" || body.RedirectURI != "http://127.0.0.1:1234/callback" {
+		if body.GrantType == "consent" {
+			t.Fatal("bare consent grant_type is not accepted")
+		}
+		if body.GrantType != grantTypeConsentRedirect || body.AgentIdentifier != "agent-test" || body.Code != "code" || body.CodeVerifier != "verifier" || body.RedirectURI != "http://127.0.0.1:1234/callback" {
 			t.Fatalf("unexpected body: %#v", body)
 		}
 		sawRequest = true

@@ -109,6 +109,12 @@ type (
 	requestOption func(*http.Request)
 )
 
+const (
+	grantTypeSelfAttested    = "self_attested"
+	grantTypeRefreshToken    = "refresh_token"
+	grantTypeConsentRedirect = "consent:redirect"
+)
+
 func New(cfg ClientConfig) (*Client, error) {
 	baseURL := strings.TrimSpace(cfg.BaseURL)
 	if baseURL == "" {
@@ -135,7 +141,7 @@ func (c *Client) CreateAgentToken(ctx context.Context, identity AgentIdentity, o
 	}
 
 	req := AgentTokenRequest{
-		GrantType:       "self_attested",
+		GrantType:       grantTypeSelfAttested,
 		AgentIdentifier: identity.Name,
 		TTLSeconds:      opts.TTLSeconds,
 		UA:              ua,
@@ -193,7 +199,7 @@ func (c *Client) RedeemAgentConsentRedirect(ctx context.Context, token agent.Tok
 	}
 
 	body := identityTokenRequest{
-		GrantType:       "consent",
+		GrantType:       grantTypeConsentRedirect,
 		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
 		Code:            req.Code,
 		CodeVerifier:    req.CodeVerifier,
@@ -221,7 +227,7 @@ func (c *Client) RefreshAgentToken(ctx context.Context, baseToken agent.Token, r
 	}
 
 	body := identityTokenRequest{
-		GrantType:       "refresh_token",
+		GrantType:       grantTypeRefreshToken,
 		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
 		RefreshToken:    strings.TrimSpace(req.RefreshToken),
 		UA:              req.UA,

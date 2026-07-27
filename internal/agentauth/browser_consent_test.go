@@ -59,11 +59,14 @@ func TestBrowserConsentAuthorizerAuthorizesOBO(t *testing.T) {
 			if r.Header.Get("Authorization") != "Bearer "+baseToken {
 				t.Fatalf("unexpected redeem authorization: %q", r.Header.Get("Authorization"))
 			}
-			var body auth.ConsentRedirectTokenRequest
+			var body map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatal(err)
 			}
-			if body.AgentIdentifier != "agent-test" || body.Code != "code-123" || body.CodeVerifier == "" || body.RedirectURI == "" {
+			if body["grant_type"] == "consent" {
+				t.Fatal("bare consent grant_type is not accepted")
+			}
+			if body["grant_type"] != "consent:redirect" || body["agent_identifier"] != "agent-test" || body["code"] != "code-123" || body["code_verifier"] == "" || body["redirect_uri"] == "" {
 				t.Fatalf("unexpected redeem body: %#v", body)
 			}
 			sawRedeem = true

@@ -248,7 +248,7 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 			switch body["grant_type"] {
 			case "self_attested":
 				_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
-			case "consent":
+			case "consent:redirect":
 				if body["agent_identifier"] != "agent-test" || body["code"] != "auth-code" || body["code_verifier"] == "" || body["redirect_uri"] == "" {
 					t.Fatalf("unexpected redeem body: %#v", body)
 				}
