@@ -16,6 +16,13 @@ import (
 const (
 	developmentConfigFile = "tb-cli.config.development.yaml"
 	envPrefix             = "TOLLBIT"
+
+	RuntimeEndUserProximityAutoDetect = "auto-detect"
+	RuntimeEndUserProximityLocal      = "local"
+	RuntimeEndUserProximityRemote     = "remote"
+
+	ConsentStrategyRedirect          = "redirect"
+	ConsentStrategyBrowserSelectIcon = "browser_select_icon"
 )
 
 func AssembleConfiguration(defaultConfig []byte) (Config, error) {
@@ -77,6 +84,26 @@ func mergeConfigIfExists(v *viper.Viper, path string) error {
 }
 
 func resolveDefaults(config Config) (Config, error) {
+	config.Runtime.EndUserProximity = strings.TrimSpace(config.Runtime.EndUserProximity)
+	if config.Runtime.EndUserProximity == "" {
+		config.Runtime.EndUserProximity = RuntimeEndUserProximityAutoDetect
+	}
+	runtimeStateDir, err := platformdefaults.StateDir(config.Runtime.StateDir)
+	if err != nil {
+		return Config{}, fmt.Errorf("resolve runtime.state_dir: %w", err)
+	}
+	config.Runtime.StateDir = runtimeStateDir
+	// Blank strategy defaults mirror tollbit-cli's resolveDefaults; the shipped
+	// remote strategy comes from tb-cli.config.yaml, which may differ.
+	config.Auth.Consent.Strategy.Local = strings.TrimSpace(config.Auth.Consent.Strategy.Local)
+	if config.Auth.Consent.Strategy.Local == "" {
+		config.Auth.Consent.Strategy.Local = ConsentStrategyRedirect
+	}
+	config.Auth.Consent.Strategy.Remote = strings.TrimSpace(config.Auth.Consent.Strategy.Remote)
+	if config.Auth.Consent.Strategy.Remote == "" {
+		config.Auth.Consent.Strategy.Remote = ConsentStrategyBrowserSelectIcon
+	}
+
 	storageDir, err := platformdefaults.CredentialsStorageDir(config.Credentials.StorageDir)
 	if err != nil {
 		return Config{}, fmt.Errorf("resolve credentials.storage_dir: %w", err)
@@ -91,6 +118,20 @@ func validate(config Config) error {
 	}
 	if strings.TrimSpace(config.Auth.BaseURL) == "" {
 		return errors.New("auth.base_url is required")
+	}
+	switch config.Runtime.EndUserProximity {
+	case RuntimeEndUserProximityAutoDetect, RuntimeEndUserProximityLocal, RuntimeEndUserProximityRemote:
+	default:
+		return fmt.Errorf("runtime.end_user_proximity must be %q, %q, or %q", RuntimeEndUserProximityAutoDetect, RuntimeEndUserProximityLocal, RuntimeEndUserProximityRemote)
+	}
+	if strings.TrimSpace(config.Runtime.StateDir) == "" {
+		return errors.New("runtime.state_dir is required")
+	}
+	if err := validateConsentStrategy("auth.consent.strategy.local", config.Auth.Consent.Strategy.Local); err != nil {
+		return err
+	}
+	if err := validateConsentStrategy("auth.consent.strategy.remote", config.Auth.Consent.Strategy.Remote); err != nil {
+		return err
 	}
 	if strings.TrimSpace(config.Agent.DefaultName) == "" {
 		return errors.New("agent.default_name is required")
@@ -114,4 +155,24 @@ func validate(config Config) error {
 		return errors.New("credentials.storage_dir is required")
 	}
 	return nil
+}
+
+func ResolveConsentStrategy(config Config) string {
+	switch config.Runtime.EndUserProximity {
+	case RuntimeEndUserProximityLocal:
+		return config.Auth.Consent.Strategy.Local
+	case RuntimeEndUserProximityAutoDetect, RuntimeEndUserProximityRemote:
+		return config.Auth.Consent.Strategy.Remote
+	default:
+		return config.Auth.Consent.Strategy.Remote
+	}
+}
+
+func validateConsentStrategy(name, strategy string) error {
+	switch strategy {
+	case ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon:
+		return nil
+	default:
+		return fmt.Errorf("%s must be %q or %q", name, ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon)
+	}
 }

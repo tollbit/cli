@@ -14,6 +14,8 @@ type (
 	configFlagOptions struct {
 		authBaseURL                       string
 		gatewayBaseURL                    string
+		endUserProximity                  string
+		runtimeStateDir                   string
 		authRetryOnOBORequired            bool
 		authTokenTTLSeconds               int32
 		authUseRefreshTokens              bool
@@ -36,6 +38,26 @@ type (
 
 var (
 	configFlags = []configFlag{
+		stringFlag(
+			"end-user-proximity",
+			"runtime.end_user_proximity",
+			"override where the CLI runs relative to the end user: local or remote",
+			func(opts *configFlagOptions) string { return opts.endUserProximity },
+			func(overrides *configuration.OverrideOptions, value *string) {
+				overrides.RuntimeEndUserProximity = value
+			},
+			true,
+		),
+		// stringFlag(
+		// 	"runtime-state-dir",
+		// 	"runtime.state_dir",
+		// 	"runtime state directory; __default__ uses the platform default",
+		// 	func(opts *configFlagOptions) string { return opts.runtimeStateDir },
+		// 	func(overrides *configuration.OverrideOptions, value *string) {
+		// 		overrides.RuntimeStateDir = value
+		// 	},
+		// 	false,
+		// ),
 		// Removing from active flags for now
 		// boolFlag(
 		// 	"auth-retry-on-obo-required",
@@ -139,6 +161,8 @@ func newConfigFlagOptions(config configuration.Config) *configFlagOptions {
 	return &configFlagOptions{
 		authBaseURL:                       config.Auth.BaseURL,
 		gatewayBaseURL:                    config.Gateway.BaseURL,
+		endUserProximity:                  config.Runtime.EndUserProximity,
+		runtimeStateDir:                   config.Runtime.StateDir,
 		authRetryOnOBORequired:            config.Auth.RetryOnOBORequired,
 		authTokenTTLSeconds:               config.Auth.TokenTTLSeconds,
 		authUseRefreshTokens:              config.Auth.UseRefreshTokens,

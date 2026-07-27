@@ -47,8 +47,22 @@ func TestAssembleConfigurationIgnoresEndpointEnv(t *testing.T) {
 	}
 }
 
+func TestAssembleConfigurationIgnoresConsentStrategyOverrides(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "tb-cli.config.development.yaml")
+	if err := os.WriteFile(path, []byte("auth:\n  consent:\n    strategy:\n      local: browser_select_icon\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TOLLBIT_AUTH_CONSENT_STRATEGY_LOCAL", ConsentStrategyBrowserSelectIcon)
+
+	config := assembleTestConfiguration(t, dir)
+	if config.Auth.Consent.Strategy.Local != ConsentStrategyRedirect {
+		t.Fatalf("expected embedded local strategy in release, got %q", config.Auth.Consent.Strategy.Local)
+	}
+}
+
 func TestIsConfigurableRejectsDevEndpointFields(t *testing.T) {
-	for _, path := range []string{"auth.base_url", "gateway.base_url", "agent.register_user_agent_url", "auth.browser_consent.callback_address"} {
+	for _, path := range []string{"auth.base_url", "gateway.base_url", "agent.register_user_agent_url", "auth.browser_consent.callback_address", "auth.consent.strategy.local", "auth.consent.strategy.remote"} {
 		if IsConfigurable(path) {
 			t.Fatalf("expected %s not to be configurable in release build", path)
 		}

@@ -1,7 +1,9 @@
 package agenttoken
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"github.com/rs/zerolog"
 	"github.com/tollbit/cli/internal/agentauth"
@@ -87,22 +89,36 @@ func (m *CredentialManager) GetAgentToken(inv agentauth.Invocation, identity aut
 	if opts.requireOBO {
 		resp, err := m.oboAuthorizer.AuthorizeOBO(inv, identity, token)
 		if err != nil {
+			var pending agentauth.AuthorizationPendingError
+			if errors.As(err, &pending) {
+				if saveErr := m.savePendingConsent(ctx, pending.Pending); saveErr != nil {
+					return agent.Token{}, fmt.Errorf("save pending authorization: %w", saveErr)
+				}
+			}
 			return agent.Token{}, err
 		}
-		oboToken := agent.Token{RawToken: resp.Token}
-		if err := oboToken.Validate(); err != nil {
-			return agent.Token{}, err
-		}
-		// Persist the OBO token and clear any stale refresh token unless this response includes a rotated one.
-		creds := credentials{AgentToken: oboToken}
-		if opts.useRefreshTokens {
-			creds.RefreshToken = valueOrEmpty(resp.RefreshToken)
-			creds.RefreshTokenExpiresAt = valueOrEmpty(resp.RefreshTokenExpiresAt)
-		}
-		if err := m.saveCredentials(ctx, creds); err != nil {
+		oboToken, err := m.saveAgentTokenResponse(ctx, resp, opts.useRefreshTokens)
+		if err != nil {
 			return agent.Token{}, err
 		}
 		return oboToken, nil
+	}
+	return token, nil
+}
+
+func (m *CredentialManager) saveAgentTokenResponse(ctx context.Context, resp auth.AgentTokenResponse, useRefreshTokens bool) (agent.Token, error) {
+	token := agent.Token{RawToken: resp.Token}
+	if err := token.Validate(); err != nil {
+		return agent.Token{}, err
+	}
+	// Persist the OBO token and clear any stale refresh token unless this response includes a rotated one.
+	creds := credentials{AgentToken: token}
+	if useRefreshTokens {
+		creds.RefreshToken = valueOrEmpty(resp.RefreshToken)
+		creds.RefreshTokenExpiresAt = valueOrEmpty(resp.RefreshTokenExpiresAt)
+	}
+	if err := m.saveCredentials(ctx, creds); err != nil {
+		return agent.Token{}, err
 	}
 	return token, nil
 }

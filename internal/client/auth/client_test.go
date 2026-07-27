@@ -306,3 +306,91 @@ func TestClientSurfacesProblemJSON(t *testing.T) {
 		t.Fatalf("expected error detail %q, got %v", detail, err)
 	}
 }
+
+func TestClientStartAgentConsentBrowserSelectIcon(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/consent/browser-select-icon/start" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		if r.Header.Get("Authorization") != "Bearer unlinked-token" {
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+		var body ConsentBrowserSelectIconStartRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.CodeChallenge != "challenge" || body.CodeChallengeMethod != "S256" || body.Scope != "offline_access" {
+			t.Fatalf("unexpected body: %#v", body)
+		}
+		sawRequest = true
+		_ = json.NewEncoder(w).Encode(ConsentBrowserSelectIconStartResponse{
+			ChallengeID: "ach_123",
+			ConsentURL:  "https://auth.example.test/oauth/consent/browser-select-icon?consent_challenge=ach_123",
+			ExpiresAt:   "2026-06-02T12:00:00Z",
+			CorrectIcon: AgentConsentIcon{ID: 17, Name: "ACORN", Art: "ACORN\n art"},
+		})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.StartAgentConsentBrowserSelectIcon(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentBrowserSelectIconStartRequest{
+		CodeChallenge: "challenge",
+		Scope:         "offline_access",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawRequest || resp.ChallengeID != "ach_123" || resp.CorrectIcon.Name != "ACORN" {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+}
+
+func TestClientRedeemAgentConsentBrowserSelectIcon(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/tokens/identity" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		if r.Header.Get("Authorization") != "Bearer unlinked-token" {
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+		var body identityTokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.GrantType == "consent" {
+			t.Fatal("bare consent grant_type is not accepted")
+		}
+		if body.GrantType != grantTypeConsentBrowserSelectIcon || body.AgentIdentifier != "agent-test" || body.ChallengeID != "ach_123" || body.CodeVerifier != "verifier" {
+			t.Fatalf("unexpected body: %#v", body)
+		}
+		if body.UA == nil || *body.UA != "agent-test/0.1" {
+			t.Fatalf("expected ua, got %#v", body.UA)
+		}
+		sawRequest = true
+		_ = json.NewEncoder(w).Encode(AgentTokenResponse{Token: "linked-token"})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ua := "agent-test/0.1"
+	resp, err := c.RedeemAgentConsentBrowserSelectIcon(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentBrowserSelectIconTokenRequest{
+		AgentIdentifier: "agent-test",
+		ChallengeID:     "ach_123",
+		CodeVerifier:    "verifier",
+		UA:              &ua,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawRequest || resp.Token != "linked-token" {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+}

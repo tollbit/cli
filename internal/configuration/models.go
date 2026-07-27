@@ -4,6 +4,7 @@ import "time"
 
 type Config struct {
 	App         AppConfig
+	Runtime     RuntimeConfig
 	Auth        AuthConfig
 	Agent       AgentConfig
 	Credentials CredentialsConfig
@@ -14,12 +15,27 @@ type AppConfig struct {
 	Name string
 }
 
+type RuntimeConfig struct {
+	EndUserProximity string `mapstructure:"end_user_proximity" configurable:"release"`
+	StateDir         string `mapstructure:"state_dir" configurable:"release"`
+}
+
 type AuthConfig struct {
 	BaseURL            string               `mapstructure:"base_url" configurable:"dev"`
 	RetryOnOBORequired bool                 `mapstructure:"retry_on_obo_required" configurable:"release"`
 	TokenTTLSeconds    int32                `mapstructure:"token_ttl_seconds" configurable:"release"`
 	UseRefreshTokens   bool                 `mapstructure:"use_refresh_tokens" configurable:"release"`
+	Consent            ConsentConfig        `mapstructure:"consent"`
 	BrowserConsent     BrowserConsentConfig `mapstructure:"browser_consent"`
+}
+
+type ConsentConfig struct {
+	Strategy ConsentStrategyConfig `mapstructure:"strategy"`
+}
+
+type ConsentStrategyConfig struct {
+	Local  string `mapstructure:"local" configurable:"dev"`
+	Remote string `mapstructure:"remote" configurable:"dev"`
 }
 
 type AgentConfig struct {
@@ -47,6 +63,8 @@ type OverrideOptions struct {
 	AuthRetryOnOBORequired            *bool
 	AuthTokenTTLSeconds               *int32
 	AuthUseRefreshTokens              *bool
+	RuntimeEndUserProximity           *string
+	RuntimeStateDir                   *string
 	AuthBrowserConsentCallbackAddress *string
 	AuthBrowserConsentTimeout         *time.Duration
 	AuthBrowserConsentAutoOpenBrowser *bool
@@ -57,6 +75,12 @@ type OverrideOptions struct {
 func (c Config) WithOverrides(opts OverrideOptions) (Config, error) {
 	if opts.AuthBaseURL != nil {
 		c.Auth.BaseURL = *opts.AuthBaseURL
+	}
+	if opts.RuntimeEndUserProximity != nil {
+		c.Runtime.EndUserProximity = *opts.RuntimeEndUserProximity
+	}
+	if opts.RuntimeStateDir != nil {
+		c.Runtime.StateDir = *opts.RuntimeStateDir
 	}
 	if opts.AuthRetryOnOBORequired != nil {
 		c.Auth.RetryOnOBORequired = *opts.AuthRetryOnOBORequired

@@ -9,6 +9,10 @@ import (
 	"github.com/tollbit/cli/internal/installmethod"
 )
 
+// ExitCodeAuthorizationPending signals that a detached authorization flow was
+// started or is still awaiting end-user browser consent.
+const ExitCodeAuthorizationPending = 3
+
 type ExitError struct {
 	Code int
 	Err  error

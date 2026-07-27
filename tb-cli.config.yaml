@@ -1,7 +1,14 @@
 app:
   name: tollbit
+runtime:
+  end_user_proximity: auto-detect
+  state_dir: __default__
 auth:
   base_url: https://oauth.tollbit.com
+  consent:
+    strategy:
+      local: redirect
+      remote: browser_select_icon
   retry_on_obo_required: true
   token_ttl_seconds: 0
   use_refresh_tokens: true

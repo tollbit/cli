@@ -19,6 +19,17 @@ const (
 	// ErrorCodeCLIUpdateRequired means the backend rejected this CLI version as
 	// below the minimum supported version; the user must update to continue.
 	ErrorCodeCLIUpdateRequired ErrorCode = "cli_update_required"
+	// ErrorCodeAuthorizationPending means a detached consent challenge has not
+	// been completed by the end user yet.
+	ErrorCodeAuthorizationPending ErrorCode = "authorization_pending"
+	// ErrorCodeAccessDenied means the end user denied the consent challenge.
+	ErrorCodeAccessDenied ErrorCode = "access_denied"
+	// ErrorCodeExpiredToken means the consent challenge expired before it was
+	// completed.
+	ErrorCodeExpiredToken ErrorCode = "expired_token"
+	// ErrorCodeInvalidGrant means the consent challenge can no longer be
+	// redeemed.
+	ErrorCodeInvalidGrant ErrorCode = "invalid_grant"
 )
 
 // Problem is the CLI-local representation of the ProblemJSON shape returned by
