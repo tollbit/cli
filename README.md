@@ -10,7 +10,7 @@ Primary workflow: install → `search` → `content pricing` → `content fetch`
 
 #### Agent install prompt
 
-**Agent?:** Install Tollbit from [github.com/tollbit/cli](https://github.com/tollbit/cli) using the install script or package that your environment needs (below), then run `tollbit guide --install <SKILLS_DIR>` to register the bundled skill.
+**Agent?:** Install TollBit from [github.com/tollbit/cli](https://github.com/tollbit/cli) using the installation method appropriate for this environment, then run `tollbit guide --install <SKILLS_DIR>` to register the bundled skill.
 
 ### macOS and Linux
 
