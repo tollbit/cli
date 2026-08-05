@@ -28,6 +28,7 @@ type (
 		BatchGetRates(ctx context.Context, urls []string, token agent.Token) ([]BatchRateResponseV2, error)
 		CreateContentAccessToken(ctx context.Context, req CreateContentAccessTokenRequest, token agent.Token) (CreateContentAccessTokenResponse, error)
 		GetContent(ctx context.Context, articleURL, contentToken, userAgent string, token agent.Token) (GetContentResponse, error)
+		SubmitFeedback(ctx context.Context, req SubmitFeedbackRequest, token agent.Token) (SubmitFeedbackResponse, error)
 	}
 
 	client struct {
@@ -139,6 +140,17 @@ type (
 		License BatchRateLicenseResponse `json:"license"`
 	}
 
+	SubmitFeedbackRequest struct {
+		Message  string            `json:"message"`
+		Rating   *int              `json:"rating,omitempty"`
+		Category string            `json:"category,omitempty"`
+		Metadata map[string]string `json:"metadata,omitempty"`
+	}
+
+	SubmitFeedbackResponse struct {
+		Accepted bool `json:"accepted"`
+	}
+
 	requestOption func(*http.Request)
 )
 
@@ -245,6 +257,29 @@ func (c *client) GetContent(ctx context.Context, articleURL, contentToken, userA
 		withTollbitToken(contentToken),
 		withTollbitUserAgent(userAgent),
 	)
+}
+
+func (c *client) SubmitFeedback(ctx context.Context, req SubmitFeedbackRequest, token agent.Token) (SubmitFeedbackResponse, error) {
+	if err := requireAgentToken(token); err != nil {
+		return SubmitFeedbackResponse{}, err
+	}
+	message := strings.TrimSpace(req.Message)
+	if message == "" {
+		return SubmitFeedbackResponse{}, errors.New("feedback message is required")
+	}
+	req.Message = message
+	if cat := strings.TrimSpace(req.Category); cat != "" {
+		req.Category = cat
+	} else {
+		req.Category = ""
+	}
+	if req.Rating != nil && (*req.Rating < 1 || *req.Rating > 5) {
+		return SubmitFeedbackResponse{}, errors.New("rating must be between 1 and 5")
+	}
+
+	u := c.resolve("/agents/v1/feedback")
+	var out SubmitFeedbackResponse
+	return out, c.doJSON(ctx, http.MethodPost, u.String(), req, &out, withBearerToken(token.RawToken))
 }
 
 func contentResourcePath(articleURL string) (string, error) {

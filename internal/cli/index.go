@@ -10,6 +10,7 @@ func NewCommandTree(factory app.Factory) *cobra.Command {
 	rootCmd.AddCommand(
 		NewAuthCommand(factory),
 		NewContentCommand(factory),
+		NewFeedbackCommand(factory),
 		NewSearchCommand(factory),
 		NewRuntimeCommand(factory),
 		NewGuideCommand(factory),
