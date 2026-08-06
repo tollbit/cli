@@ -67,7 +67,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release instruc
 - Run **`tollbit guide`** for orientation, then **`tollbit guide --install <SKILLS_DIR>`** to persist the bundled skill. The guide is the full automation contract (exit codes, streams, non-interactive fetch).
 - Typical flow: **`search`** → **`content pricing`** → **`content fetch`**. The CLI prompts for authentication when a token is required.
 - Optionally set an agent profile with **`tollbit auth set --name <name>`** (or `TOLLBIT_AGENT_DEFAULT_NAME`) / **`--user-agent`**.
-- Prefer **`--json`** on **`search`**, **`content pricing`**, **`content fetch`**, and **`auth status`**. Exit codes: `0` success, `1` runtime, `2` usage; stdout is data-only (hints and errors on stderr).
+- Prefer **`--json`** on **`search`**, **`content pricing`**, **`content fetch`**, **`feedback`**, and **`auth status`**. Exit codes: `0` success, `1` runtime, `2` usage; stdout is data-only (hints and errors on stderr).
 
 ## What the CLI can do
 
@@ -75,6 +75,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release instruc
 |--------|---------|
 | **`search "query"`** | Search publisher content via the gateway API. |
 | **`content pricing/fetch`** | Price and fetch licensed publisher content. |
+| **`feedback "message"`** | Submit CLI / agent feedback (requires OBO). |
 | **`auth login/logout/status/set`** | Agent profile and OAuth authorization token (also run automatically when needed). |
 | **`guide`** | Print the agent guide; optionally install bundled skill markdown. |
 | **`version`** | Print the CLI version string. |
@@ -106,6 +107,16 @@ tollbit content fetch https://example.com/article --confirm --json --rate-index 
 ```
 
 **Every fetch charges money.** Pricing is shown and you must confirm unless you pass `--confirm` (automation still incurs cost). Use `--toDisk=<path>` to save fetched content locally. When no user agent is configured, the org default `-tbcli-` agent is used. Set a registered user agent with `auth set --user-agent` or `--user-agent` on the fetch command.
+
+### Feedback
+
+Submit product feedback (requires an OBO-linked agent session):
+
+```bash
+tollbit feedback "search ranking felt off for this query"
+tollbit feedback "great fetch UX" --rating 5 --category content
+tollbit feedback "auth hung" --rating 2 --category auth --metadata source=cli --json
+```
 
 ### Auth
 

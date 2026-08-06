@@ -380,3 +380,84 @@ func TestGetContentRequiresAgentToken(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestSubmitFeedback(t *testing.T) {
+	token := validAgentToken(t)
+	rating := 4
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/agents/v1/feedback" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
+			t.Fatalf("unexpected authorization: %q", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("User-Agent") != version.HTTPUserAgent() {
+			t.Fatalf("unexpected user agent: %q", r.Header.Get("User-Agent"))
+		}
+		var body SubmitFeedbackRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.Message != "search felt off" {
+			t.Fatalf("unexpected message: %q", body.Message)
+		}
+		if body.Rating == nil || *body.Rating != 4 {
+			t.Fatalf("unexpected rating: %#v", body.Rating)
+		}
+		if body.Category != "search" {
+			t.Fatalf("unexpected category: %q", body.Category)
+		}
+		if body.Metadata["source"] != "cli" {
+			t.Fatalf("unexpected metadata: %#v", body.Metadata)
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(SubmitFeedbackResponse{Accepted: true})
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Config{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.SubmitFeedback(context.Background(), SubmitFeedbackRequest{
+		Message:  "  search felt off  ",
+		Rating:   &rating,
+		Category: "search",
+		Metadata: map[string]string{"source": "cli"},
+	}, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Accepted {
+		t.Fatal("expected accepted")
+	}
+}
+
+func TestSubmitFeedbackRequiresMessage(t *testing.T) {
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.SubmitFeedback(context.Background(), SubmitFeedbackRequest{}, validAgentToken(t))
+	if err == nil || !strings.Contains(err.Error(), "feedback message is required") {
+		t.Fatalf("expected message required error, got %v", err)
+	}
+}
+
+func TestSubmitFeedbackRejectsInvalidRating(t *testing.T) {
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rating := 9
+	_, err = c.SubmitFeedback(context.Background(), SubmitFeedbackRequest{
+		Message: "hi",
+		Rating:  &rating,
+	}, validAgentToken(t))
+	if err == nil || !strings.Contains(err.Error(), "rating must be between 1 and 5") {
+		t.Fatalf("expected rating error, got %v", err)
+	}
+}

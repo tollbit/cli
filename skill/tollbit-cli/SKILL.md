@@ -70,12 +70,13 @@ If `auth login` or `auth complete` reports that authorization is still pending, 
 
 ## For automation
 
-- Prefer `--json` for machine-readable output on `search`, `content pricing`, `content fetch`, and `auth status`.
+- Prefer `--json` for machine-readable output on `search`, `content pricing`, `content fetch`, `feedback`, and `auth status`.
 - **Exit codes:** `0` success · `1` runtime error · `2` usage error · `3` authorization pending (`auth login` / `auth complete` in a detached flow). `auth status --check` → `0` valid · `1` invalid/expired · `2` missing. Before paid `fetch`, prefer `auth status --check` (or `auth status --json`) so you fail fast instead of hanging on interactive consent.
 - **Streams:** stdout carries data only; prompts, spinners, next-step hints, and errors go to stderr. Parse stdout for success data; treat non-zero exit as failure and read stderr when diagnosing.
 - **Non-interactive fetch:** never call `content fetch` without `--confirm`. Pass `--rate-index N` when multiple rates exist (required with `--json` in that case). Every fetch still charges.
 - **Licensable results:** only **Programmatic** results can be priced and fetched; use `--programmatic-only` or skip Enterprise hits.
 - **Pagination:** reuse the `--next-token` / `nextToken` from the previous search response when more results exist.
+- **Feedback:** use `tollbit feedback "…"` (optional `--rating`, `--category`, `--metadata key=value`) when the user wants to report CLI or product issues to Tollbit.
 
 Install this skill: `tollbit guide --install <SKILLS_DIR>`.
 Compare frontmatter `version` with `tollbit version` when updating.
