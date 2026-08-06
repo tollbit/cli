@@ -85,7 +85,7 @@ func (r *Runtime) EndUserProximity(ctx context.Context) (EndUserProximity, error
 		if exists {
 			return st.EndUserProximity, nil
 		}
-		return EndUserProximityRemote, nil
+		return EndUserProximityLocal, nil
 	default:
 		return "", fmt.Errorf("runtime.end_user_proximity must be %q, %q, or %q", configuration.RuntimeEndUserProximityAutoDetect, configuration.RuntimeEndUserProximityLocal, configuration.RuntimeEndUserProximityRemote)
 	}
@@ -131,7 +131,7 @@ func (r *Runtime) Status(ctx context.Context) (Status, error) {
 			proximity = st.EndUserProximity
 			source = EndUserProximitySourceSavedRuntimeState
 		} else {
-			proximity = EndUserProximityRemote
+			proximity = EndUserProximityLocal
 			source = EndUserProximitySourceAutoDetect
 		}
 	default:

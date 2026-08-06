@@ -47,7 +47,7 @@ func TestAutoDetectReadsRuntimeState(t *testing.T) {
 	}
 }
 
-func TestAutoDetectDefaultsRemoteWithoutRuntimeState(t *testing.T) {
+func TestAutoDetectDefaultsLocalWithoutRuntimeState(t *testing.T) {
 	rt, err := New(Config{ConfiguredEndUserProximity: configuration.RuntimeEndUserProximityAutoDetect, StateDir: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
@@ -57,8 +57,8 @@ func TestAutoDetectDefaultsRemoteWithoutRuntimeState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != EndUserProximityRemote {
-		t.Fatalf("expected remote fallback, got %q", got)
+	if got != EndUserProximityLocal {
+		t.Fatalf("expected local fallback, got %q", got)
 	}
 }
 
@@ -98,9 +98,9 @@ func TestStatusReportsEndUserProximitySource(t *testing.T) {
 			wantStateExists: true,
 		},
 		{
-			name:            "auto detect defaults remote without saved state",
+			name:            "auto detect defaults local without saved state",
 			configured:      configuration.RuntimeEndUserProximityAutoDetect,
-			wantProximity:   EndUserProximityRemote,
+			wantProximity:   EndUserProximityLocal,
 			wantSource:      EndUserProximitySourceAutoDetect,
 			wantStateExists: false,
 		},

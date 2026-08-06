@@ -30,8 +30,8 @@ func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
 	if config.Auth.Consent.Strategy.Local != ConsentStrategyRedirect || config.Auth.Consent.Strategy.Remote != ConsentStrategyBrowserSelectIcon {
 		t.Fatalf("expected default consent strategy mapping, got %#v", config.Auth.Consent)
 	}
-	if got := ResolveConsentStrategy(config); got != ConsentStrategyBrowserSelectIcon {
-		t.Fatalf("expected auto-detect consent strategy %q, got %q", ConsentStrategyBrowserSelectIcon, got)
+	if got := ResolveConsentStrategy(config); got != ConsentStrategyRedirect {
+		t.Fatalf("expected auto-detect consent strategy %q, got %q", ConsentStrategyRedirect, got)
 	}
 	if config.Credentials.StorageDir == "" || config.Credentials.StorageDir == "__default__" {
 		t.Fatalf("expected resolved credentials storage dir, got %q", config.Credentials.StorageDir)
