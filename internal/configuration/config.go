@@ -160,12 +160,12 @@ func validate(config Config) error {
 
 func ResolveConsentStrategy(config Config) string {
 	switch config.Runtime.EndUserProximity {
-	case RuntimeEndUserProximityLocal:
+	case RuntimeEndUserProximityLocal, RuntimeEndUserProximityAutoDetect:
 		return config.Auth.Consent.Strategy.Local
-	case RuntimeEndUserProximityAutoDetect, RuntimeEndUserProximityRemote:
+	case RuntimeEndUserProximityRemote:
 		return config.Auth.Consent.Strategy.Remote
 	default:
-		return config.Auth.Consent.Strategy.Remote
+		return config.Auth.Consent.Strategy.Local
 	}
 }
 
