@@ -14,6 +14,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/tollbit/cli/internal/errorsx/problemjson"
+	"github.com/tollbit/cli/internal/logging"
 	"github.com/tollbit/cli/internal/tokens/agent"
 	"github.com/tollbit/cli/internal/version"
 )
@@ -120,6 +121,12 @@ type (
 		Revoked bool `json:"revoked"`
 	}
 
+	WhoAmIResponse struct {
+		AgentIdentifier  string  `json:"agent_identifier"`
+		OrganizationName *string `json:"organization_name,omitempty"`
+		PrimaryEmail     *string `json:"primary_email,omitempty"`
+	}
+
 	WebBotAuth struct {
 		Dir string `json:"dir"`
 		Req bool   `json:"req"`
@@ -168,6 +175,14 @@ const (
 	grantTypeConsentBrowserSelectIcon  = "consent:browser_select_icon"
 	grantTypeConsentAgentConfirmsIcons = "consent:agent_confirms_icons"
 )
+
+var authLogBodyRedactor = logging.NewHTTPBodyRedactor(logging.HTTPBodyRedactorConfig{
+	FullyRedactedPaths: []string{"/agent/v1/whoami"},
+	JSONFields: map[string]logging.JSONFieldRedactor{
+		"token":         logging.AbbreviateJSONSecret(6, 4),
+		"refresh_token": logging.AbbreviateJSONSecret(6, 4),
+	},
+})
 
 func New(cfg ClientConfig) (*Client, error) {
 	baseURL := strings.TrimSpace(cfg.BaseURL)
@@ -419,6 +434,19 @@ func (c *Client) RevokeRefreshToken(ctx context.Context, refreshToken string) (R
 	return out, nil
 }
 
+func (c *Client) WhoAmI(ctx context.Context, token agent.Token) (WhoAmIResponse, error) {
+	if strings.TrimSpace(token.RawToken) == "" {
+		return WhoAmIResponse{}, errors.New("agent token is required")
+	}
+
+	u := c.resolve("/agent/v1/whoami")
+	var out WhoAmIResponse
+	if err := c.doJSON(ctx, http.MethodGet, u.String(), nil, &out, withBearerToken(token)); err != nil {
+		return WhoAmIResponse{}, err
+	}
+	return out, nil
+}
+
 func withBearerToken(token agent.Token) requestOption {
 	return func(req *http.Request) {
 		req.Header.Set("Authorization", "Bearer "+token.RawToken)
@@ -515,13 +543,14 @@ func logRequest(ctx context.Context, req *http.Request, body []byte) {
 		e = e.Str("authorization", redactSecret(token))
 	}
 	if len(body) > 0 {
-		e = e.Str("request_body", redactLogBody(body))
+		e = e.Str("request_body", authLogBodyRedactor.Redact(req.URL.Path, body))
 	}
 	e.Msg("auth request")
 }
 
 func logResponse(ctx context.Context, method, rawURL string, reqBody []byte, statusCode int, status string, respBody []byte) {
-	loggedBody := redactLogBody(respBody)
+	path := requestPath(rawURL)
+	loggedBody := authLogBodyRedactor.Redact(path, respBody)
 	zerolog.Ctx(ctx).Debug().
 		Str("method", method).
 		Str("url", rawURL).
@@ -538,43 +567,18 @@ func logResponse(ctx context.Context, method, rawURL string, reqBody []byte, sta
 			Str("status", status).
 			Str("response_body", loggedBody)
 		if len(reqBody) > 0 {
-			e = e.Str("request_body", redactLogBody(reqBody))
+			e = e.Str("request_body", authLogBodyRedactor.Redact(path, reqBody))
 		}
 		e.Msg("auth response error")
 	}
 }
 
-func redactLogBody(body []byte) string {
-	s := strings.TrimSpace(string(body))
-	if s == "" {
-		return ""
-	}
-	var m map[string]json.RawMessage
-	if err := json.Unmarshal(body, &m); err != nil {
-		return truncateLog(s)
-	}
-	for _, key := range []string{"token", "refresh_token"} {
-		if tok, ok := m[key]; ok {
-			raw := strings.TrimSpace(string(tok))
-			redacted, err := json.Marshal(redactSecret(strings.Trim(raw, `"`)))
-			if err == nil {
-				m[key] = redacted
-			}
-		}
-	}
-	encoded, err := json.Marshal(m)
+func requestPath(rawURL string) string {
+	u, err := url.Parse(rawURL)
 	if err != nil {
-		return truncateLog(s)
+		return rawURL
 	}
-	return string(encoded)
-}
-
-func truncateLog(s string) string {
-	const max = 2048
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
+	return u.Path
 }
 
 func redactSecret(value string) string {
