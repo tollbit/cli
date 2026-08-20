@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,7 +40,16 @@ type (
 		all   bool
 		force bool
 	}
+
+	resolvedOBOIdentity struct {
+		organizationName string
+		primaryEmail     string
+	}
 )
+
+const whoAmITimeout = 3 * time.Second
+
+const identityResolutionWarning = "warning: could not resolve on-behalf-of names; showing token identifiers instead"
 
 func NewAuthCommand(factory app.Factory) *cobra.Command {
 	cmd := &cobra.Command{
@@ -248,25 +259,73 @@ func runAuthLogin(cmd *cobra.Command, factory app.Factory, opts authLoginOptions
 	if err != nil {
 		return RuntimeError(err)
 	}
-	fmt.Fprintln(cmd.ErrOrStderr(), authorizedMessage(identity.Name, claims))
+	resolvedIdentity, resolveErr := resolveOBOIdentity(ctx, app, token, claims)
+	fmt.Fprintln(cmd.ErrOrStderr(), authorizedMessage(identity.Name, claims, resolvedIdentity))
+	if resolveErr != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), identityResolutionWarning)
+	}
 	return nil
 }
 
-func authorizedMessage(name string, claims agent.Claims) string {
+func authorizedMessage(name string, claims agent.Claims, identity *resolvedOBOIdentity) string {
 	msg := fmt.Sprintf("authorized as %s", name)
-	if claims.OBO != nil {
-		parts := make([]string, 0, 2)
-		if claims.OBO.User != "" {
-			parts = append(parts, "user "+claims.OBO.User)
-		}
-		if claims.OBO.Org != "" {
-			parts = append(parts, "org "+claims.OBO.Org)
-		}
-		if len(parts) > 0 {
-			msg += " (on behalf of " + strings.Join(parts, " / ") + ")"
-		}
+	parts := oboDisplayParts(claims, identity)
+	if len(parts) > 0 {
+		msg += " (on behalf of " + strings.Join(parts, " / ") + ")"
 	}
 	return msg
+}
+
+func resolveOBOIdentity(ctx context.Context, application *app.App, token agent.Token, claims agent.Claims) (*resolvedOBOIdentity, error) {
+	if claims.OBO == nil || (claims.OBO.User == "" && claims.OBO.Org == "") {
+		return nil, nil
+	}
+	authClient, err := application.Auth()
+	if err != nil {
+		return nil, err
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, whoAmITimeout)
+	defer cancel()
+	response, err := authClient.WhoAmI(lookupCtx, token)
+	if err != nil {
+		return nil, err
+	}
+	identity := &resolvedOBOIdentity{}
+	if response.OrganizationName != nil {
+		identity.organizationName = strings.TrimSpace(*response.OrganizationName)
+	}
+	if response.PrimaryEmail != nil {
+		identity.primaryEmail = strings.TrimSpace(*response.PrimaryEmail)
+	}
+	if claims.OBO.Org != "" && identity.organizationName == "" {
+		return nil, errors.New("whoami response missing organization name")
+	}
+	if claims.OBO.User != "" && identity.primaryEmail == "" {
+		return nil, errors.New("whoami response missing primary email")
+	}
+	return identity, nil
+}
+
+func oboDisplayParts(claims agent.Claims, identity *resolvedOBOIdentity) []string {
+	if claims.OBO == nil {
+		return nil
+	}
+	parts := make([]string, 0, 2)
+	if claims.OBO.User != "" {
+		if identity != nil {
+			parts = append(parts, identity.primaryEmail)
+		} else {
+			parts = append(parts, "user "+claims.OBO.User)
+		}
+	}
+	if claims.OBO.Org != "" {
+		if identity != nil {
+			parts = append(parts, identity.organizationName)
+		} else {
+			parts = append(parts, "org "+claims.OBO.Org)
+		}
+	}
+	return parts
 }
 
 func printAuthLoginRuntimeContext(cmd *cobra.Command, application *app.App) error {
@@ -363,7 +422,11 @@ func runAuthComplete(cmd *cobra.Command, factory app.Factory, args []string) err
 	if err != nil {
 		return RuntimeError(err)
 	}
-	fmt.Fprintln(cmd.ErrOrStderr(), authorizedMessage(pending.AgentIdentity.Name, claims))
+	resolvedIdentity, resolveErr := resolveOBOIdentity(ctx, application, token, claims)
+	fmt.Fprintln(cmd.ErrOrStderr(), authorizedMessage(pending.AgentIdentity.Name, claims, resolvedIdentity))
+	if resolveErr != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), identityResolutionWarning)
+	}
 	return nil
 }
 
@@ -466,6 +529,22 @@ func runAuthStatus(cmd *cobra.Command, factory app.Factory, opts authStatusOptio
 	refreshStatus := credentials.RefreshTokenStatus(ctx)
 	autoRefresh := credentials.AutoRefreshEnabled()
 
+	tokenStatus := agenttoken.Status(token, tokenExists, tokenErr)
+	var resolvedIdentity *resolvedOBOIdentity
+	if tokenExists && tokenErr == nil {
+		if claims, claimsErr := token.Claims(); claimsErr == nil {
+			var resolveErr error
+			resolvedIdentity, resolveErr = resolveOBOIdentity(ctx, app, token, claims)
+			if resolveErr != nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), identityResolutionWarning)
+			}
+		}
+	}
+	if resolvedIdentity != nil && tokenStatus.OBO != nil {
+		tokenStatus.OBO.PrimaryEmail = resolvedIdentity.primaryEmail
+		tokenStatus.OBO.OrganizationName = resolvedIdentity.organizationName
+	}
+
 	status := map[string]any{
 		"identity": map[string]string{
 			"name":       identity.Name,
@@ -474,7 +553,7 @@ func runAuthStatus(cmd *cobra.Command, factory app.Factory, opts authStatusOptio
 		"auto_refresh":          autoRefresh,
 		"pending_authorization": pendingAuthorizationStatus(pending, pendingExists),
 		"refresh_token":         refreshStatus,
-		"token":                 agenttoken.Status(token, tokenExists, tokenErr),
+		"token":                 tokenStatus,
 	}
 	if opts.asJSON {
 		return RuntimeError(writeJSON(cmd.OutOrStdout(), status))
@@ -482,15 +561,19 @@ func runAuthStatus(cmd *cobra.Command, factory app.Factory, opts authStatusOptio
 
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
-	fmt.Fprintf(stdout, "Agent:      %s\n", identity.Name)
+	table := tabwriter.NewWriter(stdout, 0, 4, 1, ' ', 0)
+	fmt.Fprintf(table, "Agent:\t%s\n", identity.Name)
 	if identity.UserAgent != "" {
-		fmt.Fprintf(stdout, "User agent: %s\n", identity.UserAgent)
+		fmt.Fprintf(table, "User agent:\t%s\n", identity.UserAgent)
 	} else {
-		fmt.Fprintf(stdout, "User agent:\n")
+		fmt.Fprintln(table, "User agent:\t")
 	}
-	printAuthTokenStatus(stdout, token, tokenExists, tokenErr)
-	printRefreshTokenStatus(stdout, refreshStatus, autoRefresh)
-	printPendingAuthorizationStatus(stdout, pending, pendingExists)
+	printAuthTokenStatus(table, token, tokenExists, tokenErr, resolvedIdentity)
+	printRefreshTokenStatus(table, refreshStatus, autoRefresh)
+	printPendingAuthorizationStatus(table, pending, pendingExists)
+	if err := table.Flush(); err != nil {
+		return RuntimeError(err)
+	}
 	if tokenExists && tokenErr == nil {
 		if claims, claimsErr := token.Claims(); claimsErr == nil && claims.Subject != "" && claims.Subject != identity.Name {
 			fmt.Fprintf(stderr, "token subject %q does not match profile name %q — run 'tollbit auth login'\n", claims.Subject, identity.Name)
@@ -513,17 +596,17 @@ func pendingAuthorizationStatus(pending agentauth.PendingConsent, exists bool) m
 }
 
 func printRefreshTokenStatus(w interface{ Write([]byte) (int, error) }, status agenttoken.RefreshTokenStatus, autoRefresh bool) {
-	fmt.Fprintf(w, "Auto-refresh: %s\n", enabledLabel(autoRefresh))
+	fmt.Fprintf(w, "Auto-refresh:\t%s\n", enabledLabel(autoRefresh))
 	if status.Error != "" {
 		if status.Present {
-			fmt.Fprintf(w, "Refresh:    invalid (%s)\n", status.Error)
+			fmt.Fprintf(w, "Refresh:\tinvalid (%s)\n", status.Error)
 			return
 		}
-		fmt.Fprintf(w, "Refresh:    absent (%s)\n", status.Error)
+		fmt.Fprintf(w, "Refresh:\tabsent (%s)\n", status.Error)
 		return
 	}
 	if !status.Present {
-		fmt.Fprintln(w, "Refresh:    absent")
+		fmt.Fprintln(w, "Refresh:\tabsent")
 		return
 	}
 	state := "present"
@@ -531,10 +614,10 @@ func printRefreshTokenStatus(w interface{ Write([]byte) (int, error) }, status a
 		state = "expired"
 	}
 	if status.ExpiresAt != "" {
-		fmt.Fprintf(w, "Refresh:    %s (expires %s)\n", state, status.ExpiresAt)
+		fmt.Fprintf(w, "Refresh:\t%s (expires %s)\n", state, status.ExpiresAt)
 		return
 	}
-	fmt.Fprintf(w, "Refresh:    %s\n", state)
+	fmt.Fprintf(w, "Refresh:\t%s\n", state)
 }
 
 func enabledLabel(enabled bool) string {
@@ -548,10 +631,10 @@ func printPendingAuthorizationStatus(w interface{ Write([]byte) (int, error) }, 
 	if !exists {
 		return
 	}
-	fmt.Fprintln(w, "Pending:    authorization pending (complete in browser, then run 'tollbit auth complete')")
-	fmt.Fprintf(w, "Pending agent: %s\n", pending.AgentIdentity.Name)
+	fmt.Fprintln(w, "Pending:\tauthorization pending (complete in browser, then run 'tollbit auth complete')")
+	fmt.Fprintf(w, "Pending agent:\t%s\n", pending.AgentIdentity.Name)
 	if pending.AgentIdentity.UserAgent != "" {
-		fmt.Fprintf(w, "Pending user agent: %s\n", pending.AgentIdentity.UserAgent)
+		fmt.Fprintf(w, "Pending user agent:\t%s\n", pending.AgentIdentity.UserAgent)
 	}
 }
 
@@ -584,49 +667,55 @@ func runAuthSet(cmd *cobra.Command, factory app.Factory, opts authSetOptions) er
 	return nil
 }
 
-func printAuthTokenStatus(w interface{ Write([]byte) (int, error) }, token agent.Token, exists bool, validationErr error) {
+func printAuthTokenStatus(w interface{ Write([]byte) (int, error) }, token agent.Token, exists bool, validationErr error, identity *resolvedOBOIdentity) {
 	if !exists {
-		fmt.Fprintln(w, "Token:      none")
+		fmt.Fprintln(w, "Token:\tnone")
 		return
 	}
 	if validationErr != nil {
 		expires := tokenExpiryLabel(token)
 		if expires != "" {
-			fmt.Fprintf(w, "Token:      expired (%s)\n", expires)
+			fmt.Fprintf(w, "Token:\texpired (%s)\n", expires)
 			return
 		}
-		fmt.Fprintf(w, "Token:      invalid (%v)\n", validationErr)
+		fmt.Fprintf(w, "Token:\tinvalid (%v)\n", validationErr)
 		return
 	}
 	claims, err := token.Claims()
 	if err != nil {
-		fmt.Fprintf(w, "Token:      invalid (%v)\n", err)
+		fmt.Fprintf(w, "Token:\tinvalid (%v)\n", err)
 		return
 	}
 	expires := "unknown"
 	if claims.ExpiresAt != nil {
 		expires = claims.ExpiresAt.Time.UTC().Format(time.RFC3339)
 	}
-	fmt.Fprintf(w, "Token:      valid (expires %s)\n", expires)
+	fmt.Fprintf(w, "Token:\tvalid (expires %s)\n", expires)
 	if claims.OBO == nil {
 		return
 	}
-	parts := make([]string, 0, 2)
-	if claims.OBO.User != "" {
-		parts = append(parts, "user "+claims.OBO.User)
-	}
-	if claims.OBO.Org != "" {
-		parts = append(parts, "org "+claims.OBO.Org)
-	}
-	if len(parts) == 0 {
+	if claims.OBO.User == "" && claims.OBO.Org == "" {
 		return
 	}
-	source := strings.TrimSpace(claims.OBO.Source)
-	suffix := ""
-	if source != "" {
-		suffix = " (" + source + ")"
+	fmt.Fprintln(w, "On behalf:\t")
+	if identity != nil {
+		if claims.OBO.User != "" {
+			fmt.Fprintf(w, "  User:\t%s\n", identity.primaryEmail)
+		}
+		if claims.OBO.Org != "" {
+			fmt.Fprintf(w, "  Organization:\t%s\n", identity.organizationName)
+		}
 	}
-	fmt.Fprintf(w, "On behalf:  %s%s\n", strings.Join(parts, " / "), suffix)
+	source := strings.TrimSpace(claims.OBO.Source)
+	if source != "" {
+		fmt.Fprintf(w, "  Source:\t%s\n", source)
+	}
+	if claims.OBO.User != "" {
+		fmt.Fprintf(w, "  User ID:\t%s\n", claims.OBO.User)
+	}
+	if claims.OBO.Org != "" {
+		fmt.Fprintf(w, "  Org ID:\t%s\n", claims.OBO.Org)
+	}
 }
 
 func tokenExpiryLabel(token agent.Token) string {

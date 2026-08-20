@@ -240,6 +240,63 @@ func TestClientRefreshAgentToken(t *testing.T) {
 	}
 }
 
+func TestClientWhoAmI(t *testing.T) {
+	organizationName := "Example Org"
+	primaryEmail := "user@example.com"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.RequestURI() != "/agent/v1/whoami" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		if r.Header.Get("Authorization") != "Bearer agent-token" {
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("Content-Type") != "" {
+			t.Fatalf("expected no content type, got %q", r.Header.Get("Content-Type"))
+		}
+		_ = json.NewEncoder(w).Encode(WhoAmIResponse{
+			AgentIdentifier:  "agent-test",
+			OrganizationName: &organizationName,
+			PrimaryEmail:     &primaryEmail,
+		})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.WhoAmI(context.Background(), agent.Token{RawToken: "agent-token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.AgentIdentifier != "agent-test" || resp.OrganizationName == nil || *resp.OrganizationName != organizationName || resp.PrimaryEmail == nil || *resp.PrimaryEmail != primaryEmail {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+}
+
+func TestClientWhoAmISurfacesProblemJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusBadGateway)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"type":   "about:blank",
+			"title":  "Bad Gateway",
+			"status": http.StatusBadGateway,
+			"detail": "identity lookup failed",
+		})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.WhoAmI(context.Background(), agent.Token{RawToken: "agent-token"})
+	if err == nil || !strings.Contains(err.Error(), "identity lookup failed") {
+		t.Fatalf("expected problem JSON error, got %v", err)
+	}
+}
+
 func TestClientRevokesRefreshToken(t *testing.T) {
 	var sawRequest bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

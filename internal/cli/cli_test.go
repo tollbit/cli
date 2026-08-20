@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/tabwriter"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -20,6 +22,7 @@ import (
 	"github.com/tollbit/cli/internal/client/auth"
 	"github.com/tollbit/cli/internal/client/tollbit"
 	"github.com/tollbit/cli/internal/configuration"
+	"github.com/tollbit/cli/internal/tokens/agent"
 	"github.com/tollbit/cli/internal/version"
 )
 
@@ -40,6 +43,39 @@ func executeTestCommand(args []string, stdin io.Reader, stdout, stderr *bytes.Bu
 		fmt.Fprintln(stderr, err)
 	}
 	return ExitCode(err)
+}
+
+func statusLineValue(output, label string) string {
+	for line := range strings.SplitSeq(output, "\n") {
+		if strings.HasPrefix(line, label) {
+			return strings.TrimSpace(strings.TrimPrefix(line, label))
+		}
+	}
+	return ""
+}
+
+func assertStatusValueAlignment(t *testing.T, output string, values []string) {
+	t.Helper()
+	wantColumn := -1
+	for _, value := range values {
+		column := -1
+		for line := range strings.SplitSeq(output, "\n") {
+			if index := strings.Index(line, value); index >= 0 {
+				column = index
+				break
+			}
+		}
+		if column < 0 {
+			t.Fatalf("expected status output to contain %q, got %q", value, output)
+		}
+		if wantColumn < 0 {
+			wantColumn = column
+			continue
+		}
+		if column != wantColumn {
+			t.Fatalf("expected %q at column %d, got column %d in %q", value, wantColumn, column, output)
+		}
+	}
 }
 
 func testConfig() configuration.Config {
@@ -209,7 +245,7 @@ func TestRunAuthSetStatusAndLogoutAll(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("auth status failed: code=%d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Agent:      agent-test") || !strings.Contains(stdout.String(), "User agent: agent-test/0.1") {
+	if statusLineValue(stdout.String(), "Agent:") != "agent-test" || statusLineValue(stdout.String(), "User agent:") != "agent-test/0.1" {
 		t.Fatalf("unexpected status stdout: %q", stdout.String())
 	}
 
@@ -231,7 +267,7 @@ func TestRunAuthStatusDefaultsToAnonymous(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("auth status failed: code=%d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Agent:      anonymous") {
+	if statusLineValue(stdout.String(), "Agent:") != "anonymous" {
 		t.Fatalf("unexpected status stdout: %q", stdout.String())
 	}
 }
@@ -242,6 +278,7 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 	oboToken := testAgentJWTWithOBO(t)
 	var sawStart bool
 	var sawRedeem bool
+	var whoAmICalls int
 
 	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.RequestURI() {
@@ -296,6 +333,19 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 				t.Fatalf("expected POST revoke, got %s", r.Method)
 			}
 			_ = json.NewEncoder(w).Encode(auth.RevokeRefreshTokenResponse{Revoked: true})
+		case "/agent/v1/whoami":
+			if r.Method != http.MethodGet {
+				t.Fatalf("expected GET whoami, got %s", r.Method)
+			}
+			if r.Header.Get("Authorization") != "Bearer "+oboToken {
+				t.Fatalf("unexpected whoami authorization: %q", r.Header.Get("Authorization"))
+			}
+			whoAmICalls++
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"agent_identifier":  "agent-test",
+				"organization_name": "Example Org",
+				"primary_email":     "user@example.com",
+			})
 		default:
 			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.RequestURI())
 		}
@@ -312,11 +362,14 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 	if !sawStart || !sawRedeem {
 		t.Fatalf("expected start and redeem requests, sawStart=%v sawRedeem=%v", sawStart, sawRedeem)
 	}
-	for _, want := range []string{"Authorize agent: agent-test", "Open this URL in your browser", "authorized as agent-test", "user usr_123", "org org_456"} {
+	for _, want := range []string{"Authorize agent: agent-test", "Open this URL in your browser", "authorized as agent-test (on behalf of user@example.com / Example Org)"} {
 		combined := stdout.String() + stderr.String()
 		if !strings.Contains(combined, want) {
 			t.Fatalf("expected login output to contain %q, got stdout=%q stderr=%q", want, stdout.String(), stderr.String())
 		}
+	}
+	if strings.Contains(stderr.String(), "usr_123") || strings.Contains(stderr.String(), "org_456") {
+		t.Fatalf("expected post-login message to contain names only, got stderr=%q", stderr.String())
 	}
 
 	stdout.Reset()
@@ -325,11 +378,21 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("auth status failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	for _, want := range []string{"Agent:      agent-test", "Token:      valid", "On behalf:  user usr_123 / org org_456 (consent)"} {
+	for _, want := range []string{
+		"Agent:          agent-test",
+		"Token:          valid",
+		"On behalf:",
+		"  User:         user@example.com\n",
+		"  Organization: Example Org\n",
+		"  Source:       consent\n",
+		"  User ID:      usr_123\n",
+		"  Org ID:       org_456\n",
+	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected status stdout to contain %q, got %q", want, stdout.String())
 		}
 	}
+	assertStatusValueAlignment(t, stdout.String(), []string{"agent-test", "valid (expires", "user@example.com", "Example Org", "consent", "usr_123", "org_456", "enabled", "present (expires"})
 
 	stdout.Reset()
 	stderr.Reset()
@@ -350,6 +413,12 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 	if oboStatus["source"] != "consent" || oboStatus["user"] != "usr_123" || oboStatus["org"] != "org_456" {
 		t.Fatalf("unexpected obo status: %#v", oboStatus)
 	}
+	if oboStatus["primary_email"] != "user@example.com" || oboStatus["organization_name"] != "Example Org" {
+		t.Fatalf("expected resolved identity in OBO status: %#v", oboStatus)
+	}
+	if whoAmICalls != 3 {
+		t.Fatalf("expected whoami on login and both status commands, got %d calls", whoAmICalls)
+	}
 
 	stdout.Reset()
 	stderr.Reset()
@@ -367,8 +436,142 @@ func TestRunAuthLoginStatusAndLogout(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("auth status after logout failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Token:      none") {
+	if statusLineValue(stdout.String(), "Token:") != "none" {
 		t.Fatalf("expected token to be cleared, got %q", stdout.String())
+	}
+}
+
+func TestAuthorizedMessageOBOCases(t *testing.T) {
+	orgOnlyClaims := agent.Claims{OBO: &agent.OBOClaims{Source: "consent", Org: "org_456"}}
+	got := authorizedMessage("agent-test", orgOnlyClaims, &resolvedOBOIdentity{organizationName: "Example Org"})
+	if got != "authorized as agent-test (on behalf of Example Org)" {
+		t.Fatalf("unexpected organization-only message: %q", got)
+	}
+
+	noOBOClaims := agent.Claims{}
+	got = authorizedMessage("agent-test", noOBOClaims, nil)
+	if got != "authorized as agent-test" {
+		t.Fatalf("unexpected no-OBO message: %q", got)
+	}
+	resolved, err := resolveOBOIdentity(context.Background(), nil, agent.Token{}, noOBOClaims)
+	if err != nil || resolved != nil {
+		t.Fatalf("expected no identity lookup without OBO claims, got identity=%#v err=%v", resolved, err)
+	}
+}
+
+func TestPrintAuthTokenStatusOrganizationOnly(t *testing.T) {
+	token := testAgentJWTWithOBOClaims(t, "", "org_456")
+	var output bytes.Buffer
+	table := tabwriter.NewWriter(&output, 0, 4, 1, ' ', 0)
+	printAuthTokenStatus(table, agent.Token{RawToken: token}, true, nil, &resolvedOBOIdentity{organizationName: "Example Org"})
+	if err := table.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "On behalf:") {
+		t.Fatalf("expected organization-only status, got %q", output.String())
+	}
+	if !strings.Contains(output.String(), "  Organization: Example Org\n") {
+		t.Fatalf("expected organization name, got %q", output.String())
+	}
+	if !strings.Contains(output.String(), "  Source:       consent\n") {
+		t.Fatalf("expected OBO source, got %q", output.String())
+	}
+	if !strings.Contains(output.String(), "  Org ID:       org_456\n") {
+		t.Fatalf("expected organization ID, got %q", output.String())
+	}
+	if strings.Contains(output.String(), "User:") || strings.Contains(output.String(), "User ID:") {
+		t.Fatalf("unexpected user fields in organization-only status: %q", output.String())
+	}
+}
+
+func TestRunAuthLoginWhoAmIFailureFallsBack(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		timeout bool
+	}{
+		{name: "bad gateway"},
+		{name: "timeout", timeout: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			storageDir := t.TempDir()
+			baseToken := testAgentJWT(t)
+			oboToken := testAgentJWTWithOBO(t)
+			var whoAmICalls int
+
+			authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/agent/v1/tokens/identity":
+					var body map[string]any
+					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+						t.Fatal(err)
+					}
+					if body["grant_type"] == "self_attested" {
+						_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
+						return
+					}
+					_ = json.NewEncoder(w).Encode(auth.AgentTokenResponse{Token: oboToken})
+				case "/agent/v1/consent/redirect/start":
+					var body auth.ConsentRedirectStartRequest
+					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+						t.Fatal(err)
+					}
+					go func() {
+						_, _ = http.Get(body.RedirectURI + "?code=auth-code&state=" + body.State)
+					}()
+					_ = json.NewEncoder(w).Encode(auth.ConsentRedirectStartResponse{
+						ChallengeID: "ach_test",
+						ConsentURL:  "https://auth.example/consent",
+						ExpiresAt:   time.Now().Add(time.Minute).Format(time.RFC3339),
+					})
+				case "/agent/v1/whoami":
+					whoAmICalls++
+					if tc.timeout {
+						<-r.Context().Done()
+						return
+					}
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusBadGateway)
+					_ = json.NewEncoder(w).Encode(map[string]any{
+						"type":   "about:blank",
+						"title":  "Bad Gateway",
+						"status": http.StatusBadGateway,
+					})
+				default:
+					t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.RequestURI())
+				}
+			}))
+			defer authSrv.Close()
+
+			config := testConfig()
+			config.Auth.BaseURL = authSrv.URL
+			config.Credentials.StorageDir = storageDir
+			config.Runtime.StateDir = storageDir
+			cmd := NewCommandTree(app.Factory{Config: config})
+			cmd.SetArgs([]string{"auth", "login", "--name", "agent-test"})
+			var stdout, stderr bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			if tc.timeout {
+				ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+				defer cancel()
+				cmd.SetContext(ctx)
+			}
+			err := cmd.Execute()
+			if code := ExitCode(err); code != 0 {
+				t.Fatalf("expected successful login, got code=%d err=%v stdout=%q stderr=%q", code, err, stdout.String(), stderr.String())
+			}
+			if whoAmICalls != 1 {
+				t.Fatalf("expected one whoami request, got %d", whoAmICalls)
+			}
+			for _, want := range []string{"authorized as agent-test (on behalf of user usr_123 / org org_456)", identityResolutionWarning} {
+				if !strings.Contains(stderr.String(), want) {
+					t.Fatalf("expected stderr to contain %q, got %q", want, stderr.String())
+				}
+			}
+			if strings.Contains(stderr.String(), "user@example.com") {
+				t.Fatalf("unexpected resolved email in fallback output: %q", stderr.String())
+			}
+		})
 	}
 }
 
@@ -451,6 +654,10 @@ func testAgentJWT(t *testing.T) string {
 }
 
 func testAgentJWTWithOBO(t *testing.T) string {
+	return testAgentJWTWithOBOClaims(t, "usr_123", "org_456")
+}
+
+func testAgentJWTWithOBOClaims(t *testing.T, user, org string) string {
 	t.Helper()
 	claims := struct {
 		jwt.RegisteredClaims
@@ -465,8 +672,8 @@ func testAgentJWTWithOBO(t *testing.T) string {
 		OBO: map[string]any{
 			"ver": 1,
 			"src": "consent",
-			"usr": "usr_123",
-			"org": "org_456",
+			"usr": user,
+			"org": org,
 		},
 	}
 	header := map[string]any{"alg": "none"}
@@ -518,6 +725,47 @@ func TestRunAuthStatusCheckExitCodes(t *testing.T) {
 	}
 }
 
+func TestRunAuthStatusWhoAmIFailureFallsBack(t *testing.T) {
+	storageDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(storageDir, "agent-token.jwt"), []byte(testAgentJWTWithOBO(t)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/agent/v1/whoami" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusBadGateway)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"type":   "about:blank",
+			"title":  "Bad Gateway",
+			"status": http.StatusBadGateway,
+		})
+	}))
+	defer authSrv.Close()
+
+	config := testConfig()
+	config.Auth.BaseURL = authSrv.URL
+	config.Credentials.StorageDir = storageDir
+	config.Runtime.StateDir = storageDir
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"auth", "status"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected successful status, got code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, want := range []string{"On behalf:", "  Source:     consent\n", "  User ID:    usr_123\n", "  Org ID:     org_456\n"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected raw OBO fallback field %q, got %q", want, stdout.String())
+		}
+	}
+	if strings.Contains(stdout.String(), "  User:") || strings.Contains(stdout.String(), "  Organization:") {
+		t.Fatalf("expected raw OBO fallback, got %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), identityResolutionWarning) {
+		t.Fatalf("expected resolution warning, got %q", stderr.String())
+	}
+}
+
 func TestRunAuthSetNameChangeClearsToken(t *testing.T) {
 	storageDir := t.TempDir()
 	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
@@ -547,10 +795,10 @@ func TestRunAuthSetNameChangeClearsToken(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("auth status failed: code=%d stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Token:      none") {
+	if statusLineValue(stdout.String(), "Token:") != "none" {
 		t.Fatalf("expected missing token after rename, got %q", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "User agent: agent-test/0.1") {
+	if statusLineValue(stdout.String(), "User agent:") != "agent-test/0.1" {
 		t.Fatalf("expected user agent preserved, got %q", stdout.String())
 	}
 }
@@ -803,17 +1051,17 @@ func TestRunAuthStatusShowsPendingAuthorization(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("auth status failed: code=%d stderr=%q", code, stderr.String())
 	}
-	for _, want := range []string{
-		"Agent:      anonymous",
-		"Token:      none",
-		"Auto-refresh: enabled",
-		"Refresh:    absent",
-		"Pending:    authorization pending (complete in browser, then run 'tollbit auth complete')",
-		"Pending agent: pending-agent",
-		"Pending user agent: pending-agent/0.1",
+	for label, want := range map[string]string{
+		"Agent:":              "anonymous",
+		"Token:":              "none",
+		"Auto-refresh:":       "enabled",
+		"Refresh:":            "absent",
+		"Pending:":            "authorization pending (complete in browser, then run 'tollbit auth complete')",
+		"Pending agent:":      "pending-agent",
+		"Pending user agent:": "pending-agent/0.1",
 	} {
-		if !strings.Contains(stdout.String(), want) {
-			t.Fatalf("expected status stdout to contain %q, got %q", want, stdout.String())
+		if got := statusLineValue(stdout.String(), label); got != want {
+			t.Fatalf("expected %s value %q, got %q in %q", label, want, got, stdout.String())
 		}
 	}
 	if strings.Contains(stdout.String(), "browser_select_icon") {
@@ -1096,6 +1344,14 @@ func TestRunAuthCompleteAgentConfirmsIconsSucceedsWithIconNames(t *testing.T) {
 	successToken := testAgentJWTWithOBO(t)
 	var sawRedeem bool
 	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/agent/v1/whoami" {
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"agent_identifier":  "agent-test",
+				"organization_name": "Example Org",
+				"primary_email":     "user@example.com",
+			})
+			return
+		}
 		if r.Method != http.MethodPost || r.URL.Path != "/agent/v1/tokens/identity" {
 			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
 		}
@@ -1138,7 +1394,7 @@ func TestRunAuthCompleteAgentConfirmsIconsSucceedsWithIconNames(t *testing.T) {
 	if !sawRedeem {
 		t.Fatal("expected redeem request")
 	}
-	if !strings.Contains(stderr.String(), "authorized as pending-agent") {
+	if !strings.Contains(stderr.String(), "authorized as pending-agent (on behalf of user@example.com / Example Org)") {
 		t.Fatalf("expected authorized message, got stderr=%q", stderr.String())
 	}
 	if _, err := os.Stat(filepath.Join(storageDir, "pending-auth.json")); !os.IsNotExist(err) {

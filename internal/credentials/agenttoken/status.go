@@ -7,9 +7,11 @@ import (
 )
 
 type OBOStatus struct {
-	Source string `json:"source"`
-	User   string `json:"user"`
-	Org    string `json:"org"`
+	Source           string `json:"source"`
+	User             string `json:"user"`
+	Org              string `json:"org"`
+	PrimaryEmail     string `json:"primary_email,omitempty"`
+	OrganizationName string `json:"organization_name,omitempty"`
 }
 
 type TokenStatus struct {
