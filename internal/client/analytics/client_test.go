@@ -57,6 +57,41 @@ func TestQuery(t *testing.T) {
 	}
 }
 
+func TestSchema(t *testing.T) {
+	token := validAgentToken(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/prefix/analytics/agent/v1/query/schema" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("Accept") != "application/json" {
+			t.Fatalf("unexpected accept header: %q", r.Header.Get("Accept"))
+		}
+		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
+			t.Fatal("unexpected authorization header")
+		}
+		_ = json.NewEncoder(w).Encode([]QueryTable{{
+			Name:    "agent_logs_by_page",
+			Columns: []QueryColumn{{Name: "host", Type: "STRING"}},
+		}})
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(Config{BaseURL: " " + srv.URL + "/prefix "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tables, err := client.Schema(context.Background(), token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tables) != 1 || tables[0].Name != "agent_logs_by_page" {
+		t.Fatalf("unexpected tables: %#v", tables)
+	}
+	if len(tables[0].Columns) != 1 || tables[0].Columns[0].Name != "host" {
+		t.Fatalf("unexpected columns: %#v", tables[0].Columns)
+	}
+}
+
 func TestQueryParsesProblemJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Request-ID", "request-123")
