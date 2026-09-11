@@ -27,8 +27,6 @@ func TestAssembleConfigurationIgnoresDevelopmentConfig(t *testing.T) {
 
 func TestAssembleConfigurationIgnoresEndpointEnv(t *testing.T) {
 	t.Setenv("TOLLBIT_AUTH_BASE_URL", "https://evil.example.com")
-	t.Setenv("TOLLBIT_ANALYTICS_BASE_URL", "https://evil.example.com")
-	t.Setenv("TOLLBIT_ANALYTICS_ENABLED", "true")
 	t.Setenv("TOLLBIT_GATEWAY_BASE_URL", "https://evil.example.com")
 	t.Setenv("TOLLBIT_AGENT_REGISTER_USER_AGENT_URL", "https://evil.example.com/register")
 	t.Setenv("TOLLBIT_AUTH_BROWSER_CONSENT_CALLBACK_ADDRESS", "evil.example.com:9")
@@ -37,9 +35,6 @@ func TestAssembleConfigurationIgnoresEndpointEnv(t *testing.T) {
 
 	if config.Auth.BaseURL != "https://oauth.tollbit.com" {
 		t.Fatalf("expected embedded auth base URL, got %q", config.Auth.BaseURL)
-	}
-	if config.Analytics.Enabled || config.Analytics.BaseURL != "https://gateway.tollbit.com" {
-		t.Fatalf("expected embedded analytics config, got %#v", config.Analytics)
 	}
 	if config.Gateway.BaseURL != "https://gateway.tollbit.com" {
 		t.Fatalf("expected embedded gateway base URL, got %q", config.Gateway.BaseURL)
@@ -67,7 +62,7 @@ func TestAssembleConfigurationIgnoresConsentStrategyOverrides(t *testing.T) {
 }
 
 func TestIsConfigurableRejectsDevEndpointFields(t *testing.T) {
-	for _, path := range []string{"analytics.enabled", "analytics.base_url", "auth.base_url", "gateway.base_url", "agent.register_user_agent_url", "auth.browser_consent.callback_address", "auth.consent.strategy.local", "auth.consent.strategy.remote"} {
+	for _, path := range []string{"auth.base_url", "gateway.base_url", "agent.register_user_agent_url", "auth.browser_consent.callback_address", "auth.consent.strategy.local", "auth.consent.strategy.remote"} {
 		if IsConfigurable(path) {
 			t.Fatalf("expected %s not to be configurable in release build", path)
 		}
@@ -89,16 +84,13 @@ func TestReleaseEmbeddedEndpointsAreProduction(t *testing.T) {
 	if config.Gateway.BaseURL != "https://gateway.tollbit.com" {
 		t.Fatalf("gateway.base_url: got %q", config.Gateway.BaseURL)
 	}
-	if config.Analytics.Enabled || config.Analytics.BaseURL != "https://gateway.tollbit.com" {
-		t.Fatalf("analytics: got %#v", config.Analytics)
-	}
 	if config.Agent.RegisterUserAgentURL != "https://hack.tollbit.com/my-agents" {
 		t.Fatalf("agent.register_user_agent_url: got %q", config.Agent.RegisterUserAgentURL)
 	}
 	if config.Auth.BrowserConsent.CallbackAddress != "127.0.0.1:54321" {
 		t.Fatalf("auth.browser_consent.callback_address: got %q", config.Auth.BrowserConsent.CallbackAddress)
 	}
-	for _, u := range []string{config.Analytics.BaseURL, config.Auth.BaseURL, config.Gateway.BaseURL, config.Agent.RegisterUserAgentURL} {
+	for _, u := range []string{config.Auth.BaseURL, config.Gateway.BaseURL, config.Agent.RegisterUserAgentURL} {
 		if !strings.HasPrefix(u, "https://") {
 			t.Fatalf("expected https endpoint, got %q", u)
 		}
