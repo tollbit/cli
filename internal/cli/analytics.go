@@ -21,6 +21,7 @@ func NewAnalyticsCommand(factory app.Factory) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(NewAnalyticsQueryCommand(factory))
+	cmd.AddCommand(NewAnalyticsSchemaCommand(factory))
 	return cmd
 }
 
@@ -72,6 +73,57 @@ func runAnalyticsQuery(cmd *cobra.Command, factory app.Factory, sql string) erro
 	}
 	if err := writeJSON(cmd.OutOrStdout(), result); err != nil {
 		return RuntimeError(fmt.Errorf("error writing analytics response: %w", err))
+	}
+	return nil
+}
+
+func NewAnalyticsSchemaCommand(factory app.Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "schema",
+		Short: "List available analytics tables and columns",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 0 {
+				return UsageError("analytics schema accepts no arguments")
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAnalyticsSchema(cmd, factory)
+		},
+	}
+	cmd.Flags().String("user-agent", "", "user agent for request")
+	return cmd
+}
+
+func runAnalyticsSchema(cmd *cobra.Command, factory app.Factory) error {
+	application, err := appForCommand(factory, cmd)
+	if err != nil {
+		return RuntimeError(err)
+	}
+	credentials, err := application.Credentials()
+	if err != nil {
+		return RuntimeError(err)
+	}
+	analyticsClient, err := application.Analytics()
+	if err != nil {
+		return RuntimeError(err)
+	}
+	identity, err := credentials.ResolveIdentity(cmd.Context(), agenttoken.ResolveIdentityOptions{
+		UserAgent: flagChangedStr(cmd, "user-agent"),
+	})
+	if err != nil {
+		return RuntimeError(fmt.Errorf("error resolving identity: %w", err))
+	}
+	token, err := credentials.GetAgentToken(cmd, identity, agenttoken.WithOBO())
+	if err != nil {
+		return RuntimeError(fmt.Errorf("error fetching agent token: %w", err))
+	}
+	result, err := analyticsClient.Schema(cmd.Context(), token)
+	if err != nil {
+		return RuntimeError(fmt.Errorf("error fetching analytics schema: %w", err))
+	}
+	if err := writeJSON(cmd.OutOrStdout(), result); err != nil {
+		return RuntimeError(fmt.Errorf("error writing analytics schema: %w", err))
 	}
 	return nil
 }

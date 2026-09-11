@@ -15,7 +15,10 @@ import (
 	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
-const queryPath = "/analytics/agent/v1/query"
+const (
+	queryPath  = "/analytics/agent/v1/query"
+	schemaPath = queryPath + "/schema"
+)
 
 type (
 	Config struct {
@@ -24,6 +27,7 @@ type (
 
 	Client interface {
 		Query(context.Context, QueryRequest, agent.Token) (QueryResponse, error)
+		Schema(context.Context, agent.Token) ([]QueryTable, error)
 	}
 
 	client struct {
@@ -43,6 +47,11 @@ type (
 	QueryResponse struct {
 		Columns []QueryColumn `json:"columns"`
 		Rows    [][]any       `json:"rows"`
+	}
+
+	QueryTable struct {
+		Name    string        `json:"name"`
+		Columns []QueryColumn `json:"columns"`
 	}
 )
 
@@ -98,6 +107,40 @@ func (c *client) Query(ctx context.Context, request QueryRequest, token agent.To
 	var result QueryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return QueryResponse{}, err
+	}
+	return result, nil
+}
+
+func (c *client) Schema(ctx context.Context, token agent.Token) ([]QueryTable, error) {
+	if strings.TrimSpace(token.RawToken) == "" {
+		return nil, errors.New("agent token is required")
+	}
+	if err := token.Validate(); err != nil {
+		return nil, err
+	}
+
+	u := *c.baseURL
+	u.Path = strings.TrimRight(c.baseURL.Path, "/") + schemaPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token.RawToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errorsx.ParseResponseError(ctx, resp.Status, resp.StatusCode, resp.Header, body)
+	}
+
+	var result []QueryTable
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
 	}
 	return result, nil
 }

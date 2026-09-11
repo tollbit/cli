@@ -80,6 +80,52 @@ func TestAnalyticsQueryUsesOBOAgentTokenAndWritesJSON(t *testing.T) {
 	}
 }
 
+func TestAnalyticsSchemaUsesOBOAgentTokenAndWritesJSON(t *testing.T) {
+	token := testAgentJWTWithOBO(t)
+	storageDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(storageDir, "agent-token.jwt"), []byte(token), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	analyticsSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/analytics/agent/v1/query/schema" {
+			t.Fatalf("unexpected analytics request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer "+token {
+			t.Fatal("unexpected authorization header")
+		}
+		_, _ = w.Write([]byte(`[{"name":"agent_logs_by_page","columns":[{"name":"host","type":"STRING"}]}]`))
+	}))
+	defer analyticsSrv.Close()
+
+	config := testConfig()
+	config.Analytics.Enabled = true
+	config.Analytics.BaseURL = analyticsSrv.URL
+	config.Credentials.StorageDir = storageDir
+	config.Runtime.StateDir = storageDir
+
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"analytics", "schema"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected success, got %d (stderr=%q)", code, stderr.String())
+	}
+	var output []struct {
+		Name    string `json:"name"`
+		Columns []struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"columns"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+		t.Fatalf("invalid JSON output %q: %v", stdout.String(), err)
+	}
+	if len(output) != 1 || output[0].Name != "agent_logs_by_page" {
+		t.Fatalf("unexpected tables: %#v", output)
+	}
+	if len(output[0].Columns) != 1 || output[0].Columns[0].Name != "host" {
+		t.Fatalf("unexpected columns: %#v", output[0].Columns)
+	}
+}
+
 func TestAnalyticsQueryRequiresOneSQLArgument(t *testing.T) {
 	config := testConfig()
 	config.Analytics.Enabled = true

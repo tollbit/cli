@@ -162,6 +162,10 @@ func (f *fakeAnalytics) Query(context.Context, analytics.QueryRequest, agent.Tok
 	return analytics.QueryResponse{}, nil
 }
 
+func (f *fakeAnalytics) Schema(context.Context, agent.Token) ([]analytics.QueryTable, error) {
+	return nil, nil
+}
+
 func TestBuildConsentStrategyAgentConfirmsIcons(t *testing.T) {
 	config := testConfig(t)
 	config.Runtime.EndUserProximity = configuration.RuntimeEndUserProximityRemote
