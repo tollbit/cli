@@ -100,7 +100,8 @@ func testConfig() configuration.Config {
 		App: configuration.AppConfig{
 			Name: "tollbit",
 		},
-		Runtime: configuration.RuntimeConfig{EndUserProximity: configuration.RuntimeEndUserProximityLocal, StateDir: storageDir},
+		Analytics: configuration.AnalyticsConfig{BaseURL: "https://gateway.tollbit.com"},
+		Runtime:   configuration.RuntimeConfig{EndUserProximity: configuration.RuntimeEndUserProximityLocal, StateDir: storageDir},
 		Auth: configuration.AuthConfig{
 			BaseURL:          authBaseURL,
 			UseRefreshTokens: true,

@@ -91,11 +91,13 @@ func TestIsConfigurableReportsCommonFields(t *testing.T) {
 
 func TestConfigWithOverridesAppliesAndValidates(t *testing.T) {
 	config := assembleTestConfiguration(t, t.TempDir())
+	analyticsBaseURL := "https://analytics-flag.example.com"
 	gatewayBaseURL := "https://gateway-flag.example.com"
 	timeout := 30 * time.Second
 	autoOpenBrowser := false
 
 	got, err := config.WithOverrides(OverrideOptions{
+		AnalyticsBaseURL:                  &analyticsBaseURL,
 		GatewayBaseURL:                    &gatewayBaseURL,
 		AuthBrowserConsentTimeout:         &timeout,
 		AuthBrowserConsentAutoOpenBrowser: &autoOpenBrowser,
@@ -105,6 +107,9 @@ func TestConfigWithOverridesAppliesAndValidates(t *testing.T) {
 	}
 	if got.Gateway.BaseURL != gatewayBaseURL {
 		t.Fatalf("expected gateway override, got %q", got.Gateway.BaseURL)
+	}
+	if got.Analytics.BaseURL != analyticsBaseURL {
+		t.Fatalf("expected analytics override, got %q", got.Analytics.BaseURL)
 	}
 	if got.Auth.BrowserConsent.Timeout != timeout {
 		t.Fatalf("expected timeout override, got %s", got.Auth.BrowserConsent.Timeout)
@@ -185,6 +190,15 @@ func TestValidateConsentStrategyAcceptsAgentConfirmsIcons(t *testing.T) {
 	config.Auth.Consent.Strategy.Remote = "unknown"
 	if err := validate(config); err == nil {
 		t.Fatal("expected unknown consent strategy to be rejected")
+	}
+}
+
+func TestValidateRequiresAnalyticsBaseURLWhenEnabled(t *testing.T) {
+	config := assembleTestConfiguration(t, t.TempDir())
+	config.Analytics.Enabled = true
+	config.Analytics.BaseURL = ""
+	if err := validate(config); err == nil {
+		t.Fatal("expected enabled analytics to require a base URL")
 	}
 }
 

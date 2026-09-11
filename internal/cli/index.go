@@ -16,5 +16,8 @@ func NewCommandTree(factory app.Factory) *cobra.Command {
 		NewGuideCommand(factory),
 		NewVersionCommand(),
 	)
+	if factory.Config.Analytics.Enabled {
+		rootCmd.AddCommand(NewAnalyticsCommand(factory))
+	}
 	return rootCmd
 }

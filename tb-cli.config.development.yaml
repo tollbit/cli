@@ -2,6 +2,9 @@
 #
 auth:
   base_url: http://oauth.localhost:7011
+analytics:
+  enabled: true
+  base_url: http://analytics.localhost:7011
 gateway:
   base_url: http://tollbit.localhost:7011
 # auth:

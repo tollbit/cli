@@ -6,6 +6,7 @@ type Config struct {
 	App         AppConfig
 	Runtime     RuntimeConfig
 	Auth        AuthConfig
+	Analytics   AnalyticsConfig
 	Agent       AgentConfig
 	Credentials CredentialsConfig
 	Gateway     GatewayConfig
@@ -27,6 +28,11 @@ type AuthConfig struct {
 	UseRefreshTokens   bool                 `mapstructure:"use_refresh_tokens" configurable:"release"`
 	Consent            ConsentConfig        `mapstructure:"consent"`
 	BrowserConsent     BrowserConsentConfig `mapstructure:"browser_consent"`
+}
+
+type AnalyticsConfig struct {
+	Enabled bool   `mapstructure:"enabled" configurable:"dev"`
+	BaseURL string `mapstructure:"base_url" configurable:"dev"`
 }
 
 type ConsentConfig struct {
@@ -59,6 +65,7 @@ type BrowserConsentConfig struct {
 }
 
 type OverrideOptions struct {
+	AnalyticsBaseURL                  *string
 	AuthBaseURL                       *string
 	AuthRetryOnOBORequired            *bool
 	AuthTokenTTLSeconds               *int32
@@ -73,6 +80,9 @@ type OverrideOptions struct {
 }
 
 func (c Config) WithOverrides(opts OverrideOptions) (Config, error) {
+	if opts.AnalyticsBaseURL != nil {
+		c.Analytics.BaseURL = *opts.AnalyticsBaseURL
+	}
 	if opts.AuthBaseURL != nil {
 		c.Auth.BaseURL = *opts.AuthBaseURL
 	}
