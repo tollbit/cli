@@ -1,7 +1,7 @@
 app:
   name: tollbit
 analytics:
-  enabled: false
+  enabled: true
   base_url: https://gateway.tollbit.com
 runtime:
   end_user_proximity: auto-detect
