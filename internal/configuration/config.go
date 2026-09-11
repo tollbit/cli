@@ -117,6 +117,9 @@ func validate(config Config) error {
 	if strings.TrimSpace(config.App.Name) == "" {
 		return errors.New("app.name is required")
 	}
+	if config.Analytics.Enabled && strings.TrimSpace(config.Analytics.BaseURL) == "" {
+		return errors.New("analytics.base_url is required when analytics is enabled")
+	}
 	if strings.TrimSpace(config.Auth.BaseURL) == "" {
 		return errors.New("auth.base_url is required")
 	}

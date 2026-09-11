@@ -9,6 +9,7 @@ import (
 	"github.com/tollbit/cli/internal/agentauth/agentconfirmsicons"
 	"github.com/tollbit/cli/internal/agentauth/browserselecticon"
 	"github.com/tollbit/cli/internal/agentauth/redirect"
+	"github.com/tollbit/cli/internal/client/analytics"
 	"github.com/tollbit/cli/internal/client/auth"
 	"github.com/tollbit/cli/internal/client/tollbit"
 	"github.com/tollbit/cli/internal/cliruntime"
@@ -17,6 +18,7 @@ import (
 )
 
 type Dependencies struct {
+	Analytics     analytics.Client
 	Auth          *auth.Client
 	Tollbit       tollbit.Client
 	OBOAuthorizer agentauth.OBOAuthorizer
@@ -30,6 +32,7 @@ type App struct {
 	deps   Dependencies
 
 	auth          func() (*auth.Client, error)
+	analytics     func() (analytics.Client, error)
 	tollbit       func() (tollbit.Client, error)
 	oboAuthorizer func() (agentauth.OBOAuthorizer, error)
 	credentials   func() (*agenttoken.CredentialManager, error)
@@ -46,6 +49,7 @@ func New(config configuration.Config, opts ...Option) (*App, error) {
 		deps:   cfg.dependencies,
 	}
 	a.auth = sync.OnceValues(a.buildAuth)
+	a.analytics = sync.OnceValues(a.buildAnalytics)
 	a.tollbit = sync.OnceValues(a.buildTollbit)
 	a.oboAuthorizer = sync.OnceValues(a.buildOBOAuthorizer)
 	a.credentials = sync.OnceValues(a.buildCredentials)
@@ -59,6 +63,21 @@ func (a *App) Config() configuration.Config {
 
 func (a *App) Auth() (*auth.Client, error) {
 	return a.auth()
+}
+
+func (a *App) Analytics() (analytics.Client, error) {
+	return a.analytics()
+}
+
+func (a *App) buildAnalytics() (analytics.Client, error) {
+	if a.deps.Analytics != nil {
+		return a.deps.Analytics, nil
+	}
+	client, err := analytics.NewClient(analytics.Config{BaseURL: a.config.Analytics.BaseURL})
+	if err != nil {
+		return nil, fmt.Errorf("build analytics client: %w", err)
+	}
+	return client, nil
 }
 
 func (a *App) buildAuth() (*auth.Client, error) {

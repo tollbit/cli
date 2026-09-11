@@ -1,5 +1,8 @@
 app:
   name: tollbit
+analytics:
+  enabled: true
+  base_url: https://gateway.tollbit.com
 runtime:
   end_user_proximity: auto-detect
   state_dir: __default__

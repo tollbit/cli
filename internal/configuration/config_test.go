@@ -188,6 +188,15 @@ func TestValidateConsentStrategyAcceptsAgentConfirmsIcons(t *testing.T) {
 	}
 }
 
+func TestValidateRequiresAnalyticsBaseURLWhenEnabled(t *testing.T) {
+	config := assembleTestConfiguration(t, t.TempDir())
+	config.Analytics.Enabled = true
+	config.Analytics.BaseURL = ""
+	if err := validate(config); err == nil {
+		t.Fatal("expected enabled analytics to require a base URL")
+	}
+}
+
 func assembleTestConfiguration(t *testing.T, wd string) Config {
 	t.Helper()
 	config, err := assembleConfiguration(readTestdata(t, "default-config.yaml"), func() (string, error) { return wd, nil })

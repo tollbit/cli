@@ -1,10 +1,13 @@
 package app
 
 import (
+	"context"
 	"testing"
 
 	"github.com/tollbit/cli/internal/agentauth"
+	"github.com/tollbit/cli/internal/client/analytics"
 	"github.com/tollbit/cli/internal/configuration"
+	"github.com/tollbit/cli/internal/tokens/agent"
 )
 
 func TestNewExposesConfigAndBuildsClients(t *testing.T) {
@@ -17,6 +20,9 @@ func TestNewExposesConfigAndBuildsClients(t *testing.T) {
 	if _, err := app.Auth(); err != nil {
 		t.Fatalf("expected auth client: %v", err)
 	}
+	if _, err := app.Analytics(); err != nil {
+		t.Fatalf("expected analytics client: %v", err)
+	}
 	if _, err := app.Tollbit(); err != nil {
 		t.Fatalf("expected tollbit client: %v", err)
 	}
@@ -28,6 +34,22 @@ func TestNewExposesConfigAndBuildsClients(t *testing.T) {
 	}
 	if app.Config().App.Name != "test-cli" {
 		t.Fatalf("expected app name test-cli, got %q", app.Config().App.Name)
+	}
+}
+
+func TestNewUsesInjectedAnalytics(t *testing.T) {
+	fake := &fakeAnalytics{}
+	application, err := New(testConfig(t), OverrideDependencies(Dependencies{Analytics: fake}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	analyticsClient, err := application.Analytics()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if analyticsClient != fake {
+		t.Fatal("expected injected analytics client")
 	}
 }
 
@@ -112,7 +134,8 @@ func testConfig(t *testing.T) configuration.Config {
 		App: configuration.AppConfig{
 			Name: "test-cli",
 		},
-		Runtime: configuration.RuntimeConfig{EndUserProximity: configuration.RuntimeEndUserProximityLocal, StateDir: t.TempDir()},
+		Analytics: configuration.AnalyticsConfig{BaseURL: "https://analytics.example"},
+		Runtime:   configuration.RuntimeConfig{EndUserProximity: configuration.RuntimeEndUserProximityLocal, StateDir: t.TempDir()},
 		Auth: configuration.AuthConfig{
 			BaseURL: "https://auth.example",
 			Consent: configuration.ConsentConfig{
@@ -131,6 +154,12 @@ func testConfig(t *testing.T) configuration.Config {
 		Credentials: configuration.CredentialsConfig{StorageDir: t.TempDir()},
 		Gateway:     configuration.GatewayConfig{BaseURL: "https://gateway.example.com"},
 	}
+}
+
+type fakeAnalytics struct{}
+
+func (f *fakeAnalytics) Query(context.Context, analytics.QueryRequest, agent.Token) (analytics.QueryResponse, error) {
+	return analytics.QueryResponse{}, nil
 }
 
 func TestBuildConsentStrategyAgentConfirmsIcons(t *testing.T) {
