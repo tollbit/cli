@@ -131,14 +131,63 @@ func TestAnalyticsQueryRequiresOneSQLArgument(t *testing.T) {
 	config.Analytics.Enabled = true
 	config.Analytics.BaseURL = "https://analytics.example"
 
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"analytics", "query"}, "analytics query requires <SQL>"},
+		{[]string{"analytics", "query", "SELECT", "1"}, "analytics query accepts a single <SQL> argument"},
+		{[]string{"analytics", "query", "   "}, "analytics query SQL must not be empty"},
+	} {
+		var stdout, stderr bytes.Buffer
+		code := executeTestCommandWithConfig(config, tc.args, nil, &stdout, &stderr)
+		if code != 2 || !strings.Contains(stderr.String(), tc.want) {
+			t.Fatalf("expected usage error %q for %#v, got code=%d stderr=%q", tc.want, tc.args, code, stderr.String())
+		}
+	}
+}
+
+func TestAnalyticsCommandsRejectUserAgentFlag(t *testing.T) {
+	config := testConfig()
+	config.Analytics.Enabled = true
+	config.Analytics.BaseURL = "https://analytics.example"
+
 	for _, args := range [][]string{
-		{"analytics", "query"},
-		{"analytics", "query", "SELECT", "1"},
+		{"analytics", "query", "--user-agent", "Agent", "SELECT 1"},
+		{"analytics", "schema", "--user-agent", "Agent"},
 	} {
 		var stdout, stderr bytes.Buffer
 		code := executeTestCommandWithConfig(config, args, nil, &stdout, &stderr)
-		if code != 2 || !strings.Contains(stderr.String(), "analytics query requires <SQL>") {
-			t.Fatalf("expected SQL usage error for %#v, got code=%d stderr=%q", args, code, stderr.String())
+		if code != 2 || !strings.Contains(stderr.String(), "unknown flag: --user-agent") {
+			t.Fatalf("expected unknown flag error for %#v, got code=%d stderr=%q", args, code, stderr.String())
+		}
+	}
+}
+
+func TestAnalyticsHelpDocumentsQueryContract(t *testing.T) {
+	config := testConfig()
+	config.Analytics.Enabled = true
+
+	for _, tc := range []struct {
+		args []string
+		want []string
+	}{
+		{[]string{"analytics", "--help"}, []string{"analytics schema", "analytics query"}},
+		{[]string{"analytics", "query", "--help"}, []string{"BigQuery Standard SQL", "single SELECT", "timestamp", "user_agent_aggregate", "Examples:"}},
+		{[]string{"analytics", "schema", "--help"}, []string{"JSON array of tables", "analytics query"}},
+	} {
+		var stdout, stderr bytes.Buffer
+		code := executeTestCommandWithConfig(config, tc.args, nil, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("expected help to succeed for %#v, got code=%d stderr=%q", tc.args, code, stderr.String())
+		}
+		for _, want := range tc.want {
+			if !strings.Contains(stdout.String(), want) {
+				t.Fatalf("expected help for %#v to mention %q, got:\n%s", tc.args, want, stdout.String())
+			}
+		}
+		if strings.Contains(stdout.String(), "FROM logs") {
+			t.Fatalf("help for %#v still references the nonexistent logs table", tc.args)
 		}
 	}
 }
