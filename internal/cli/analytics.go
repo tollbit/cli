@@ -21,7 +21,8 @@ automatically when needed).`
 
 const analyticsQueryLongHelp = `Execute a read-only SQL query against TollBit analytics.
 
-Queries use BigQuery Standard SQL. Only a single SELECT statement is accepted;
+Queries use standard SQL (SQL:2011) as reported by "analytics schema" in its
+"dialect" field. Only a single SELECT statement is accepted;
 SHOW, DESCRIBE, and data-modifying statements are rejected by the server.
 Use "analytics schema" to list the tables and columns you can query.
 

@@ -178,7 +178,7 @@ func TestAnalyticsSchemaUsesOBOAgentTokenAndWritesJSON(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer "+token {
 			t.Fatal("unexpected authorization header")
 		}
-		_, _ = w.Write([]byte(`{"dialect":"bigquery","tables":[{"name":"agent_logs_by_page","clustering":["host","user_agent","path"],"columns":[{"name":"host","type":"STRING"}]}],"limits":{"max_rows":{"value":10000,"unit":"rows"}}}`))
+		_, _ = w.Write([]byte(`{"dialect":"standard_sql","tables":[{"name":"agent_logs_by_page","clustering":["host","user_agent","path"],"columns":[{"name":"host","type":"STRING"}]}],"limits":{"max_rows":{"value":10000,"unit":"rows"}}}`))
 	}))
 	defer analyticsSrv.Close()
 
@@ -211,7 +211,7 @@ func TestAnalyticsSchemaUsesOBOAgentTokenAndWritesJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON output %q: %v", stdout.String(), err)
 	}
-	if output.Dialect != "bigquery" || len(output.Tables) != 1 || output.Tables[0].Name != "agent_logs_by_page" {
+	if output.Dialect != "standard_sql" || len(output.Tables) != 1 || output.Tables[0].Name != "agent_logs_by_page" {
 		t.Fatalf("unexpected schema: %#v", output)
 	}
 	if len(output.Tables[0].Clustering) != 3 || len(output.Tables[0].Columns) != 1 || output.Tables[0].Columns[0].Name != "host" {
@@ -304,7 +304,7 @@ func TestAnalyticsHelpDocumentsQueryContract(t *testing.T) {
 		want []string
 	}{
 		{[]string{"analytics", "--help"}, []string{"analytics schema", "analytics query"}},
-		{[]string{"analytics", "query", "--help"}, []string{"BigQuery Standard SQL", "single SELECT", "timestamp", "user_agent_aggregate", "Examples:", "meta"}},
+		{[]string{"analytics", "query", "--help"}, []string{"standard SQL", "single SELECT", "timestamp", "user_agent_aggregate", "Examples:", "meta"}},
 		{[]string{"analytics", "schema", "--help"}, []string{"JSON object", "limits", "clustering", "analytics query"}},
 	} {
 		var stdout, stderr bytes.Buffer

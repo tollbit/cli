@@ -88,7 +88,7 @@ func TestSchema(t *testing.T) {
 			t.Fatal("unexpected authorization header")
 		}
 		_, _ = w.Write([]byte(`{
-			"dialect": "bigquery",
+			"dialect": "standard_sql",
 			"tables": [{"name": "agent_logs_by_page", "description": "Daily counts.", "clustering": ["host", "user_agent", "path"],
 			            "columns": [{"name": "host", "type": "STRING", "description": "Site hostname."},
 			                        {"name": "type", "type": "STRING", "values": ["REQUEST", "ROBOT"]}]}],
@@ -106,7 +106,7 @@ func TestSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if schema.Dialect != "bigquery" {
+	if schema.Dialect != "standard_sql" {
 		t.Fatalf("unexpected dialect: %q", schema.Dialect)
 	}
 	if len(schema.Tables) != 1 || schema.Tables[0].Name != "agent_logs_by_page" || schema.Tables[0].Description != "Daily counts." {
