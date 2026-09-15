@@ -27,7 +27,7 @@ type (
 
 	Client interface {
 		Query(context.Context, QueryRequest, agent.Token) (QueryResponse, error)
-		Schema(context.Context, agent.Token) ([]QueryTable, error)
+		Schema(context.Context, agent.Token) (SchemaResponse, error)
 	}
 
 	client struct {
@@ -40,18 +40,46 @@ type (
 	}
 
 	QueryColumn struct {
-		Name string `json:"name"`
-		Type string `json:"type"`
+		Name        string   `json:"name"`
+		Type        string   `json:"type"`
+		Description string   `json:"description,omitempty"`
+		Values      []string `json:"values,omitempty"`
+	}
+
+	// QueryMeta is sent by servers that report result metadata. Absent on
+	// older servers, so it is a pointer and omitted when nil.
+	QueryMeta struct {
+		RowCount     int   `json:"row_count"`
+		Truncated    bool  `json:"truncated"`
+		BytesScanned int64 `json:"bytes_scanned"`
+		DurationMs   int64 `json:"duration_ms"`
 	}
 
 	QueryResponse struct {
 		Columns []QueryColumn `json:"columns"`
 		Rows    [][]any       `json:"rows"`
+		Meta    *QueryMeta    `json:"meta,omitempty"`
 	}
 
 	QueryTable struct {
-		Name    string        `json:"name"`
-		Columns []QueryColumn `json:"columns"`
+		Name        string        `json:"name"`
+		Description string        `json:"description,omitempty"`
+		Columns     []QueryColumn `json:"columns"`
+		Clustering  []string      `json:"clustering,omitempty"`
+	}
+
+	Limit struct {
+		Value       json.Number `json:"value"`
+		Unit        string      `json:"unit"`
+		Description string      `json:"description,omitempty"`
+	}
+
+	// SchemaResponse is the schema object. Older servers return a bare array
+	// of tables; Schema accepts both and always returns this shape.
+	SchemaResponse struct {
+		Dialect string           `json:"dialect,omitempty"`
+		Tables  []QueryTable     `json:"tables"`
+		Limits  map[string]Limit `json:"limits,omitempty"`
 	}
 )
 
@@ -111,36 +139,53 @@ func (c *client) Query(ctx context.Context, request QueryRequest, token agent.To
 	return result, nil
 }
 
-func (c *client) Schema(ctx context.Context, token agent.Token) ([]QueryTable, error) {
+func (c *client) Schema(ctx context.Context, token agent.Token) (SchemaResponse, error) {
 	if strings.TrimSpace(token.RawToken) == "" {
-		return nil, errors.New("agent token is required")
+		return SchemaResponse{}, errors.New("agent token is required")
 	}
 	if err := token.Validate(); err != nil {
-		return nil, err
+		return SchemaResponse{}, err
 	}
 
 	u := *c.baseURL
 	u.Path = strings.TrimRight(c.baseURL.Path, "/") + schemaPath
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, err
+		return SchemaResponse{}, err
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token.RawToken)
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, err
+		return SchemaResponse{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, errorsx.ParseResponseError(ctx, resp.Status, resp.StatusCode, resp.Header, body)
+		return SchemaResponse{}, errorsx.ParseResponseError(ctx, resp.Status, resp.StatusCode, resp.Header, body)
 	}
 
-	var result []QueryTable
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return SchemaResponse{}, err
+	}
+	return decodeSchema(body)
+}
+
+// decodeSchema accepts the schema object or the older bare array of tables.
+func decodeSchema(body []byte) (SchemaResponse, error) {
+	trimmed := bytes.TrimLeft(body, " \t\r\n")
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		var tables []QueryTable
+		if err := json.Unmarshal(trimmed, &tables); err != nil {
+			return SchemaResponse{}, err
+		}
+		return SchemaResponse{Tables: tables}, nil
+	}
+	var result SchemaResponse
+	if err := json.Unmarshal(trimmed, &result); err != nil {
+		return SchemaResponse{}, err
 	}
 	return result, nil
 }

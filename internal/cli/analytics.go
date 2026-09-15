@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/tollbit/cli/internal/app"
 	analyticsclient "github.com/tollbit/cli/internal/client/analytics"
 	"github.com/tollbit/cli/internal/credentials/agenttoken"
+	"github.com/tollbit/cli/internal/errorsx/problemjson"
 )
 
 const analyticsLongHelp = `Query TollBit analytics for your organization's sites.
@@ -31,13 +33,19 @@ unfiltered queries are rejected even with LIMIT. The server also caps the
 number of rows returned, so add ORDER BY with LIMIT and OFFSET when paging
 through large results.
 
-Output is a JSON object with "columns" (name and type) and "rows" (arrays in
-column order, null for missing values).`
+Output is a JSON object with "columns" (name and type), "rows" (arrays in
+column order, null for missing values), and "meta" (row_count, truncated,
+bytes_scanned, duration_ms). When meta.truncated is true the result was cut
+at the server's row limit and a warning is printed to stderr.`
 
 const analyticsSchemaLongHelp = `List the analytics tables and columns available to your organization.
 
-Output is a JSON array of tables, each with its name and columns (name and
-type). Run this before "analytics query" to discover table and column names.`
+Output is a JSON object with "dialect", "tables" and "limits". Each table has
+its name, a description, its columns (name, type, description and, where the
+column has a fixed set, values), and "clustering": the columns the table is
+ordered by, most significant first. Filtering and grouping in that order,
+after a timestamp filter, scans the least data. "limits" maps each server
+limit to its value, unit and description. Run this before "analytics query".`
 
 const analyticsQueryExample = `  # Discover tables and columns first
   tollbit analytics schema
@@ -116,12 +124,34 @@ func runAnalyticsQuery(cmd *cobra.Command, factory app.Factory, sql string) erro
 	}
 	result, err := analyticsClient.Query(cmd.Context(), analyticsclient.QueryRequest{SQL: sql}, token)
 	if err != nil {
+		if hint := analyticsErrorHint(err); hint != "" {
+			printLeadingCommand(cmd.ErrOrStderr(), hint)
+		}
 		return RuntimeError(fmt.Errorf("error querying analytics: %w", err))
 	}
 	if err := writeJSON(cmd.OutOrStdout(), result); err != nil {
 		return RuntimeError(fmt.Errorf("error writing analytics response: %w", err))
 	}
+	if result.Meta != nil && result.Meta.Truncated {
+		printLeadingCommand(cmd.ErrOrStderr(), fmt.Sprintf("warning: result truncated at %d rows (server limit). Add ORDER BY with LIMIT and OFFSET to page, or narrow the query.", result.Meta.RowCount))
+	}
 	return nil
+}
+
+// analyticsErrorHint maps a server error code to a next step. Unknown or
+// absent codes give no hint.
+func analyticsErrorHint(err error) string {
+	var problem problemjson.Problem
+	if !errors.As(err, &problem) || problem.Code == nil {
+		return ""
+	}
+	switch string(*problem.Code) {
+	case "analytics_unknown_table", "analytics_statement_not_allowed":
+		return "Run \"tollbit analytics schema\" to list the available tables."
+	case "analytics_scan_limit_exceeded", "analytics_query_timeout":
+		return "Run \"tollbit analytics schema\" to see the query limits, then filter on timestamp or select fewer columns."
+	}
+	return ""
 }
 
 func NewAnalyticsSchemaCommand(factory app.Factory) *cobra.Command {
