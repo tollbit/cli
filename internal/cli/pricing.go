@@ -171,8 +171,8 @@ func printPricingResults(stdout, stderr io.Writer, resp []tollbit.BatchRateRespo
 }
 
 const (
-	licenseTypeOnDemand         = "ON_DEMAND_LICENSE"
-	licenseTypeOnDemandFullUse  = "ON_DEMAND_FULL_USE_LICENSE"
+	licenseTypeOnDemand        = "ON_DEMAND_LICENSE"
+	licenseTypeOnDemandFullUse = "ON_DEMAND_FULL_USE_LICENSE"
 )
 
 type licenseDisplay struct {

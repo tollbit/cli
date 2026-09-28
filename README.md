@@ -1,4 +1,4 @@
-# Tollbit CLI
+# TollBit CLI
 
 CLI client for searching and grounding content for agents, allows access to all content in the [TollBit](https://tollbit.com) network.
 
@@ -10,7 +10,7 @@ Primary workflow: install → `search` → `content pricing` → `content fetch`
 
 #### Agent install prompt
 
-**Agent?:** Install Tollbit from [github.com/tollbit/cli](https://github.com/tollbit/cli) using the install script or package that your environment needs (below), then run `tollbit guide --install <SKILLS_DIR>` to register the bundled skill.
+**Agent?:** Install TollBit from [github.com/tollbit/cli](https://github.com/tollbit/cli) using the install script or package that your environment needs (below), then run `tollbit guide --install <SKILLS_DIR>` to register the bundled skill.
 
 ### macOS and Linux
 
@@ -21,7 +21,7 @@ curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.s
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.7
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.8
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
@@ -37,7 +37,7 @@ Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
 irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
-Install-Tollbit -Version v0.3.7 -Force
+Install-Tollbit -Version v0.3.8 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -167,7 +167,7 @@ Installer channel updates:
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.7 --force
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.8 --force
 ```
 
 ```powershell

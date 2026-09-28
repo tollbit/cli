@@ -1,11 +1,18 @@
 # Changelog
 
-All notable changes to the Tollbit CLI are documented in this file.
+All notable changes to the TollBit CLI are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.8] - 2026-09-28
+
+### Changed
+
+- Help text, messages and documentation now use the TollBit brand name
+  consistently.
 
 ## [0.3.7] - 2026-09-28
 
@@ -220,6 +227,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Earlier versions (0.1.x and before) were released from a previous repository.
 
+[0.3.8]: https://github.com/tollbit/cli/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/tollbit/cli/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/tollbit/cli/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/tollbit/cli/compare/v0.3.4...v0.3.5

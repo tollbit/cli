@@ -71,3 +71,6 @@ tag:
 	  echo "error: working tree is dirty (commit or stash first, or: make tag ALLOW_DIRTY=1)"; exit 1; \
 	fi; \
 	git tag "v$$v" && echo "created tag v$$v — push with: git push origin v$$v"
+
+# Private eval targets (make agent-eval, …); absent from the public tree.
+-include evals/agent-eval/agent-eval.mk

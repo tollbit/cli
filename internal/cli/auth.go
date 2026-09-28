@@ -95,7 +95,7 @@ func NewAuthLoginCommand(factory app.Factory) *cobra.Command {
 	var opts authLoginOptions
 	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "Authorize this agent with a Tollbit user and organization",
+		Short: "Authorize this agent with a TollBit user and organization",
 		Long:  authLoginLongHelp(factory),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
@@ -130,7 +130,7 @@ record is cleared. If authorization is still pending, this exits with code 3.`)
 }
 
 func authLoginLongHelp(factory app.Factory) string {
-	preamble := strings.TrimSpace(`Authorize this agent with a Tollbit user and organization.
+	preamble := strings.TrimSpace(`Authorize this agent with a TollBit user and organization.
 
 End-user proximity describes where the agent environment running this CLI is
 located relative to the end user's browser. The CLI uses that context to present

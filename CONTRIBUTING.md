@@ -1,6 +1,6 @@
 # Contributing
 
-The Tollbit CLI is open source under the [MIT license](LICENSE), but it is
+The TollBit CLI is open source under the [MIT license](LICENSE), but it is
 developed privately. This repository is a read-only mirror of each release:
 every release is published here as a single commit and a matching `vX.Y.Z` tag,
 so you can read and build the exact source of any version.

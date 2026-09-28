@@ -13,15 +13,15 @@ import (
 )
 
 const (
-	searchMaxSize            = 20
-	searchMaxProperties      = 20
-	searchDefaultSize        = 10
+	searchMaxSize       = 20
+	searchMaxProperties = 20
+	searchDefaultSize   = 10
 )
 
 const searchLongHelp = `Search content on the TollBit network.
 
 Results show access type: Programmatic (licensable via the CLI now) or
-Enterprise (reach out to Tollbit for access). Use --programmatic-only to
+Enterprise (reach out to TollBit for access). Use --programmatic-only to
 limit results to Programmatic content. Without it, search spans the full
 catalog of discoverable content.`
 

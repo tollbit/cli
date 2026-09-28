@@ -265,7 +265,7 @@ func TestPrintPricingResultsLicenseDetails(t *testing.T) {
 				License: tollbit.BatchRateLicenseResponse{LicenseType: licenseTypeOnDemandFullUse},
 			},
 			{
-				Price:   tollbit.RatePriceResponse{PriceMicros: 200000, Currency: "USD"},
+				Price: tollbit.RatePriceResponse{PriceMicros: 200000, Currency: "USD"},
 				License: tollbit.BatchRateLicenseResponse{
 					LicenseType: "premium",
 					LicensePath: "https://example.com/licenses/premium",

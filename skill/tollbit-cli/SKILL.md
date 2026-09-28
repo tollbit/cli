@@ -1,10 +1,10 @@
 ---
 name: tollbit-cli
-version: 0.3.7
+version: 0.3.8
 description: Search for news and articles and ground answers in licensed publisher content on the TollBit network. Use whenever the user wants to find news, articles, reporting, or sources on a topic or current event — searches the catalog, then prices and fetches full article content (paid) with the tollbit CLI.
 ---
 
-# Tollbit CLI
+# TollBit CLI
 
 Primary workflow: `search` → `content pricing` → `content fetch`. Authentication is triggered automatically by the CLI when needed.
 
@@ -24,7 +24,7 @@ tollbit search "query" --programmatic-only
 tollbit search "query" --next-token "…"
 ```
 
-Results are labeled **Programmatic** (licensable via the CLI now) or **Enterprise** (reach out to Tollbit for access). Use `--programmatic-only` to limit results to Programmatic content. Without it, search spans the full catalog of discoverable content on the network. Only Programmatic results can be priced and fetched via the CLI.
+Results are labeled **Programmatic** (licensable via the CLI now) or **Enterprise** (reach out to TollBit for access). Use `--programmatic-only` to limit results to Programmatic content. Without it, search spans the full catalog of discoverable content on the network. Only Programmatic results can be priced and fetched via the CLI.
 
 When more results exist, human output prints a `--next-token` value (or `nextToken` in `--json`); pass it back to continue.
 
@@ -76,7 +76,7 @@ If `auth login` or `auth complete` reports that authorization is still pending, 
 - **Non-interactive fetch:** never call `content fetch` without `--confirm`. Pass `--rate-index N` when multiple rates exist (required with `--json` in that case). Every fetch still charges.
 - **Licensable results:** only **Programmatic** results can be priced and fetched; use `--programmatic-only` or skip Enterprise hits.
 - **Pagination:** reuse the `--next-token` / `nextToken` from the previous search response when more results exist.
-- **Feedback:** use `tollbit feedback "…"` (optional `--rating`, `--category`, `--metadata key=value`) when the user wants to report CLI or product issues to Tollbit.
+- **Feedback:** use `tollbit feedback "…"` (optional `--rating`, `--category`, `--metadata key=value`) when the user wants to report CLI or product issues to TollBit.
 
 Install this skill: `tollbit guide --install <SKILLS_DIR>`.
 Compare frontmatter `version` with `tollbit version` when updating.

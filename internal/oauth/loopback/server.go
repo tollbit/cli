@@ -52,7 +52,7 @@ func Start(ctx context.Context, address string) (*Server, error) {
 			_, _ = fmt.Fprintln(w, result.Err.Error())
 			return
 		}
-		_, _ = fmt.Fprintln(w, "Tollbit agent authorization received. You can return to the CLI.")
+		_, _ = fmt.Fprintln(w, "TollBit agent authorization received. You can return to the CLI.")
 	})
 
 	go func() {

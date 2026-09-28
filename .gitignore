@@ -31,6 +31,7 @@ Thumbs.db
 credentials.json
 .env
 .env.*
+!evals/agent-eval/.env.sample
 
 # Release / dist (GoReleaser, npm wrapper artifacts, etc.)
 dist/

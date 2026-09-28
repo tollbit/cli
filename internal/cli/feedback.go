@@ -14,7 +14,7 @@ import (
 const feedbackLongHelp = `Submit feedback about the TollBit CLI or agent experience.
 
 Requires an authenticated agent with on-behalf-of (OBO) consent. Feedback is
-accepted asynchronously and delivered to Tollbit (Slack + spreadsheet).`
+accepted asynchronously and delivered to TollBit (Slack + spreadsheet).`
 
 type feedbackOptions struct {
 	rating    int
@@ -29,7 +29,7 @@ func NewFeedbackCommand(factory app.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   `feedback "message"`,
-		Short: "Submit feedback to Tollbit",
+		Short: "Submit feedback to TollBit",
 		Long:  feedbackLongHelp,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
