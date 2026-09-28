@@ -21,7 +21,7 @@ The repo includes a small `Makefile`:
 
 | Target | What it runs |
 |--------|----------------|
-| `make test` | `go test ./...` |
+| `make test` | `go run gotest.tools/gotestsum@latest` (runs `go test ./...` with readable output) |
 | `make build` | `go build -o tollbit ./cmd/tollbit` (binary at `./tollbit` in the repo root) |
 | `make alias` | Prints a one-line `alias` so you can point `tollbit` at that binary |
 | `make dev-install` | Builds and installs the repo binary into your `tollbit` command path, moving any existing installed binary to `tollbit-original` |
