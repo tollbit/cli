@@ -21,7 +21,7 @@ curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.s
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.5
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.6
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
@@ -37,7 +37,7 @@ Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
 irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
-Install-Tollbit -Version v0.3.5 -Force
+Install-Tollbit -Version v0.3.6 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -167,7 +167,7 @@ Installer channel updates:
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.5 --force
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.6 --force
 ```
 
 ```powershell
@@ -187,6 +187,24 @@ Other channels:
 ## Configure
 
 Agent credentials are stored under `TOLLBIT_CREDENTIALS_STORAGE_DIR` (default platform path): `agent-identity.json` and `agent-token.jwt`.
+
+## Source and contributions
+
+The CLI is developed privately and published here release by release. Each
+release is a single commit on `main` with a matching `vX.Y.Z` tag, and the
+[release workflow](.github/workflows/release.yml) builds the binaries on
+[GitHub Releases](https://github.com/tollbit/cli/releases) from exactly that
+source. We don't accept pull requests or issues here; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+To check that a release archive was built from this repository by that workflow:
+
+```bash
+gh attestation verify tollbit_<version>_<os>_<arch>.tar.gz --repo tollbit/cli
+```
+
+To read or build the exact source of a release, check out its tag
+(`git checkout v<version>`).
 
 ## License
 

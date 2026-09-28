@@ -44,13 +44,18 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The GitHub Release notes are this version's CHANGELOG.md section.
+      # Written outside the checkout: GoReleaser refuses a dirty git tree.
+      - name: Extract release notes from CHANGELOG.md
+        run: scripts/changelog-section.sh "${GITHUB_REF_NAME#v}" > "${RUNNER_TEMP}/release-notes.md"
+
       # Publishes GitHub Releases on this repo (tollbit/cli).
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

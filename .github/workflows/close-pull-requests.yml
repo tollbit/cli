@@ -1,0 +1,27 @@
+# Closes every pull request opened on this repository. It is a read-only mirror
+# of released source, so pull requests here are never merged; see
+# CONTRIBUTING.md.
+#
+# pull_request_target runs with this repository's token even for pull requests
+# from forks. That is safe here because the job never checks out or runs the
+# pull request's code.
+name: close-pull-requests
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close with a comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr close "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --comment \
+            "Thanks for your interest. This repository is a read-only mirror of released source and does not accept pull requests. See CONTRIBUTING.md."

@@ -13,7 +13,7 @@ func TestHTTPBodyRedactorRedactsConfiguredFields(t *testing.T) {
 		},
 	})
 
-	got := redactor.Redact("/agent/v1/tokens/identity", []byte(`{"token":"eyJhbGciOiJSUzI1NiJ9.abcdef","refresh_token":"agrt_secret_value","expires_in":3600}`))
+	got := redactor.Redact("/agent/v1/tokens/identity", []byte(`{"token":"eyJhbGciOiJSUzI1NiJ9.abcdef","refresh_token":"agrt_secret_value","expires_in":3600}`)) // gitleaks:allow (fake JWT fixture)
 	if strings.Contains(got, "eyJhbGciOi") || strings.Contains(got, "agrt_secret_value") {
 		t.Fatalf("expected secrets redacted, got %q", got)
 	}
