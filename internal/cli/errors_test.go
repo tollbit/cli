@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tollbit/cli/internal/errorsx"
 	"github.com/tollbit/cli/internal/errorsx/problemjson"
 	"github.com/tollbit/cli/internal/installmethod"
 )
@@ -58,5 +59,76 @@ func TestRenderErrorPassthrough(t *testing.T) {
 	problem := problemjson.Problem{Title: "Bad Request", Status: 400}
 	if got := RenderError(problem); got != problem.Error() {
 		t.Fatalf("RenderError = %q, want %q", got, problem.Error())
+	}
+}
+
+func entitlementRequiredProblem(t *testing.T, extra string) problemjson.Problem {
+	t.Helper()
+	problem, err := problemjson.Parse([]byte(`{
+		"type": "about:blank",
+		"title": "Forbidden",
+		"status": 403,
+		"detail": "Developer terms of service not accepted.",
+		"requestId": "req-123",
+		"code": "entitlement_required",
+		"entitlement": "build:license_content"` + extra + `
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return problem
+}
+
+func TestRenderErrorEntitlementRequiredWithTermsURL(t *testing.T) {
+	problem := entitlementRequiredProblem(t, `,
+		"terms_url": "https://app.tollbit.com/onboard?flow=developer"`)
+
+	got := RenderError(RuntimeError(problem))
+	want := "403 Forbidden: Developer terms of service not accepted. (requestId: req-123)\n" +
+		"Relay ONLY this URL to the end user. The end user must open it in their browser, sign in, and accept the terms:\n" +
+		"https://app.tollbit.com/onboard?flow=developer\n" +
+		"\n" +
+		"After the end user accepts the terms, re-run the command."
+	if got != want {
+		t.Fatalf("RenderError = %q, want %q", got, want)
+	}
+	if ExitCode(RuntimeError(problem)) != 1 {
+		t.Fatalf("ExitCode = %d, want 1", ExitCode(RuntimeError(problem)))
+	}
+}
+
+func TestRenderErrorEntitlementRequiredWithoutTermsURL(t *testing.T) {
+	problem := entitlementRequiredProblem(t, "")
+
+	got := RenderError(problem)
+	want := "403 Forbidden: Developer terms of service not accepted. (requestId: req-123)\n" +
+		"Missing capability: build:license_content\n" +
+		"Contact TollBit to enable it for your organization."
+	if got != want {
+		t.Fatalf("RenderError = %q, want %q", got, want)
+	}
+}
+
+func TestRenderErrorEntitlementRequiredWrapped(t *testing.T) {
+	problem := entitlementRequiredProblem(t, `,
+		"terms_url": "https://app.tollbit.com/onboard?flow=developer"`)
+
+	got := RenderError(RuntimeError(fmt.Errorf("error fetching rates: %w", problem)))
+	if !strings.HasPrefix(got, "error fetching rates: 403 Forbidden: Developer terms of service not accepted. (requestId: req-123)\n") {
+		t.Fatalf("RenderError on wrapped problem = %q, want the original error line first", got)
+	}
+	if !strings.Contains(got, "\nhttps://app.tollbit.com/onboard?flow=developer\n") {
+		t.Fatalf("RenderError on wrapped problem = %q, want the terms URL", got)
+	}
+}
+
+func TestRenderErrorPlainTextForbiddenPassthrough(t *testing.T) {
+	err := errorsx.GenericHTTPError{
+		Status:     "403 Forbidden",
+		StatusCode: 403,
+		Body:       "Terms of service not accepted for audiences: [developers]",
+	}
+	if got := RenderError(RuntimeError(err)); got != err.Error() {
+		t.Fatalf("RenderError = %q, want %q", got, err.Error())
 	}
 }

@@ -26,13 +26,15 @@ Queries use standard SQL (SQL:2011) as reported by "analytics schema" in its
 SHOW, DESCRIBE, and data-modifying statements are rejected by the server.
 Use "analytics schema" to list the tables and columns you can query.
 
-Rows are daily aggregates: the timestamp column is a day bucket at 00:00 UTC
-and the count column is the number of requests in that bucket. Filter on
-timestamp (for example, timestamp >= '2026-09-01') to keep queries within the
-server's scan limit; the per-page and referrer tables are large enough that
-unfiltered queries are rejected even with LIMIT. The server also caps the
-number of rows returned, so add ORDER BY with LIMIT and OFFSET when paging
-through large results.
+Log tables contain daily counts. Their timestamp is a day bucket at 00:00 UTC.
+Entity tables contain extraction records; their timestamp is the extraction time.
+Use UNNEST for repeated entity fields. Daily brand traffic requires a day filter.
+Select one level and distinguish brand rows from scope totals (entity_name = '').
+Daily page counts do not sum to an exact multi-day distinct-page count.
+
+Filter on timestamp or day to limit the scan. LIMIT alone does not limit scanned
+bytes. Use ORDER BY with LIMIT and OFFSET to page through results.
+Intelligence tables require publisher intelligence access as well as SQL access.
 
 Output is a JSON object with "columns" (name and type), "rows" (arrays in
 column order, null for missing values), and "meta" (row_count, truncated,
@@ -42,11 +44,11 @@ at the server's row limit and a warning is printed to stderr.`
 const analyticsSchemaLongHelp = `List the analytics tables and columns available to your organization.
 
 Output is a JSON object with "dialect", "tables" and "limits". Each table has
-its name, a description, its columns (name, type, description and, where the
-column has a fixed set, values), and "clustering": the columns the table is
-ordered by, most significant first. Filtering and grouping in that order,
-after a timestamp filter, scans the least data. "limits" maps each server
-limit to its value, unit and description. Run this before "analytics query".`
+its name, description, columns, and source "clustering" order. Columns include
+their type, mode, nested fields, and descriptions where available.
+"partition_column" and "require_partition_filter" describe intelligence date filters.
+"limits" maps each server limit to its value, unit and description.
+Run this before "analytics query".`
 
 const analyticsQueryExample = `  # Discover tables and columns first
   tollbit analytics schema
@@ -58,7 +60,13 @@ const analyticsQueryExample = `  # Discover tables and columns first
   tollbit analytics query "SELECT path, SUM(count) AS requests FROM agent_logs_by_page WHERE host = 'example.com' AND timestamp >= '2026-09-04' GROUP BY path ORDER BY requests DESC LIMIT 20"
 
   # Daily trend for one crawler
-  tollbit analytics query "SELECT timestamp, SUM(count) AS requests FROM user_agent_aggregate WHERE user_agent = 'GPTBot' AND timestamp >= '2026-08-12' GROUP BY timestamp ORDER BY timestamp"`
+  tollbit analytics query "SELECT timestamp, SUM(count) AS requests FROM user_agent_aggregate WHERE user_agent = 'GPTBot' AND timestamp >= '2026-08-12' GROUP BY timestamp ORDER BY timestamp"
+
+  tollbit analytics query "SELECT hostname, entity_name, qid FROM entity_data WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY) AND timestamp < CURRENT_TIMESTAMP() LIMIT 20"
+
+  tollbit analytics query "SELECT hostname, category.name FROM entity_pages, UNNEST(categories) AS category WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY) AND timestamp < CURRENT_TIMESTAMP() LIMIT 20"
+
+  tollbit analytics query "SELECT entity_name, SUM(impressions) AS impressions FROM entity_brand_traffic_daily WHERE day >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) AND day < CURRENT_DATE() AND level = 'all' AND entity_name != '' GROUP BY entity_name ORDER BY impressions DESC LIMIT 20"`
 
 func NewAnalyticsCommand(factory app.Factory) *cobra.Command {
 	cmd := &cobra.Command{
@@ -150,7 +158,7 @@ func analyticsErrorHint(err error) string {
 	case "analytics_unknown_table", "analytics_statement_not_allowed":
 		return "Run \"tollbit analytics schema\" to list the available tables."
 	case "analytics_scan_limit_exceeded", "analytics_query_timeout":
-		return "Run \"tollbit analytics schema\" to see the query limits, then filter on timestamp or select fewer columns."
+		return "Run \"tollbit analytics schema\" to see the query limits, then filter on timestamp or day and select fewer columns."
 	}
 	return ""
 }

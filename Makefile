@@ -1,4 +1,4 @@
-.PHONY: test build build-release alias dev-install dev-uninstall bump tag third-party-notices
+.PHONY: test build build-release alias dev-install dev-uninstall bump third-party-notices
 
 test:
 	go run gotest.tools/gotestsum@latest
@@ -61,16 +61,6 @@ dev-uninstall:
 bump:
 	@test -n "$(VERSION)" || (echo "usage: make bump VERSION=0.2.0  (or v0.2.0)"; exit 1)
 	@python3 "$(CURDIR)/scripts/bump-version.py" "$(VERSION)"
-
-# Create git tag v$(Version) matching internal/version/version.go (clean tree unless ALLOW_DIRTY=1)
-tag:
-	@v="$$(sed -n 's/^const Version = "\(.*\)"/\1/p' "$(CURDIR)/internal/version/version.go")"; \
-	if [ -z "$$v" ]; then echo "error: could not read Version from internal/version/version.go"; exit 1; fi; \
-	if git rev-parse "v$$v" >/dev/null 2>&1; then echo "error: tag v$$v already exists"; exit 1; fi; \
-	if [ "$(ALLOW_DIRTY)" != "1" ] && ! git diff-index --quiet HEAD -- 2>/dev/null; then \
-	  echo "error: working tree is dirty (commit or stash first, or: make tag ALLOW_DIRTY=1)"; exit 1; \
-	fi; \
-	git tag "v$$v" && echo "created tag v$$v — push with: git push origin v$$v"
 
 # Private eval targets (make agent-eval, …); absent from the public tree.
 -include evals/agent-eval/agent-eval.mk

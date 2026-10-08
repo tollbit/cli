@@ -9,10 +9,10 @@ const HTTPProduct = "Tollbit-CLI"
 
 // ClientHeader returns the X-Tollbit-Client value ("<product>/<semver>").
 func ClientHeader() string {
-	return Product + "/" + Version
+	return Product + "/" + String()
 }
 
 // HTTPUserAgent returns the HTTP User-Agent value ("<product>/v<semver>").
 func HTTPUserAgent() string {
-	return HTTPProduct + "/v" + Version
+	return HTTPProduct + "/v" + String()
 }

@@ -34,7 +34,7 @@ jobs:
           fi
           if [ "$TAG" != "$CODE" ]; then
             echo "error: git tag '${GITHUB_REF_NAME}' does not match internal/version/version.go (${CODE})"
-            echo "tag the commit that contains the matching Version const (see make tag)"
+            echo "tag the commit that contains the matching Version const"
             exit 1
           fi
           echo "ok: tag ${GITHUB_REF_NAME} matches version.go (${CODE})"

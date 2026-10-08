@@ -40,10 +40,12 @@ type (
 	}
 
 	QueryColumn struct {
-		Name        string   `json:"name"`
-		Type        string   `json:"type"`
-		Description string   `json:"description,omitempty"`
-		Values      []string `json:"values,omitempty"`
+		Name        string        `json:"name"`
+		Type        string        `json:"type"`
+		Mode        string        `json:"mode,omitempty"`
+		Fields      []QueryColumn `json:"fields,omitempty"`
+		Description string        `json:"description,omitempty"`
+		Values      []string      `json:"values,omitempty"`
 	}
 
 	// QueryMeta is sent by servers that report result metadata. Absent on
@@ -62,10 +64,12 @@ type (
 	}
 
 	QueryTable struct {
-		Name        string        `json:"name"`
-		Description string        `json:"description,omitempty"`
-		Columns     []QueryColumn `json:"columns"`
-		Clustering  []string      `json:"clustering,omitempty"`
+		Name                   string        `json:"name"`
+		Description            string        `json:"description,omitempty"`
+		Columns                []QueryColumn `json:"columns"`
+		Clustering             []string      `json:"clustering,omitempty"`
+		PartitionColumn        string        `json:"partition_column,omitempty"`
+		RequirePartitionFilter bool          `json:"require_partition_filter,omitempty"`
 	}
 
 	Limit struct {
@@ -96,7 +100,7 @@ func NewClient(cfg Config) (Client, error) {
 	}
 	return &client{
 		baseURL: parsed,
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http:    &http.Client{Timeout: 90 * time.Second},
 	}, nil
 }
 

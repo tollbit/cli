@@ -27,7 +27,6 @@ The repo includes a small `Makefile`:
 | `make dev-install` | Builds and installs the repo binary into your `tollbit` command path, moving any existing installed binary to `tollbit-original` |
 | `make dev-uninstall` | Restores `tollbit-original` back to `tollbit` and removes the dev-installed binary |
 | `make bump VERSION=…` | Bumps `internal/version`, `skill/tollbit-cli/SKILL.md`, and install examples in [README.md](README.md) |
-| `make tag` | Creates `v$(Version)` from [`internal/version/version.go`](internal/version/version.go); use `ALLOW_DIRTY=1` to skip the clean-tree check |
 
 ```bash
 make test

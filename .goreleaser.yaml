@@ -46,11 +46,3 @@ checksum:
 # new version — do not mutate a published one. Mirrors the immutable tag ruleset.
 release:
   mode: keep-existing
-
-changelog:
-  use: git
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	analyticsclient "github.com/tollbit/cli/internal/client/analytics"
 )
 
 func TestAnalyticsCommandDisabled(t *testing.T) {
@@ -178,7 +180,7 @@ func TestAnalyticsSchemaUsesOBOAgentTokenAndWritesJSON(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer "+token {
 			t.Fatal("unexpected authorization header")
 		}
-		_, _ = w.Write([]byte(`{"dialect":"standard_sql","tables":[{"name":"agent_logs_by_page","clustering":["host","user_agent","path"],"columns":[{"name":"host","type":"STRING"}]}],"limits":{"max_rows":{"value":10000,"unit":"rows"}}}`))
+		_, _ = w.Write([]byte(`{"dialect":"standard_sql","tables":[{"name":"agent_logs_by_page","clustering":["host","user_agent","path"],"columns":[{"name":"host","type":"STRING"}]},{"name":"entity_pages","partition_column":"timestamp","columns":[{"name":"categories","type":"STRUCT","mode":"REPEATED","fields":[{"name":"name","type":"STRING","mode":"NULLABLE"},{"name":"subcategories","type":"STRUCT","mode":"REPEATED","fields":[{"name":"name","type":"STRING"}]}]}]},{"name":"entity_brand_traffic_daily","partition_column":"day","require_partition_filter":true,"columns":[{"name":"day","type":"DATE","mode":"REQUIRED"}]}],"limits":{"max_rows":{"value":10000,"unit":"rows"}}}`))
 	}))
 	defer analyticsSrv.Close()
 
@@ -193,32 +195,29 @@ func TestAnalyticsSchemaUsesOBOAgentTokenAndWritesJSON(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("expected success, got %d (stderr=%q)", code, stderr.String())
 	}
-	var output struct {
-		Dialect string `json:"dialect"`
-		Tables  []struct {
-			Name       string   `json:"name"`
-			Clustering []string `json:"clustering"`
-			Columns    []struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
-			} `json:"columns"`
-		} `json:"tables"`
-		Limits map[string]struct {
-			Value float64 `json:"value"`
-			Unit  string  `json:"unit"`
-		} `json:"limits"`
-	}
+	var output analyticsclient.SchemaResponse
 	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON output %q: %v", stdout.String(), err)
 	}
-	if output.Dialect != "standard_sql" || len(output.Tables) != 1 || output.Tables[0].Name != "agent_logs_by_page" {
+	if output.Dialect != "standard_sql" || len(output.Tables) != 3 || output.Tables[0].Name != "agent_logs_by_page" {
 		t.Fatalf("unexpected schema: %#v", output)
 	}
 	if len(output.Tables[0].Clustering) != 3 || len(output.Tables[0].Columns) != 1 || output.Tables[0].Columns[0].Name != "host" {
 		t.Fatalf("unexpected table: %#v", output.Tables[0])
 	}
-	if output.Limits["max_rows"].Value != 10000 || output.Limits["max_rows"].Unit != "rows" {
+	if output.Limits["max_rows"].Value.String() != "10000" || output.Limits["max_rows"].Unit != "rows" {
 		t.Fatalf("unexpected limits: %#v", output.Limits)
+	}
+	pages, traffic := output.Tables[1], output.Tables[2]
+	if pages.PartitionColumn != "timestamp" || len(pages.Columns) != 1 || pages.Columns[0].Mode != "REPEATED" || len(pages.Columns[0].Fields) != 2 {
+		t.Fatalf("unexpected page schema: %#v", pages)
+	}
+	subcategories := pages.Columns[0].Fields[1]
+	if subcategories.Mode != "REPEATED" || len(subcategories.Fields) != 1 || subcategories.Fields[0].Name != "name" {
+		t.Fatalf("unexpected subcategory schema: %#v", subcategories)
+	}
+	if traffic.PartitionColumn != "day" || !traffic.RequirePartitionFilter || traffic.Columns[0].Mode != "REQUIRED" {
+		t.Fatalf("unexpected traffic schema: %#v", traffic)
 	}
 }
 

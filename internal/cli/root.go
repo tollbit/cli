@@ -14,12 +14,12 @@ func NewRootCommand(factory app.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "tollbit",
 		Short:         "TollBit CLI",
-		Long:          fmt.Sprintf("TollBit CLI\nversion: %s\n\nAgent? Run `tollbit guide` for orientation, then `tollbit guide --install <SKILLS_DIR>` to register the bundled skill.", version.Version),
+		Long:          fmt.Sprintf("TollBit CLI\nversion: %s\n\nAgent? Run `tollbit guide` for orientation, then `tollbit guide --install <SKILLS_DIR>` to register the bundled skill.", version.String()),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if showVersion {
-				fmt.Fprintln(cmd.OutOrStdout(), version.Version)
+				fmt.Fprintln(cmd.OutOrStdout(), version.String())
 				return nil
 			}
 			if err := cmd.Help(); err != nil {

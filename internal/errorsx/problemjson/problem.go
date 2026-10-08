@@ -33,6 +33,10 @@ const (
 	// ErrorCodeUnrecognizedIcon means a submitted icon name did not match the
 	// icon manifest; no consent attempt is consumed.
 	ErrorCodeUnrecognizedIcon ErrorCode = "unrecognized_icon"
+	// ErrorCodeEntitlementRequired means the org lacks the entitlement the
+	// operation needs. The problem names it in "entitlement" and, when accepting
+	// terms grants it, carries a "terms_url" to accept them at.
+	ErrorCodeEntitlementRequired ErrorCode = "entitlement_required"
 )
 
 // Problem is the CLI-local representation of the ProblemJSON shape returned by
@@ -122,6 +126,12 @@ func (p Problem) IsUserAgentNotRegistered() bool {
 // error code.
 func (p Problem) IsCLIUpdateRequired() bool {
 	return p.Code != nil && *p.Code == ErrorCodeCLIUpdateRequired
+}
+
+// IsEntitlementRequired reports whether the problem has the
+// entitlement_required error code.
+func (p Problem) IsEntitlementRequired() bool {
+	return p.Code != nil && *p.Code == ErrorCodeEntitlementRequired
 }
 
 // StringProperty returns a top-level additional property as a string.
