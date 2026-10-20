@@ -9,7 +9,9 @@ type Config struct {
 	Analytics   AnalyticsConfig
 	Agent       AgentConfig
 	Credentials CredentialsConfig
+	Foundry     FoundryConfig
 	Gateway     GatewayConfig
+	Update      UpdateConfig
 }
 
 type AppConfig struct {
@@ -54,8 +56,19 @@ type CredentialsConfig struct {
 	StorageDir string `mapstructure:"storage_dir" configurable:"release"`
 }
 
+type FoundryConfig struct {
+	BaseURL string `mapstructure:"base_url" configurable:"dev"`
+}
+
 type GatewayConfig struct {
 	BaseURL string `mapstructure:"base_url" configurable:"dev"`
+}
+
+type UpdateConfig struct {
+	CheckEnabled   bool          `mapstructure:"check_enabled"`
+	CheckInterval  time.Duration `mapstructure:"check_interval" configurable:"release"`
+	AutoUpdate     bool          `mapstructure:"auto_update" configurable:"release"`
+	ReleaseBaseURL string        `mapstructure:"release_base_url" configurable:"dev"`
 }
 
 type BrowserConsentConfig struct {
@@ -76,7 +89,11 @@ type OverrideOptions struct {
 	AuthBrowserConsentTimeout         *time.Duration
 	AuthBrowserConsentAutoOpenBrowser *bool
 	CredentialsStorageDir             *string
+	FoundryBaseURL                    *string
 	GatewayBaseURL                    *string
+	UpdateCheckInterval               *time.Duration
+	UpdateAutoUpdate                  *bool
+	UpdateReleaseBaseURL              *string
 }
 
 func (c Config) WithOverrides(opts OverrideOptions) (Config, error) {
@@ -113,8 +130,20 @@ func (c Config) WithOverrides(opts OverrideOptions) (Config, error) {
 	if opts.CredentialsStorageDir != nil {
 		c.Credentials.StorageDir = *opts.CredentialsStorageDir
 	}
+	if opts.FoundryBaseURL != nil {
+		c.Foundry.BaseURL = *opts.FoundryBaseURL
+	}
 	if opts.GatewayBaseURL != nil {
 		c.Gateway.BaseURL = *opts.GatewayBaseURL
+	}
+	if opts.UpdateCheckInterval != nil {
+		c.Update.CheckInterval = *opts.UpdateCheckInterval
+	}
+	if opts.UpdateAutoUpdate != nil {
+		c.Update.AutoUpdate = *opts.UpdateAutoUpdate
+	}
+	if opts.UpdateReleaseBaseURL != nil {
+		c.Update.ReleaseBaseURL = *opts.UpdateReleaseBaseURL
 	}
 	var err error
 	c, err = resolveDefaults(c)

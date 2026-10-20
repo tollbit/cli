@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/tollbit/cli/internal/agentauth"
@@ -26,10 +27,14 @@ type Dependencies struct {
 	Runtime       *cliruntime.Runtime
 }
 
-// App represents the application and its shared components.
+// App is how commands interact with the system: it builds and hands out the
+// clients and services a command needs. Things the whole run must share,
+// like the update handler, live on the run's Process, which App holds a
+// reference to.
 type App struct {
-	config configuration.Config
-	deps   Dependencies
+	config  configuration.Config
+	deps    Dependencies
+	process *Process
 
 	auth          func() (*auth.Client, error)
 	analytics     func() (analytics.Client, error)
@@ -45,8 +50,9 @@ func New(config configuration.Config, opts ...Option) (*App, error) {
 		opt(&cfg)
 	}
 	a := &App{
-		config: config,
-		deps:   cfg.dependencies,
+		config:  config,
+		deps:    cfg.dependencies,
+		process: cfg.process,
 	}
 	a.auth = sync.OnceValues(a.buildAuth)
 	a.analytics = sync.OnceValues(a.buildAnalytics)
@@ -99,11 +105,20 @@ func (a *App) buildTollbit() (tollbit.Client, error) {
 	if a.deps.Tollbit != nil {
 		return a.deps.Tollbit, nil
 	}
-	client, err := tollbit.NewClient(tollbit.Config{BaseURL: a.config.Gateway.BaseURL})
+	client, err := tollbit.NewClient(tollbit.Config{BaseURL: a.config.Gateway.BaseURL}, a.apiTransport())
 	if err != nil {
 		return nil, fmt.Errorf("build tollbit client: %w", err)
 	}
 	return client, nil
+}
+
+// apiTransport is the run's API transport, which reports the gateway's
+// latest-version header; nil, the default transport, without a Process.
+func (a *App) apiTransport() http.RoundTripper {
+	if a.process == nil {
+		return nil
+	}
+	return a.process.Transport()
 }
 
 func (a *App) OBOAuthorizer() (agentauth.OBOAuthorizer, error) {

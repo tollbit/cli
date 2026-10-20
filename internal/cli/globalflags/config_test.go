@@ -45,6 +45,7 @@ func newTestRootCommand(t *testing.T) *cobra.Command {
 				AutoOpenBrowser: true,
 			},
 		},
+		Foundry:     configuration.FoundryConfig{BaseURL: "https://gateway.tollbit.com/foundry"},
 		Gateway:     configuration.GatewayConfig{BaseURL: "https://gateway.tollbit.com"},
 		Credentials: configuration.CredentialsConfig{StorageDir: "/tmp/tollbit"},
 	})

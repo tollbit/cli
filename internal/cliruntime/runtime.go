@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tollbit/cli/internal/configuration"
+	"github.com/tollbit/cli/internal/statefile"
 )
 
 const (
@@ -109,7 +110,7 @@ func (r *Runtime) SetEndUserProximity(ctx context.Context, proximity EndUserProx
 		return err
 	}
 	b = append(b, '\n')
-	return writeFile(ctx, r.statePath, b)
+	return statefile.WriteAtomic(ctx, r.statePath, b)
 }
 
 func (r *Runtime) Status(ctx context.Context) (Status, error) {
@@ -184,37 +185,4 @@ func validateEndUserProximity(proximity EndUserProximity) error {
 	default:
 		return fmt.Errorf("runtime end-user proximity must be %q or %q", EndUserProximityLocal, EndUserProximityRemote)
 	}
-}
-
-func writeFile(ctx context.Context, path string, content []byte) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return fmt.Errorf("create runtime state directory: %w", err)
-	}
-	f, err := os.CreateTemp(filepath.Dir(path), ".runtime-*.tmp")
-	if err != nil {
-		return fmt.Errorf("create runtime state temp file: %w", err)
-	}
-	tmp := f.Name()
-	defer func() { _ = os.Remove(tmp) }()
-	if err := f.Chmod(0o600); err != nil {
-		_ = f.Close()
-		return fmt.Errorf("set runtime state temp file permissions: %w", err)
-	}
-	if _, err := f.Write(content); err != nil {
-		_ = f.Close()
-		return fmt.Errorf("write runtime state: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("close runtime state temp file: %w", err)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return fmt.Errorf("save runtime state: %w", err)
-	}
-	return nil
 }

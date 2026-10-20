@@ -34,8 +34,8 @@ const (
 	// icon manifest; no consent attempt is consumed.
 	ErrorCodeUnrecognizedIcon ErrorCode = "unrecognized_icon"
 	// ErrorCodeEntitlementRequired means the org lacks the entitlement the
-	// operation needs. The problem names it in "entitlement" and, when accepting
-	// terms grants it, carries a "terms_url" to accept them at.
+	// operation needs. When accepting terms grants it, the problem carries a
+	// "terms_url" to accept them at.
 	ErrorCodeEntitlementRequired ErrorCode = "entitlement_required"
 )
 

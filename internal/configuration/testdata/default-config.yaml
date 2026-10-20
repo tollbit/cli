@@ -25,5 +25,12 @@ agent:
   register_user_agent_url: https://hack.tollbit.com/my-agents
 credentials:
   storage_dir: __default__
+foundry:
+  base_url: https://gateway.tollbit.com/foundry
 gateway:
   base_url: https://gateway.tollbit.com
+update:
+  check_enabled: true
+  check_interval: 1h
+  auto_update: false
+  release_base_url: https://releases.example/download

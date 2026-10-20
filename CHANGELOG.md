@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-20
+
+### Added
+
+- Automatic updates. About once an hour the CLI checks which versions TollBit
+  supports. When this version is below the supported minimum, a CLI installed
+  with the install script or npm downloads the update, installs it, says so on
+  stderr, and runs the command again. Other installs print the update command.
+- `TOLLBIT_UPDATE_AUTO_UPDATE=false` turns off the self-install. The CLI still
+  warns below the latest version and still stops with exit `1` below the
+  minimum. `TOLLBIT_UPDATE_CHECK_INTERVAL` sets how often it checks.
+- The README and the agent guide describe automatic updates.
+
+### Changed
+
+- The "new version available" notice prints once per run.
+- Permission-required errors show the server's message instead of a
+  "Missing capability" line.
+
 ## [0.3.9] - 2026-10-08
+
+### Added
+
+- Permission-required errors tell the agent what to do: relay the terms link
+  to the end user and re-run after they accept, or contact TollBit.
 
 ### Changed
 

@@ -31,11 +31,28 @@ func TestAssembleConfigurationEnvOverridesFiles(t *testing.T) {
 	}
 }
 
+func TestAssembleConfigurationFoundryEnvOverridesDevelopmentConfig(t *testing.T) {
+	dir := t.TempDir()
+	writeDevelopmentConfig(t, dir, "foundry:\n  base_url: https://foundry-development.example/foundry\n")
+
+	config := assembleTestConfiguration(t, dir)
+	if config.Foundry.BaseURL != "https://foundry-development.example/foundry" {
+		t.Fatalf("expected foundry development override, got %q", config.Foundry.BaseURL)
+	}
+
+	t.Setenv("TOLLBIT_FOUNDRY_BASE_URL", "https://foundry-env.example/foundry")
+	config = assembleTestConfiguration(t, dir)
+	if config.Foundry.BaseURL != "https://foundry-env.example/foundry" {
+		t.Fatalf("expected foundry env override, got %q", config.Foundry.BaseURL)
+	}
+}
+
 func TestAssembleConfigurationAppliesDevEndpointEnv(t *testing.T) {
 	t.Setenv("TOLLBIT_AUTH_BASE_URL", "https://oauth-development.example")
 	t.Setenv("TOLLBIT_GATEWAY_BASE_URL", "https://gateway-development.example.com")
 	t.Setenv("TOLLBIT_AGENT_REGISTER_USER_AGENT_URL", "https://hack-development.example/my-agents")
 	t.Setenv("TOLLBIT_AUTH_BROWSER_CONSENT_CALLBACK_ADDRESS", "127.0.0.1:65432")
+	t.Setenv("TOLLBIT_UPDATE_RELEASE_BASE_URL", "http://127.0.0.1:8899/releases")
 
 	config := assembleTestConfiguration(t, t.TempDir())
 
@@ -50,6 +67,9 @@ func TestAssembleConfigurationAppliesDevEndpointEnv(t *testing.T) {
 	}
 	if config.Auth.BrowserConsent.CallbackAddress != "127.0.0.1:65432" {
 		t.Fatalf("expected callback env override, got %q", config.Auth.BrowserConsent.CallbackAddress)
+	}
+	if config.Update.ReleaseBaseURL != "http://127.0.0.1:8899/releases" {
+		t.Fatalf("expected release base URL env override, got %q", config.Update.ReleaseBaseURL)
 	}
 }
 

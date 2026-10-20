@@ -156,7 +156,9 @@ type (
 
 var _ Client = (*client)(nil)
 
-func NewClient(cfg Config) (Client, error) {
+// NewClient sends requests through transport (http.DefaultTransport when nil),
+// so callers can observe every response without the client knowing.
+func NewClient(cfg Config, transport http.RoundTripper) (Client, error) {
 	cfg.Normalize()
 	if strings.TrimSpace(cfg.BaseURL) == "" {
 		return nil, errors.New("gateway base URL is required")
@@ -167,7 +169,7 @@ func NewClient(cfg Config) (Client, error) {
 	}
 	return &client{
 		baseURL: parsed,
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http:    &http.Client{Timeout: 30 * time.Second, Transport: transport},
 	}, nil
 }
 
@@ -378,7 +380,6 @@ func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return errorsx.ParseResponseError(ctx, resp.Status, resp.StatusCode, resp.Header, respBody)
 	}
-	notifyUpdateWarning(resp.Header)
 	if out == nil {
 		return nil
 	}

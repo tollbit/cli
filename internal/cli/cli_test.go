@@ -27,6 +27,7 @@ import (
 )
 
 const testGatewayBaseURLEnvVar = "TOLLBIT_GATEWAY_BASE_URL"
+const testFoundryBaseURLEnvVar = "TOLLBIT_FOUNDRY_BASE_URL"
 const testAuthBaseURLEnvVar = "TOLLBIT_AUTH_BASE_URL"
 const testCredentialsStorageDirEnvVar = "TOLLBIT_CREDENTIALS_STORAGE_DIR"
 const testAgentDefaultNameEnvVar = "TOLLBIT_AGENT_DEFAULT_NAME"
@@ -83,6 +84,10 @@ func testConfig() configuration.Config {
 	if gatewayBaseURL == "" {
 		gatewayBaseURL = "https://gateway.tollbit.com"
 	}
+	foundryBaseURL := os.Getenv(testFoundryBaseURLEnvVar)
+	if foundryBaseURL == "" {
+		foundryBaseURL = "https://gateway.tollbit.com/foundry"
+	}
 	authBaseURL := os.Getenv(testAuthBaseURLEnvVar)
 	if authBaseURL == "" {
 		authBaseURL = "https://oauth.tollbit.com"
@@ -123,7 +128,9 @@ func testConfig() configuration.Config {
 			RegisterUserAgentURL: "https://hack.tollbit.com/my-agents",
 		},
 		Credentials: configuration.CredentialsConfig{StorageDir: storageDir},
+		Foundry:     configuration.FoundryConfig{BaseURL: foundryBaseURL},
 		Gateway:     configuration.GatewayConfig{BaseURL: gatewayBaseURL},
+		Update:      configuration.UpdateConfig{ReleaseBaseURL: "https://github.com/tollbit/cli/releases/download"},
 	}
 }
 

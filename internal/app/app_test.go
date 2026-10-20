@@ -152,6 +152,7 @@ func testConfig(t *testing.T) configuration.Config {
 		},
 		Agent:       configuration.AgentConfig{DefaultName: "anonymous"},
 		Credentials: configuration.CredentialsConfig{StorageDir: t.TempDir()},
+		Foundry:     configuration.FoundryConfig{BaseURL: "https://gateway.example.com/foundry"},
 		Gateway:     configuration.GatewayConfig{BaseURL: "https://gateway.example.com"},
 	}
 }

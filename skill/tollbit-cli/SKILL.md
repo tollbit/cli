@@ -1,6 +1,6 @@
 ---
 name: tollbit-cli
-version: 0.3.9
+version: 0.4.0
 description: Search for news and articles and ground answers in licensed publisher content on the TollBit network. Use whenever the user wants to find news, articles, reporting, or sources on a topic or current event — searches the catalog, then prices and fetches full article content (paid) with the tollbit CLI.
 ---
 
@@ -73,6 +73,7 @@ If `auth login` or `auth complete` reports that authorization is still pending, 
 - Prefer `--json` for machine-readable output on `search`, `content pricing`, `content fetch`, `feedback`, and `auth status`.
 - **Exit codes:** `0` success · `1` runtime error · `2` usage error · `3` authorization pending (`auth login` / `auth complete` in a detached flow). `auth status --check` → `0` valid · `1` invalid/expired · `2` missing. Before paid `fetch`, prefer `auth status --check` (or `auth status --json`) so you fail fast instead of hanging on interactive consent.
 - **Streams:** stdout carries data only; prompts, spinners, next-step hints, and errors go to stderr. Parse stdout for success data; treat non-zero exit as failure and read stderr when diagnosing.
+- **Updates:** the CLI may update itself, print a notice on stderr, and run the command again. stdout and the exit code are the command's own; there is nothing to do. `TOLLBIT_UPDATE_AUTO_UPDATE=false` stops the self-install only: the CLI still warns on stderr when a newer version exists, and still exits `1` with the update command below the supported minimum.
 - **Non-interactive fetch:** never call `content fetch` without `--confirm`. Pass `--rate-index N` when multiple rates exist (required with `--json` in that case). Every fetch still charges.
 - **Licensable results:** only **Programmatic** results can be priced and fetched; use `--programmatic-only` or skip Enterprise hits.
 - **Pagination:** reuse the `--next-token` / `nextToken` from the previous search response when more results exist.

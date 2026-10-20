@@ -65,6 +65,20 @@ func TestAssembleConfigurationAppliesCommonEnv(t *testing.T) {
 	}
 }
 
+func TestAssembleConfigurationAppliesUpdateEnv(t *testing.T) {
+	t.Setenv("TOLLBIT_UPDATE_CHECK_INTERVAL", "15m")
+	t.Setenv("TOLLBIT_UPDATE_AUTO_UPDATE", "true")
+
+	config := assembleTestConfiguration(t, t.TempDir())
+
+	if config.Update.CheckInterval != 15*time.Minute {
+		t.Fatalf("expected env check interval, got %s", config.Update.CheckInterval)
+	}
+	if !config.Update.AutoUpdate {
+		t.Fatal("expected env auto update")
+	}
+}
+
 func TestIsConfigurableReportsCommonFields(t *testing.T) {
 	if !IsConfigurable("agent.default_name") {
 		t.Fatal("expected agent.default_name to be configurable")
@@ -121,6 +135,7 @@ func TestConfigWithOverridesRejectsInvalidConfig(t *testing.T) {
 	config := assembleTestConfiguration(t, t.TempDir())
 	blank := ""
 	invalidEndUserProximity := "invalid"
+	negativeInterval := -time.Minute
 
 	tests := []struct {
 		name      string
@@ -131,8 +146,20 @@ func TestConfigWithOverridesRejectsInvalidConfig(t *testing.T) {
 			overrides: OverrideOptions{AuthBaseURL: &blank},
 		},
 		{
+			name:      "blank foundry base URL",
+			overrides: OverrideOptions{FoundryBaseURL: &blank},
+		},
+		{
 			name:      "invalid end-user proximity value",
 			overrides: OverrideOptions{RuntimeEndUserProximity: &invalidEndUserProximity},
+		},
+		{
+			name:      "negative update check interval",
+			overrides: OverrideOptions{UpdateCheckInterval: &negativeInterval},
+		},
+		{
+			name:      "blank release base URL",
+			overrides: OverrideOptions{UpdateReleaseBaseURL: &blank},
 		},
 	}
 
@@ -143,6 +170,22 @@ func TestConfigWithOverridesRejectsInvalidConfig(t *testing.T) {
 				t.Fatal("expected error")
 			}
 		})
+	}
+}
+
+func TestConfigWithOverridesAppliesFoundryBaseURL(t *testing.T) {
+	config := assembleTestConfiguration(t, t.TempDir())
+	foundryBaseURL := "https://foundry-flag.example/foundry"
+
+	got, err := config.WithOverrides(OverrideOptions{FoundryBaseURL: &foundryBaseURL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Foundry.BaseURL != foundryBaseURL {
+		t.Fatalf("expected foundry override, got %q", got.Foundry.BaseURL)
+	}
+	if config.Foundry.BaseURL == foundryBaseURL {
+		t.Fatal("expected original config to remain unchanged")
 	}
 }
 

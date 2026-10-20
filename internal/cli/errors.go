@@ -71,22 +71,21 @@ func RenderError(err error) string {
 	return err.Error()
 }
 
-// renderEntitlementRequired keeps the original error line and adds how to get
-// the entitlement: the server's terms_url when accepting terms grants it,
-// otherwise the entitlement name and a pointer to TollBit.
+// renderEntitlementRequired keeps the original error line and, when accepting
+// terms grants the entitlement, adds the server's terms_url. Otherwise the
+// server's detail already says to contact TollBit, so the CLI adds that only
+// when the problem has no detail.
 func renderEntitlementRequired(err error, problem problemjson.Problem) string {
 	var b strings.Builder
 	b.WriteString(err.Error())
-	b.WriteString("\n")
 	if termsURL, _ := problem.StringProperty("terms_url"); termsURL != "" {
-		b.WriteString("Relay ONLY this URL to the end user. The end user must open it in their browser, sign in, and accept the terms:\n")
+		b.WriteString("\nRelay ONLY this URL to the end user. The end user must open it in their browser, sign in, and accept the terms:\n")
 		b.WriteString(termsURL)
 		b.WriteString("\n\nAfter the end user accepts the terms, re-run the command.")
 		return b.String()
 	}
-	if entitlement, _ := problem.StringProperty("entitlement"); entitlement != "" {
-		fmt.Fprintf(&b, "Missing capability: %s\n", entitlement)
+	if problem.Detail == nil || *problem.Detail == "" {
+		b.WriteString("\nContact TollBit to enable it for your organization.")
 	}
-	b.WriteString("Contact TollBit to enable it for your organization.")
 	return b.String()
 }

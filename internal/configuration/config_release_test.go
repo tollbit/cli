@@ -30,6 +30,7 @@ func TestAssembleConfigurationIgnoresEndpointEnv(t *testing.T) {
 	t.Setenv("TOLLBIT_GATEWAY_BASE_URL", "https://evil.example.com")
 	t.Setenv("TOLLBIT_AGENT_REGISTER_USER_AGENT_URL", "https://evil.example.com/register")
 	t.Setenv("TOLLBIT_AUTH_BROWSER_CONSENT_CALLBACK_ADDRESS", "evil.example.com:9")
+	t.Setenv("TOLLBIT_UPDATE_RELEASE_BASE_URL", "https://evil.example.com/releases")
 
 	config := assembleTestConfiguration(t, t.TempDir())
 
@@ -44,6 +45,9 @@ func TestAssembleConfigurationIgnoresEndpointEnv(t *testing.T) {
 	}
 	if config.Auth.BrowserConsent.CallbackAddress != "127.0.0.1:54321" {
 		t.Fatalf("expected embedded callback address, got %q", config.Auth.BrowserConsent.CallbackAddress)
+	}
+	if config.Update.ReleaseBaseURL != "https://releases.example/download" {
+		t.Fatalf("expected embedded release base URL, got %q", config.Update.ReleaseBaseURL)
 	}
 }
 

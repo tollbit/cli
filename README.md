@@ -21,7 +21,7 @@ curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.s
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.9
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.4.0
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
@@ -37,7 +37,7 @@ Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
 irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
-Install-Tollbit -Version v0.3.9 -Force
+Install-Tollbit -Version v0.4.0 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -160,6 +160,14 @@ Compare to the `version` field in the embedded skill when deciding whether to re
 
 ## Updating
 
+### Automatic updates
+
+About once an hour the CLI checks which versions TollBit supports. When a newer version exists, it prints a notice on stderr. When this version is below the supported minimum, it installs the update itself, says so on stderr, and runs the command again. Script installs replace the binary; global npm installs run `npm install -g @tollbit/tollbit-cli@<version>`. Other installs (`go install`, preview builds, pnpm, Yarn, Volta, `npx`, npm on Windows, or a folder that needs `sudo`) print the update command and exit `1`.
+
+`TOLLBIT_UPDATE_AUTO_UPDATE=false` stops the self-install only. The CLI still warns below the latest version and still stops with exit `1` below the minimum.
+
+### Updating by hand
+
 Installer channel updates:
 
 ```bash
@@ -167,7 +175,7 @@ Installer channel updates:
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.3.9 --force
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.4.0 --force
 ```
 
 ```powershell

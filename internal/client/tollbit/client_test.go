@@ -25,7 +25,7 @@ func TestConfigNormalize(t *testing.T) {
 }
 
 func TestNewClientRequiresBaseURL(t *testing.T) {
-	_, err := NewClient(Config{})
+	_, err := NewClient(Config{}, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -74,7 +74,7 @@ func TestSearch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestSearch(t *testing.T) {
 }
 
 func TestSearchRequiresQuery(t *testing.T) {
-	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestBatchGetRates(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestBatchGetRates(t *testing.T) {
 }
 
 func TestBatchGetRatesRequiresURLs(t *testing.T) {
-	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestSearchReturnsProblemJSONError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestCreateContentAccessToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestCreateContentAccessTokenOmitsUserAgent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +317,7 @@ func TestGetContent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestGetContentStripsTrailingSlash(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,7 @@ func TestGetContentOmitsTollbitUserAgent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +371,7 @@ func TestGetContentOmitsTollbitUserAgent(t *testing.T) {
 }
 
 func TestGetContentRequiresAgentToken(t *testing.T) {
-	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +418,7 @@ func TestSubmitFeedback(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(Config{BaseURL: srv.URL})
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,7 +437,7 @@ func TestSubmitFeedback(t *testing.T) {
 }
 
 func TestSubmitFeedbackRequiresMessage(t *testing.T) {
-	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func TestSubmitFeedbackRequiresMessage(t *testing.T) {
 }
 
 func TestSubmitFeedbackRejectsInvalidRating(t *testing.T) {
-	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"})
+	c, err := NewClient(Config{BaseURL: "https://gateway.example.com"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,5 +459,75 @@ func TestSubmitFeedbackRejectsInvalidRating(t *testing.T) {
 	}, validAgentToken(t))
 	if err == nil || !strings.Contains(err.Error(), "rating must be between 1 and 5") {
 		t.Fatalf("expected rating error, got %v", err)
+	}
+}
+
+func TestClientVersionHeaderSent(t *testing.T) {
+	token := validAgentToken(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got := r.Header.Get("X-Tollbit-Client")
+		if got != version.ClientHeader() {
+			t.Errorf("X-Tollbit-Client = %q, want %q", got, version.ClientHeader())
+		}
+		if !strings.HasPrefix(got, "search-cli/") {
+			t.Errorf("X-Tollbit-Client %q missing search-cli/ product prefix", got)
+		}
+		_ = json.NewEncoder(w).Encode(PagedSearchResultResponse{})
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Search(context.Background(), SearchParams{Query: "q"}, token); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateRequiredBlocksWithProblemJSON(t *testing.T) {
+	token := validAgentToken(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusUpgradeRequired)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"type":           "about:blank",
+			"title":          "Upgrade Required",
+			"status":         http.StatusUpgradeRequired,
+			"detail":         "TollBit CLI version 0.0.1 is below the minimum supported version 0.1.0. Update the CLI to continue.",
+			"code":           "cli_update_required",
+			"minimumVersion": "0.1.0",
+			"latestVersion":  "0.2.0",
+		})
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Config{BaseURL: srv.URL}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.Search(context.Background(), SearchParams{Query: "q"}, token)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	var problem problemjson.Problem
+	if !errors.As(err, &problem) {
+		t.Fatalf("expected problemjson.Problem, got %T: %v", err, err)
+	}
+	if problem.Status != http.StatusUpgradeRequired {
+		t.Fatalf("problem status = %d, want %d", problem.Status, http.StatusUpgradeRequired)
+	}
+	if !problem.IsCLIUpdateRequired() {
+		t.Fatalf("problem code = %v, want cli_update_required", problem.Code)
+	}
+	if problem.IsOBORequired() {
+		t.Fatal("426 must not be classified as obo_required (would trigger token retry)")
+	}
+	if minimum, ok := problem.StringProperty("minimumVersion"); !ok || minimum != "0.1.0" {
+		t.Fatalf("minimumVersion = %q (ok=%v), want 0.1.0", minimum, ok)
+	}
+	if latest, ok := problem.StringProperty("latestVersion"); !ok || latest != "0.2.0" {
+		t.Fatalf("latestVersion = %q (ok=%v), want 0.2.0", latest, ok)
 	}
 }

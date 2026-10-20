@@ -143,6 +143,9 @@ func validate(config Config) error {
 	if strings.TrimSpace(config.Agent.RegisterUserAgentURL) == "" {
 		return errors.New("agent.register_user_agent_url is required")
 	}
+	if strings.TrimSpace(config.Foundry.BaseURL) == "" {
+		return errors.New("foundry.base_url is required")
+	}
 	if strings.TrimSpace(config.Gateway.BaseURL) == "" {
 		return errors.New("gateway.base_url is required")
 	}
@@ -157,6 +160,12 @@ func validate(config Config) error {
 	}
 	if strings.TrimSpace(config.Credentials.StorageDir) == "" {
 		return errors.New("credentials.storage_dir is required")
+	}
+	if config.Update.CheckInterval < 0 {
+		return errors.New("update.check_interval must be non-negative")
+	}
+	if strings.TrimSpace(config.Update.ReleaseBaseURL) == "" {
+		return errors.New("update.release_base_url is required")
 	}
 	return nil
 }

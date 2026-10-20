@@ -68,10 +68,8 @@ func entitlementRequiredProblem(t *testing.T, extra string) problemjson.Problem 
 		"type": "about:blank",
 		"title": "Forbidden",
 		"status": 403,
-		"detail": "Developer terms of service not accepted.",
 		"requestId": "req-123",
-		"code": "entitlement_required",
-		"entitlement": "build:license_content"` + extra + `
+		"code": "entitlement_required"` + extra + `
 	}`))
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +79,7 @@ func entitlementRequiredProblem(t *testing.T, extra string) problemjson.Problem 
 
 func TestRenderErrorEntitlementRequiredWithTermsURL(t *testing.T) {
 	problem := entitlementRequiredProblem(t, `,
+		"detail": "Developer terms of service not accepted.",
 		"terms_url": "https://app.tollbit.com/onboard?flow=developer"`)
 
 	got := RenderError(RuntimeError(problem))
@@ -98,12 +97,34 @@ func TestRenderErrorEntitlementRequiredWithTermsURL(t *testing.T) {
 }
 
 func TestRenderErrorEntitlementRequiredWithoutTermsURL(t *testing.T) {
+	problem := entitlementRequiredProblem(t, `,
+		"detail": "Your organization does not have access to this feature. Contact TollBit to enable it."`)
+
+	got := RenderError(problem)
+	want := "403 Forbidden: Your organization does not have access to this feature. Contact TollBit to enable it. (requestId: req-123)"
+	if got != want {
+		t.Fatalf("RenderError = %q, want %q", got, want)
+	}
+}
+
+func TestRenderErrorEntitlementRequiredWithoutDetail(t *testing.T) {
 	problem := entitlementRequiredProblem(t, "")
 
 	got := RenderError(problem)
-	want := "403 Forbidden: Developer terms of service not accepted. (requestId: req-123)\n" +
-		"Missing capability: build:license_content\n" +
+	want := "403 Forbidden: Forbidden (requestId: req-123)\n" +
 		"Contact TollBit to enable it for your organization."
+	if got != want {
+		t.Fatalf("RenderError = %q, want %q", got, want)
+	}
+}
+
+func TestRenderErrorEntitlementRequiredIgnoresEntitlementField(t *testing.T) {
+	problem := entitlementRequiredProblem(t, `,
+		"detail": "Your organization does not have access to this feature. Contact TollBit to enable it.",
+		"entitlement": "analytics:sql_api"`)
+
+	got := RenderError(problem)
+	want := "403 Forbidden: Your organization does not have access to this feature. Contact TollBit to enable it. (requestId: req-123)"
 	if got != want {
 		t.Fatalf("RenderError = %q, want %q", got, want)
 	}
@@ -111,6 +132,7 @@ func TestRenderErrorEntitlementRequiredWithoutTermsURL(t *testing.T) {
 
 func TestRenderErrorEntitlementRequiredWrapped(t *testing.T) {
 	problem := entitlementRequiredProblem(t, `,
+		"detail": "Developer terms of service not accepted.",
 		"terms_url": "https://app.tollbit.com/onboard?flow=developer"`)
 
 	got := RenderError(RuntimeError(fmt.Errorf("error fetching rates: %w", problem)))
