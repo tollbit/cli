@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-23
+
+### Security
+
+- Built with Go 1.27.3, which rejects certificate chains through eight
+  blocked intermediate CA keys.
+
 ## [0.4.0] - 2026-10-20
 
 ### Added
