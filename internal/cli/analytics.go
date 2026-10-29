@@ -38,8 +38,8 @@ Intelligence tables require publisher intelligence access as well as SQL access.
 
 Output is a JSON object with "columns" (name and type), "rows" (arrays in
 column order, null for missing values), and "meta" (row_count, truncated,
-bytes_scanned, duration_ms). When meta.truncated is true the result was cut
-at the server's row limit and a warning is printed to stderr.`
+duration_ms). When meta.truncated is true the result was cut at the server's
+row limit and a warning is printed to stderr.`
 
 const analyticsSchemaLongHelp = `List the analytics tables and columns available to your organization.
 

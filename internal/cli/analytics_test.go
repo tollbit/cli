@@ -49,7 +49,7 @@ func TestAnalyticsQueryUsesOBOAgentTokenAndWritesJSON(t *testing.T) {
 		if request.SQL != "SELECT * FROM logs" {
 			t.Fatalf("unexpected SQL: %q", request.SQL)
 		}
-		_, _ = w.Write([]byte(`{"columns":[{"name":"requests","type":"INTEGER"},{"name":"optional","type":"STRING"}],"rows":[[42,null]],"meta":{"row_count":1,"truncated":false,"bytes_scanned":10,"duration_ms":5}}`))
+		_, _ = w.Write([]byte(`{"columns":[{"name":"requests","type":"INTEGER"},{"name":"optional","type":"STRING"}],"rows":[[42,null]],"meta":{"row_count":1,"truncated":false,"duration_ms":5}}`))
 	}))
 	defer analyticsSrv.Close()
 
@@ -87,6 +87,9 @@ func TestAnalyticsQueryUsesOBOAgentTokenAndWritesJSON(t *testing.T) {
 	if output.Meta == nil || output.Meta.RowCount != 1 {
 		t.Fatalf("expected meta in output, got %q", stdout.String())
 	}
+	if strings.Contains(stdout.String(), "bytes_scanned") {
+		t.Fatalf("bytes_scanned must not be printed, got %q", stdout.String())
+	}
 	if strings.Contains(stderr.String(), "truncated") {
 		t.Fatalf("no truncation warning expected, got %q", stderr.String())
 	}
@@ -99,7 +102,7 @@ func TestAnalyticsQueryWarnsOnTruncation(t *testing.T) {
 		t.Fatal(err)
 	}
 	analyticsSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"columns":[{"name":"n","type":"INT64"}],"rows":[[1]],"meta":{"row_count":10000,"truncated":true,"bytes_scanned":10,"duration_ms":5}}`))
+		_, _ = w.Write([]byte(`{"columns":[{"name":"n","type":"INT64"}],"rows":[[1]],"meta":{"row_count":10000,"truncated":true,"duration_ms":5}}`))
 	}))
 	defer analyticsSrv.Close()
 

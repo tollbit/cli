@@ -34,7 +34,7 @@ func TestQuery(t *testing.T) {
 		if request.SQL != "SELECT * FROM logs" {
 			t.Fatalf("unexpected SQL: %q", request.SQL)
 		}
-		_, _ = w.Write([]byte(`{"columns":[{"name":"requests","type":"INTEGER"},{"name":"optional","type":"STRING"}],"rows":[[42,null]],"meta":{"row_count":1,"truncated":true,"bytes_scanned":512,"duration_ms":7}}`))
+		_, _ = w.Write([]byte(`{"columns":[{"name":"requests","type":"INTEGER"},{"name":"optional","type":"STRING"}],"rows":[[42,null]],"meta":{"row_count":1,"truncated":true,"duration_ms":7}}`))
 	}))
 	defer srv.Close()
 
@@ -52,7 +52,7 @@ func TestQuery(t *testing.T) {
 	if len(response.Rows) != 1 || response.Rows[0][0] != float64(42) || response.Rows[0][1] != nil {
 		t.Fatalf("unexpected rows: %#v", response.Rows)
 	}
-	if response.Meta == nil || !response.Meta.Truncated || response.Meta.RowCount != 1 || response.Meta.BytesScanned != 512 || response.Meta.DurationMs != 7 {
+	if response.Meta == nil || !response.Meta.Truncated || response.Meta.RowCount != 1 || response.Meta.DurationMs != 7 {
 		t.Fatalf("unexpected meta: %#v", response.Meta)
 	}
 }

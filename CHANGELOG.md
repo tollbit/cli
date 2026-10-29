@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-29
+
+### Changed
+
+- `analytics query` no longer prints `meta.bytes_scanned`.
+
 ## [0.4.1] - 2026-10-23
 
 ### Security

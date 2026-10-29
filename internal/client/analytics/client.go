@@ -51,10 +51,9 @@ type (
 	// QueryMeta is sent by servers that report result metadata. Absent on
 	// older servers, so it is a pointer and omitted when nil.
 	QueryMeta struct {
-		RowCount     int   `json:"row_count"`
-		Truncated    bool  `json:"truncated"`
-		BytesScanned int64 `json:"bytes_scanned"`
-		DurationMs   int64 `json:"duration_ms"`
+		RowCount   int   `json:"row_count"`
+		Truncated  bool  `json:"truncated"`
+		DurationMs int64 `json:"duration_ms"`
 	}
 
 	QueryResponse struct {
