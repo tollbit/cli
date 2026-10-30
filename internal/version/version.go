@@ -2,7 +2,7 @@
 // Bump this when shipping; keep skill frontmatter `version` in sync (tests enforce it).
 package version
 
-const Version = "0.4.2"
+const Version = "0.4.3"
 
 // prerelease is set at build time for preview builds only, e.g.
 // -ldflags "-X github.com/tollbit/cli/internal/version.prerelease=preview.3".

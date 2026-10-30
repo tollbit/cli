@@ -15,18 +15,22 @@ The rest of this file covers building and working on the CLI from source.
 
 **CI:** `go test ./...` runs on pull requests and on pushes to `main` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Go version from [`go.mod`](go.mod)).
 
-`tollbit guide` is an embedded copy of [`skill/tollbit-cli/SKILL.md`](skill/tollbit-cli/SKILL.md) — edit that file only; do not maintain a separate guide.
+`tollbit guide` prints the embedded skills in [`skill/`](skill/): `--skill cli` (the default) is [`skill/tollbit-cli/SKILL.md`](skill/tollbit-cli/SKILL.md) and `--skill analytics` is [`skill/tollbit-analytics/SKILL.md`](skill/tollbit-analytics/SKILL.md). Edit those files only. They are Go templates: `version: {{ .Version }}` takes the CLI version, so a bump never edits them. A new skill needs a case in `bundledSkillMarkdown` (`internal/cli/guide.go`).
+
+The Claude plugin marketplace is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json); the plugin lives in [`plugins/tollbit/`](plugins/tollbit/). `make plugin` (`cmd/gen-plugin`, running `internal/generator/plugin`; neither is part of the `tollbit` binary) generates its skills from every `skill/*/SKILL.md`, each exactly as `tollbit guide` prints it; don't edit those by hand. `plugin.json` and `skills/tollbit-install-claude/` (which exists only in the plugin, for Claude's sandbox) are written by hand, except that `make plugin` sets the CLI version in each: `plugin.json`'s `version`, and the release tag the install skill fetches `install.sh` from. All of these are committed. A test fails when they are stale.
 
 The repo includes a small `Makefile`:
 
 | Target | What it runs |
 |--------|----------------|
 | `make test` | `go run gotest.tools/gotestsum@latest` (runs `go test ./...` with readable output) |
+| `node --test npm/install.test.js` | Tests the npm package's installer (proxy, `NO_PROXY`, time limit); CI runs it too |
 | `make build` | `go build -o tollbit ./cmd/tollbit` (binary at `./tollbit` in the repo root) |
 | `make alias` | Prints a one-line `alias` so you can point `tollbit` at that binary |
 | `make dev-install` | Builds and installs the repo binary into your `tollbit` command path, moving any existing installed binary to `tollbit-original` |
 | `make dev-uninstall` | Restores `tollbit-original` back to `tollbit` and removes the dev-installed binary |
-| `make bump VERSION=…` | Bumps `internal/version`, `skill/tollbit-cli/SKILL.md`, and install examples in [README.md](README.md) |
+| `make bump VERSION=…` | Bumps `internal/version` and install examples in [README.md](README.md), then runs `make plugin` |
+| `make plugin` | Regenerates the plugin's skills from `skill/*/SKILL.md` and its `plugin.json` version from `internal/version` |
 
 ```bash
 make test

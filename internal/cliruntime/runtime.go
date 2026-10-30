@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -38,6 +39,8 @@ type (
 		configuredEndUserProximity string
 		stateDir                   string
 		statePath                  string
+		goos                       string
+		getenv                     func(string) string
 	}
 
 	Status struct {
@@ -69,6 +72,8 @@ func New(cfg Config) (*Runtime, error) {
 		configuredEndUserProximity: configuredEndUserProximity,
 		stateDir:                   stateDir,
 		statePath:                  filepath.Join(stateDir, stateFilename),
+		goos:                       runtime.GOOS,
+		getenv:                     os.Getenv,
 	}, nil
 }
 
@@ -86,7 +91,7 @@ func (r *Runtime) EndUserProximity(ctx context.Context) (EndUserProximity, error
 		if exists {
 			return st.EndUserProximity, nil
 		}
-		return EndUserProximityLocal, nil
+		return r.detectEndUserProximity(ctx), nil
 	default:
 		return "", fmt.Errorf("runtime.end_user_proximity must be %q, %q, or %q", configuration.RuntimeEndUserProximityAutoDetect, configuration.RuntimeEndUserProximityLocal, configuration.RuntimeEndUserProximityRemote)
 	}
@@ -132,7 +137,7 @@ func (r *Runtime) Status(ctx context.Context) (Status, error) {
 			proximity = st.EndUserProximity
 			source = EndUserProximitySourceSavedRuntimeState
 		} else {
-			proximity = EndUserProximityLocal
+			proximity = r.detectEndUserProximity(ctx)
 			source = EndUserProximitySourceAutoDetect
 		}
 	default:

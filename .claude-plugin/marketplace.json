@@ -1,0 +1,17 @@
+{
+  "name": "tollbit",
+  "owner": {
+    "name": "TollBit"
+  },
+  "metadata": {
+    "description": "Official plugins from TollBit, the web stack for the agentic internet."
+  },
+  "plugins": [
+    {
+      "name": "tollbit",
+      "source": "./plugins/tollbit",
+      "description": "Search, navigate, and build the agentic internet: use sites built for agents, build your own, and see how agents use them.",
+      "keywords": ["agent site", "ai agents", "publishers", "analytics", "tollbit"]
+    }
+  ]
+}

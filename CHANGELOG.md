@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-30
+
+### Added
+
+- This repo is a Claude plugin marketplace. The `tollbit` plugin ships the
+  agent skills that `tollbit guide` prints, plus a skill that installs and
+  sets up the CLI in Claude's sandbox (chat and Cowork).
+- `tollbit guide --skill analytics` prints (or, with `--install`, installs) a
+  new skill for querying your organization's site analytics with
+  `tollbit analytics`. `--skill cli` is the default. The Claude plugin ships
+  both skills.
+
+### Changed
+
+- When end-user proximity hasn't been set, the CLI now detects it instead of
+  always using the local browser login flow. On Linux or other Unix systems
+  with no graphical display, such as a cloud sandbox, a container or an SSH
+  session, it uses the remote flow. On macOS, Windows, WSL and Linux desktops
+  it keeps the local flow. A value saved with `tollbit runtime set` still
+  takes precedence.
+
+### Fixed
+
+- The npm package's installer now downloads through the proxy in
+  `HTTPS_PROXY` (skipping hosts in `NO_PROXY`), like the CLI itself. A
+  download that receives no data for 60 seconds fails with an error naming
+  the URL instead of waiting forever. This also applies to npm self-updates.
+
 ## [0.4.2] - 2026-10-29
 
 ### Changed

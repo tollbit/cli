@@ -16,6 +16,7 @@ func TestEndUserProximityUsesConfiguredValueBeforeState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	stubDetectionEnvironment(rt, "linux", nil)
 	if err := rt.SetEndUserProximity(context.Background(), EndUserProximityRemote); err != nil {
 		t.Fatal(err)
 	}
@@ -29,11 +30,12 @@ func TestEndUserProximityUsesConfiguredValueBeforeState(t *testing.T) {
 	}
 }
 
-func TestAutoDetectReadsRuntimeState(t *testing.T) {
+func TestAutoDetectPrefersRuntimeStateOverDetection(t *testing.T) {
 	rt, err := New(Config{ConfiguredEndUserProximity: configuration.RuntimeEndUserProximityAutoDetect, StateDir: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
+	stubDetectionEnvironment(rt, "linux", nil)
 	if err := rt.SetEndUserProximity(context.Background(), EndUserProximityLocal); err != nil {
 		t.Fatal(err)
 	}
@@ -47,18 +49,32 @@ func TestAutoDetectReadsRuntimeState(t *testing.T) {
 	}
 }
 
-func TestAutoDetectDefaultsLocalWithoutRuntimeState(t *testing.T) {
-	rt, err := New(Config{ConfiguredEndUserProximity: configuration.RuntimeEndUserProximityAutoDetect, StateDir: t.TempDir()})
-	if err != nil {
-		t.Fatal(err)
+func TestAutoDetectUsesDetectedProximityWithoutRuntimeState(t *testing.T) {
+	tests := []struct {
+		name string
+		goos string
+		want EndUserProximity
+	}{
+		{name: "headless Linux", goos: "linux", want: EndUserProximityRemote},
+		{name: "macOS", goos: "darwin", want: EndUserProximityLocal},
 	}
 
-	got, err := rt.EndUserProximity(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != EndUserProximityLocal {
-		t.Fatalf("expected local fallback, got %q", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rt, err := New(Config{ConfiguredEndUserProximity: configuration.RuntimeEndUserProximityAutoDetect, StateDir: t.TempDir()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			stubDetectionEnvironment(rt, tt.goos, nil)
+
+			got, err := rt.EndUserProximity(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Fatalf("expected detected %q, got %q", tt.want, got)
+			}
+		})
 	}
 }
 
@@ -89,7 +105,7 @@ func TestStatusReportsEndUserProximitySource(t *testing.T) {
 			wantStateExists: false,
 		},
 		{
-			name:            "auto detect reads saved runtime state",
+			name:            "auto detect prefers saved runtime state over detection",
 			configured:      configuration.RuntimeEndUserProximityAutoDetect,
 			saved:           EndUserProximityLocal,
 			wantProximity:   EndUserProximityLocal,
@@ -98,9 +114,9 @@ func TestStatusReportsEndUserProximitySource(t *testing.T) {
 			wantStateExists: true,
 		},
 		{
-			name:            "auto detect defaults local without saved state",
+			name:            "auto detect reports detected remote without saved state",
 			configured:      configuration.RuntimeEndUserProximityAutoDetect,
-			wantProximity:   EndUserProximityLocal,
+			wantProximity:   EndUserProximityRemote,
 			wantSource:      EndUserProximitySourceAutoDetect,
 			wantStateExists: false,
 		},
@@ -112,6 +128,9 @@ func TestStatusReportsEndUserProximitySource(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Headless Linux detects remote, so every case below that
+			// reports local shows a configured or saved value winning.
+			stubDetectionEnvironment(rt, "linux", nil)
 			if tt.saved != "" {
 				if err := rt.SetEndUserProximity(context.Background(), tt.saved); err != nil {
 					t.Fatal(err)

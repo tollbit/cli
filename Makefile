@@ -1,4 +1,4 @@
-.PHONY: test build build-release alias dev-install dev-uninstall bump third-party-notices
+.PHONY: test build build-release alias dev-install dev-uninstall bump third-party-notices plugin
 
 test:
 	go run gotest.tools/gotestsum@latest
@@ -13,6 +13,10 @@ build-release:
 # Regenerate THIRD-PARTY-NOTICES.md from the linked Go dependencies' licenses.
 third-party-notices:
 	bash scripts/gen-third-party-notices.sh
+
+# Regenerate the Claude plugin's skills and the CLI version in its hand-written files.
+plugin:
+	go run ./cmd/gen-plugin
 
 # Prints an alias for the repo-local binary; use: eval "$(make alias)"
 alias:
@@ -57,10 +61,11 @@ dev-uninstall:
 	mv -f "$$ORIGINAL_PATH" "$$DEV_PATH"; \
 	echo "restored original binary to $$DEV_PATH"
 
-# Bump CLI + skill version (semver). Example: make bump VERSION=0.2.0
+# Bump CLI + skill version (semver), then regenerate the plugin. Example: make bump VERSION=0.2.0
 bump:
 	@test -n "$(VERSION)" || (echo "usage: make bump VERSION=0.2.0  (or v0.2.0)"; exit 1)
 	@python3 "$(CURDIR)/scripts/bump-version.py" "$(VERSION)"
+	@$(MAKE) --no-print-directory plugin
 
 # Private eval targets (make agent-eval, …); absent from the public tree.
 -include evals/agent-eval/agent-eval.mk

@@ -36,6 +36,17 @@ jobs:
       - name: Test
         run: go test -tags '${{ matrix.tags }}' ./...
 
+  # The npm package's postinstall downloader (proxy, NO_PROXY, time limit).
+  # Node is preinstalled on ubuntu-latest.
+  npm-installer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test npm/install.js
+        run: node --test npm/install.test.js
+
   notices:
     runs-on: ubuntu-latest
     steps:

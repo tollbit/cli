@@ -30,9 +30,6 @@ func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
 	if config.Auth.Consent.Strategy.Local != ConsentStrategyRedirect || config.Auth.Consent.Strategy.Remote != ConsentStrategyBrowserSelectIcon {
 		t.Fatalf("expected default consent strategy mapping, got %#v", config.Auth.Consent)
 	}
-	if got := ResolveConsentStrategy(config); got != ConsentStrategyRedirect {
-		t.Fatalf("expected auto-detect consent strategy %q, got %q", ConsentStrategyRedirect, got)
-	}
 	if config.Credentials.StorageDir == "" || config.Credentials.StorageDir == "__default__" {
 		t.Fatalf("expected resolved credentials storage dir, got %q", config.Credentials.StorageDir)
 	}
@@ -199,9 +196,6 @@ func TestConfigWithOverridesAppliesRuntimeProximity(t *testing.T) {
 	}
 	if got.Runtime.EndUserProximity != RuntimeEndUserProximityLocal {
 		t.Fatalf("expected runtime end-user proximity override, got %#v", got.Runtime)
-	}
-	if strategy := ResolveConsentStrategy(got); strategy != ConsentStrategyRedirect {
-		t.Fatalf("expected local consent strategy %q, got %q", ConsentStrategyRedirect, strategy)
 	}
 }
 

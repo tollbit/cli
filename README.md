@@ -10,7 +10,7 @@ Primary workflow: install → `search` → `content pricing` → `content fetch`
 
 #### Agent install prompt
 
-**Agent?:** Install TollBit from [github.com/tollbit/cli](https://github.com/tollbit/cli) using the install script or package that your environment needs (below), then run `tollbit guide --install <SKILLS_DIR>` to register the bundled skill.
+**Agent?:** Install TollBit from [github.com/tollbit/cli](https://github.com/tollbit/cli) using the install script or package that your environment needs (below), then run `tollbit guide --install <SKILLS_DIR>` to register the bundled skill (add `--skill analytics` for the analytics skill).
 
 ### macOS and Linux
 
@@ -21,7 +21,7 @@ curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.s
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.4.2
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.4.3
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
@@ -37,7 +37,7 @@ Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
 irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
-Install-Tollbit -Version v0.4.2 -Force
+Install-Tollbit -Version v0.4.3 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -48,6 +48,15 @@ npm install -g @tollbit/tollbit-cli
 ```
 
 Then run `tollbit` from any terminal (the package downloads the native binary for your OS).
+
+### Claude plugin
+
+This repo is a Claude plugin marketplace. The `tollbit` plugin adds the agent skills (what `tollbit guide --skill cli` and `--skill analytics` print) and a skill that installs and sets up the CLI in Claude's sandbox (chat and Cowork). In Claude Code:
+
+```
+/plugin marketplace add tollbit/cli
+/plugin install tollbit@tollbit
+```
 
 ### Manual install
 
@@ -64,7 +73,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release instruc
 ## For AI coding agents
 
 - Install `tollbit` so it is on **`PATH`** in every environment where you run shell commands (CI images, local sandboxes, agent runners).
-- Run **`tollbit guide`** for orientation, then **`tollbit guide --install <SKILLS_DIR>`** to persist the bundled skill. The guide is the full automation contract (exit codes, streams, non-interactive fetch).
+- Run **`tollbit guide`** for orientation, then **`tollbit guide --install <SKILLS_DIR>`** to persist the bundled skill. Use **`--skill analytics`** for the skill that queries your organization's site analytics. The guide is the full automation contract (exit codes, streams, non-interactive fetch).
 - Typical flow: **`search`** → **`content pricing`** → **`content fetch`**. The CLI prompts for authentication when a token is required.
 - Optionally set an agent profile with **`tollbit auth set --name <name>`** (or `TOLLBIT_AGENT_DEFAULT_NAME`) / **`--user-agent`**.
 - Prefer **`--json`** on **`search`**, **`content pricing`**, **`content fetch`**, **`feedback`**, and **`auth status`**. Exit codes: `0` success, `1` runtime, `2` usage; stdout is data-only (hints and errors on stderr).
@@ -77,7 +86,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release instruc
 | **`content pricing/fetch`** | Price and fetch licensed publisher content. |
 | **`feedback "message"`** | Submit CLI / agent feedback (requires OBO). |
 | **`auth login/logout/status/set`** | Agent profile and OAuth authorization token (also run automatically when needed). |
-| **`guide`** | Print the agent guide; optionally install bundled skill markdown. |
+| **`guide`** | Print an agent skill (`--skill cli`, the default, or `--skill analytics`); optionally install it. |
 | **`version`** | Print the CLI version string. |
 
 Typical flow: **`search "query"`** → **`content pricing <url>`** → **`content fetch <url>`**. Use **`--help`** on each command for flags.
@@ -145,6 +154,7 @@ Set `TOLLBIT_AUTH_BROWSER_CONSENT_AUTO_OPEN_BROWSER=false` in headless environme
 ```bash
 tollbit guide
 tollbit guide --install ~/.claude/skills
+tollbit guide --skill analytics --install ~/.claude/skills
 ```
 
 Install writes `<dir>/<skill-name>/SKILL.md` (name from embedded frontmatter, e.g. `tollbit-cli`).
@@ -175,7 +185,7 @@ Installer channel updates:
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.4.2 --force
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.4.3 --force
 ```
 
 ```powershell

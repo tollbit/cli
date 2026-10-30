@@ -12,17 +12,22 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tollbit/cli/internal/agentauth"
 	"github.com/tollbit/cli/internal/app"
+	"github.com/tollbit/cli/internal/version"
 )
 
 type guideOptions struct {
 	installPath string
+	skill       string
 }
 
 func NewGuideCommand(factory app.Factory) *cobra.Command {
 	var opts guideOptions
 	cmd := &cobra.Command{
 		Use:   "guide",
-		Short: "Print or install the bundled agent guide",
+		Short: "Print or install bundled agent skills",
+		Long: "Print or install bundled skills for agent harnesses.\n\n" +
+			"Use `--skill cli` (the default) for searching, pricing and fetching content.\n" +
+			"Use `--skill analytics` for querying your organization's site analytics.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				return UsageError("guide does not accept positional arguments")
@@ -34,11 +39,20 @@ func NewGuideCommand(factory app.Factory) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.installPath, "install", "", "install guide to <skills-dir>/<skill-name>/SKILL.md")
+	cmd.Flags().StringVar(&opts.skill, "skill", "cli", "bundled skill to print or install: cli, analytics")
 	return cmd
 }
 
 func runGuide(cmd *cobra.Command, factory app.Factory, opts guideOptions) error {
-	markdown, err := renderCLIGuideMarkdown(cmd, factory, skillMarkdown)
+	markdown, err := bundledSkillMarkdown(opts.skill)
+	if err != nil {
+		return UsageError("%s", err.Error())
+	}
+	if isCLIGuideSkill(opts.skill) {
+		markdown, err = renderCLIGuideMarkdown(cmd, factory, markdown)
+	} else {
+		markdown, err = renderSkillTemplate(opts.skill, markdown, skillTemplateData{Version: version.Version})
+	}
 	if err != nil {
 		return RuntimeError(err)
 	}
@@ -56,6 +70,17 @@ func runGuide(cmd *cobra.Command, factory app.Factory, opts guideOptions) error 
 	return writeGuideFile(target, markdown, cmd.OutOrStdout(), cmd.ErrOrStderr())
 }
 
+// isCLIGuideSkill reports whether name selects the tollbit-cli skill, the only
+// bundled skill that also needs auth details rendered into it.
+func isCLIGuideSkill(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "cli", "consumer", "tollbit-cli":
+		return true
+	default:
+		return false
+	}
+}
+
 func renderCLIGuideMarkdown(cmd *cobra.Command, factory app.Factory, markdown string) (string, error) {
 	application, err := appForCommand(factory, cmd)
 	if err != nil {
@@ -70,11 +95,18 @@ func renderCLIGuideMarkdown(cmd *cobra.Command, factory app.Factory, markdown st
 		return "", err
 	}
 	data := cliGuideTemplateData{
+		skillTemplateData:  skillTemplateData{Version: version.Version},
 		AuthInstructions:   renderAuthInstructions(local.Guidance(), remote.Guidance()),
 		AuthCompleteInputs: completeInputs(local, remote),
 		AuthRenderedFooter: fmt.Sprintf("Auth instructions rendered for local=%s, remote=%s; re-run `tollbit guide --install <SKILLS_DIR>` if the CLI's auth configuration changes.", local.Method(), remote.Method()),
 	}
-	tmpl, err := template.New("tollbit-cli-skill").Parse(markdown)
+	return renderSkillTemplate("tollbit-cli", markdown, data)
+}
+
+// renderSkillTemplate renders a bundled skill; every skill takes at least
+// {{ .Version }} (the CLI version) for its frontmatter.
+func renderSkillTemplate(name, markdown string, data any) (string, error) {
+	tmpl, err := template.New(name + "-skill").Parse(markdown)
 	if err != nil {
 		return "", err
 	}
@@ -85,11 +117,18 @@ func renderCLIGuideMarkdown(cmd *cobra.Command, factory app.Factory, markdown st
 	return out.String(), nil
 }
 
-type cliGuideTemplateData struct {
-	AuthInstructions   string
-	AuthCompleteInputs string
-	AuthRenderedFooter string
-}
+type (
+	skillTemplateData struct {
+		Version string
+	}
+
+	cliGuideTemplateData struct {
+		skillTemplateData
+		AuthInstructions   string
+		AuthCompleteInputs string
+		AuthRenderedFooter string
+	}
+)
 
 func renderAuthInstructions(local, remote agentauth.ConsentGuidance) string {
 	var b strings.Builder
@@ -152,4 +191,15 @@ func writeGuideFile(path string, markdown string, stdout, stderr io.Writer) erro
 	}
 	fmt.Fprintf(stdout, "installed SKILL.md at %s\n", display)
 	return nil
+}
+
+func bundledSkillMarkdown(name string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "cli", "consumer", "tollbit-cli":
+		return skillMarkdown, nil
+	case "analytics", "tollbit-analytics":
+		return analyticsSkillMarkdown, nil
+	default:
+		return "", fmt.Errorf("unknown guide skill %q; expected cli or analytics", name)
+	}
 }

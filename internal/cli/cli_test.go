@@ -902,15 +902,46 @@ func TestRunHelpIncludesVersion(t *testing.T) {
 	}
 }
 
-func TestSkillFrontmatterVersionMatchesCLI(t *testing.T) {
-	skillPath := filepath.Join("..", "..", "skill", "tollbit-cli", "SKILL.md")
-	b, err := os.ReadFile(skillPath)
-	if err != nil {
-		t.Fatalf("read skill: %v", err)
+func TestRunGuideRendersCLIVersionIntoSkills(t *testing.T) {
+	for _, skill := range []string{"cli", "analytics"} {
+		var stdout, stderr bytes.Buffer
+		code := executeTestCommand([]string{"guide", "--skill", skill}, nil, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("%s: expected exit code 0, got %d (stderr %q)", skill, code, stderr.String())
+		}
+		if want := "\nversion: " + version.Version + "\n"; !strings.Contains(stdout.String(), want) {
+			t.Fatalf("%s: expected rendered frontmatter %q", skill, strings.TrimSpace(want))
+		}
+		if strings.Contains(stdout.String(), "{{") {
+			t.Fatalf("%s: guide output contains unrendered template syntax", skill)
+		}
 	}
-	wantLine := "version: " + version.Version
-	if !strings.Contains(string(b), wantLine) {
-		t.Fatalf("skill should contain %q for sync with internal/version", wantLine)
+}
+
+func TestRunGuideAnalyticsInstallsUnderSkillName(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommand([]string{"guide", "--skill", "analytics", "--install", dir}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr %q)", code, stderr.String())
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "tollbit-analytics", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read installed skill: %v", err)
+	}
+	if !strings.Contains(string(got), "tollbit analytics schema") {
+		t.Fatalf("installed skill is not the analytics skill: %q", got)
+	}
+}
+
+func TestRunGuideRejectsUnknownSkill(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommand([]string{"guide", "--skill", "nope"}, nil, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("expected usage exit code 2, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "expected cli or analytics") {
+		t.Fatalf("expected the valid skill names in stderr, got %q", stderr.String())
 	}
 }
 

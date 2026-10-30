@@ -191,9 +191,8 @@ Values:
     browser. The agent may need to relay printed browser instructions to the end
     user, then run auth complete after browser approval.
 
-If end-user proximity is not configured, the CLI attempts to determine it
-automatically. When no saved preference exists, it defaults to local (redirect
-browser consent).
+If end-user proximity is not configured and no value is saved, the CLI makes a
+best guess from its environment. A saved value always takes precedence.
 
 Guidance:
   Prefer runtime set when the agent environment is known. Persisting end-user

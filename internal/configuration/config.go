@@ -170,17 +170,6 @@ func validate(config Config) error {
 	return nil
 }
 
-func ResolveConsentStrategy(config Config) string {
-	switch config.Runtime.EndUserProximity {
-	case RuntimeEndUserProximityLocal, RuntimeEndUserProximityAutoDetect:
-		return config.Auth.Consent.Strategy.Local
-	case RuntimeEndUserProximityRemote:
-		return config.Auth.Consent.Strategy.Remote
-	default:
-		return config.Auth.Consent.Strategy.Local
-	}
-}
-
 func validateConsentStrategy(name, strategy string) error {
 	switch strategy {
 	case ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons:

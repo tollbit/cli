@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Bump internal/version.Version and matching strings in skill + README examples."""
+"""Bump internal/version.Version and the pinned install examples in README.
+
+The bundled skills take their version from the CLI when `tollbit guide` renders
+them ({{ .Version }}), so they need no bump.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +24,6 @@ def main() -> None:
 
     root = pathlib.Path(__file__).resolve().parent.parent
     version_go = root / "internal" / "version" / "version.go"
-    skill_md = root / "skill" / "tollbit-cli" / "SKILL.md"
     readme = root / "README.md"
 
     text = version_go.read_text()
@@ -38,12 +41,6 @@ def main() -> None:
         text.replace(f'const Version = "{old}"', f'const Version = "{new}"', 1)
     )
 
-    st = skill_md.read_text()
-    # Whole-token replacement so 1.2.3 does not corrupt 1.2.30-style strings.
-    st_new = re.sub(rf"\b{re.escape(old)}\b", new, st)
-    if st_new == st:
-        print(f"warning: no occurrences of {old} updated in {skill_md}", file=sys.stderr)
-    skill_md.write_text(st_new)
 
     rt = readme.read_text()
     rt_new = rt.replace(f"v{old}", f"v{new}")

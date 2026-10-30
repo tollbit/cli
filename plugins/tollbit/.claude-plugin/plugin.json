@@ -1,0 +1,13 @@
+{
+  "name": "tollbit",
+  "version": "0.4.3",
+  "description": "Search, navigate, and build the agentic internet: use sites built for agents, build your own, and see how agents use them.",
+  "author": {
+    "name": "TollBit",
+    "url": "https://tollbit.com"
+  },
+  "homepage": "https://github.com/tollbit/cli",
+  "repository": "https://github.com/tollbit/cli",
+  "license": "MIT",
+  "keywords": ["agent site", "ai agents", "publishers", "analytics", "tollbit"]
+}
