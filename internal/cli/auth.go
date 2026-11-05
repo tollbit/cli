@@ -80,7 +80,7 @@ func NewAuthCompleteCommand(factory app.Factory) *cobra.Command {
 		Long:  authCompleteLongHelp(factory),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 3 {
-				return UsageError("auth complete accepts at most 3 icon name arguments")
+				return UsageError("auth complete accepts at most 3 arguments")
 			}
 			return nil
 		},
@@ -382,12 +382,9 @@ func runAuthComplete(cmd *cobra.Command, factory app.Factory, args []string) err
 	if !exists {
 		return RuntimeError(errors.New("no pending authorization found"))
 	}
-	if pending.Method == agentauth.ConsentMethodAgentConfirmsIcons {
-		if len(args) == 0 {
-			return UsageError("auth complete requires icon names for this authorization flow; run `tollbit auth complete <first> <second> <third>`. Valid icon names: %s", strings.Join(pending.IconNames, " "))
-		}
-	} else if len(args) != 0 {
-		return UsageError("auth complete does not accept arguments for this authorization flow")
+	input, err := completeDetachedInput(pending, args)
+	if err != nil {
+		return err
 	}
 	strategy, err := application.ConsentStrategy(pending.Method)
 	if err != nil {
@@ -396,7 +393,7 @@ func runAuthComplete(cmd *cobra.Command, factory app.Factory, args []string) err
 	if !strategy.SupportsDetachedCompletion() {
 		return RuntimeError(errors.New("auth complete is not supported or required for this authorization flow; run auth login instead"))
 	}
-	resp, err := strategy.CompleteDetached(cmd, pending, agentauth.CompleteDetachedInput{IconNames: args})
+	resp, err := strategy.CompleteDetached(cmd, pending, input)
 	if err != nil {
 		if isAuthorizationPending(err) {
 			return ExitError{Code: ExitCodeAuthorizationPending, Err: errors.New("authorization still pending")}
@@ -428,6 +425,28 @@ func runAuthComplete(cmd *cobra.Command, factory app.Factory, args []string) err
 		fmt.Fprintln(cmd.ErrOrStderr(), identityResolutionWarning)
 	}
 	return nil
+}
+
+// completeDetachedInput maps positional args onto the pending flow's input. Its
+// errors never repeat args, which can hold a confirmation code.
+func completeDetachedInput(pending agentauth.PendingConsent, args []string) (agentauth.CompleteDetachedInput, error) {
+	switch pending.Method {
+	case agentauth.ConsentMethodAgentConfirmsIcons:
+		if len(args) == 0 {
+			return agentauth.CompleteDetachedInput{}, UsageError("auth complete requires icon names for this authorization flow; run `tollbit auth complete <first> <second> <third>`. Valid icon names: %s", strings.Join(pending.IconNames, " "))
+		}
+		return agentauth.CompleteDetachedInput{IconNames: args}, nil
+	case agentauth.ConsentMethodCodeAuthorization:
+		if len(args) != 1 {
+			return agentauth.CompleteDetachedInput{}, UsageError("auth complete requires one confirmation code for this authorization flow; run `tollbit auth complete <code>`, and quote the code if it contains spaces")
+		}
+		return agentauth.CompleteDetachedInput{Code: args[0]}, nil
+	default:
+		if len(args) != 0 {
+			return agentauth.CompleteDetachedInput{}, UsageError("auth complete does not accept arguments for this authorization flow")
+		}
+		return agentauth.CompleteDetachedInput{}, nil
+	}
 }
 
 func isUnrecognizedIcon(err error) bool {

@@ -26,7 +26,7 @@ The npm package downloads the CLI release from GitHub through the sandbox's prox
 
   ```bash
   installer="$(mktemp)"
-  curl -fsSL -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.5.0/scripts/install.sh"
+  curl -fsSL -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.5.1/scripts/install.sh"
   bash "$installer" --no-modify-path
   ~/.local/bin/tollbit version
   ```
@@ -57,7 +57,7 @@ If `tollbit auth login` fails with `authorization timed out`, ask the user what 
 - They didn't get to it in time: run `tollbit auth login` again.
 - No page opened for them, or they approved and their browser then couldn't connect: their browser isn't on this machine. Run `tollbit runtime set --end-user-proximity remote` and log in again.
 
-With `remote`, `tollbit auth login` prints a link. Give it to the user, and ask them to read back the three icons the page shows. Then run `tollbit auth complete` with those names, as the tollbit-cli skill describes.
+With `remote`, `tollbit auth login` prints a link. Give it to the user, and ask them to paste back the code the page shows after they click Authorize. Then run `tollbit auth complete <code>`, as the tollbit-cli skill describes.
 
 ## 3. Name this agent
 

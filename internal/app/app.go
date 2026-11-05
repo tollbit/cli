@@ -9,6 +9,7 @@ import (
 	"github.com/tollbit/cli/internal/agentauth"
 	"github.com/tollbit/cli/internal/agentauth/agentconfirmsicons"
 	"github.com/tollbit/cli/internal/agentauth/browserselecticon"
+	"github.com/tollbit/cli/internal/agentauth/codeauthorization"
 	"github.com/tollbit/cli/internal/agentauth/redirect"
 	"github.com/tollbit/cli/internal/client/analytics"
 	"github.com/tollbit/cli/internal/client/auth"
@@ -244,6 +245,17 @@ func (a *App) buildConsentStrategy(ctx context.Context, authClient *auth.Client,
 			return nil, fmt.Errorf("build agent-confirms-icons consent strategy: %w", err)
 		}
 		return agentConfirmsIconsStrategy, nil
+	case configuration.ConsentStrategyCodeAuthorization:
+		codeAuthorizationStrategy, err := codeauthorization.NewConsentStrategy(codeauthorization.ConsentStrategyConfig{
+			AuthClient:       authClient,
+			Runtime:          rt,
+			AutoOpenBrowser:  autoOpenBrowser,
+			UseRefreshTokens: a.config.Auth.UseRefreshTokens,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("build code-authorization consent strategy: %w", err)
+		}
+		return codeAuthorizationStrategy, nil
 	default:
 		return nil, fmt.Errorf("unsupported consent strategy %q", strategy)
 	}

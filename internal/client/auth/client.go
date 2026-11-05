@@ -106,6 +106,27 @@ type (
 		WBA             *WebBotAuth `json:"wba,omitempty"`
 	}
 
+	ConsentCodeAuthorizationStartRequest struct {
+		CodeChallenge       string `json:"code_challenge"`
+		CodeChallengeMethod string `json:"code_challenge_method"`
+		Scope               string `json:"scope,omitempty"`
+	}
+
+	ConsentCodeAuthorizationStartResponse struct {
+		ChallengeID string `json:"challenge_id"`
+		ConsentURL  string `json:"consent_url"`
+		ExpiresAt   string `json:"expires_at"`
+	}
+
+	ConsentCodeAuthorizationTokenRequest struct {
+		AgentIdentifier string      `json:"agent_identifier"`
+		ChallengeID     string      `json:"challenge_id"`
+		Code            string      `json:"code"`
+		CodeVerifier    string      `json:"code_verifier"`
+		UA              *string     `json:"ua,omitempty"`
+		WBA             *WebBotAuth `json:"wba,omitempty"`
+	}
+
 	RefreshTokenGrantRequest struct {
 		AgentIdentifier string
 		RefreshToken    string
@@ -174,6 +195,7 @@ const (
 	grantTypeConsentRedirect           = "consent:redirect"
 	grantTypeConsentBrowserSelectIcon  = "consent:browser_select_icon"
 	grantTypeConsentAgentConfirmsIcons = "consent:agent_confirms_icons"
+	grantTypeConsentCodeAuthorization  = "consent:code_authorization"
 )
 
 var authLogBodyRedactor = logging.NewHTTPBodyRedactor(logging.HTTPBodyRedactorConfig{
@@ -181,6 +203,19 @@ var authLogBodyRedactor = logging.NewHTTPBodyRedactor(logging.HTTPBodyRedactorCo
 	JSONFields: map[string]logging.JSONFieldRedactor{
 		"token":         logging.AbbreviateJSONSecret(6, 4),
 		"refresh_token": logging.AbbreviateJSONSecret(6, 4),
+	},
+})
+
+// authLogRequestBodyRedactor also hides the consent grant's code and verifier.
+// It is separate because `code` in a response body is a harmless problem code
+// that the logs need to show.
+var authLogRequestBodyRedactor = logging.NewHTTPBodyRedactor(logging.HTTPBodyRedactorConfig{
+	FullyRedactedPaths: []string{"/agent/v1/whoami"},
+	JSONFields: map[string]logging.JSONFieldRedactor{
+		"token":         logging.AbbreviateJSONSecret(6, 4),
+		"refresh_token": logging.AbbreviateJSONSecret(6, 4),
+		"code":          logging.RedactJSONField,
+		"code_verifier": logging.RedactJSONField,
 	},
 })
 
@@ -348,6 +383,59 @@ func (c *Client) RedeemAgentConsentAgentConfirmsIcons(ctx context.Context, token
 		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
 		ChallengeID:     strings.TrimSpace(req.ChallengeID),
 		IconNames:       iconNames,
+		CodeVerifier:    req.CodeVerifier,
+		UA:              req.UA,
+		WBA:             req.WBA,
+	}
+	u := c.resolve("/agent/v1/tokens/identity")
+	var out AgentTokenResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), body, &out, withBearerToken(token)); err != nil {
+		return AgentTokenResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *Client) StartAgentConsentCodeAuthorization(ctx context.Context, token agent.Token, req ConsentCodeAuthorizationStartRequest) (ConsentCodeAuthorizationStartResponse, error) {
+	if strings.TrimSpace(token.RawToken) == "" {
+		return ConsentCodeAuthorizationStartResponse{}, errors.New("agent token is required")
+	}
+	if strings.TrimSpace(req.CodeChallenge) == "" {
+		return ConsentCodeAuthorizationStartResponse{}, errors.New("code challenge is required")
+	}
+	if strings.TrimSpace(req.CodeChallengeMethod) == "" {
+		req.CodeChallengeMethod = "S256"
+	}
+
+	u := c.resolve("/agent/v1/consent/code-authorization/start")
+	var out ConsentCodeAuthorizationStartResponse
+	if err := c.doJSON(ctx, http.MethodPost, u.String(), req, &out, withBearerToken(token)); err != nil {
+		return ConsentCodeAuthorizationStartResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *Client) RedeemAgentConsentCodeAuthorization(ctx context.Context, token agent.Token, req ConsentCodeAuthorizationTokenRequest) (AgentTokenResponse, error) {
+	if strings.TrimSpace(token.RawToken) == "" {
+		return AgentTokenResponse{}, errors.New("agent token is required")
+	}
+	if strings.TrimSpace(req.AgentIdentifier) == "" {
+		return AgentTokenResponse{}, errors.New("agent identifier is required")
+	}
+	if strings.TrimSpace(req.ChallengeID) == "" {
+		return AgentTokenResponse{}, errors.New("challenge id is required")
+	}
+	if strings.TrimSpace(req.Code) == "" {
+		return AgentTokenResponse{}, errors.New("confirmation code is required")
+	}
+	if strings.TrimSpace(req.CodeVerifier) == "" {
+		return AgentTokenResponse{}, errors.New("code verifier is required")
+	}
+
+	body := identityTokenRequest{
+		GrantType:       grantTypeConsentCodeAuthorization,
+		AgentIdentifier: strings.TrimSpace(req.AgentIdentifier),
+		ChallengeID:     strings.TrimSpace(req.ChallengeID),
+		Code:            req.Code,
 		CodeVerifier:    req.CodeVerifier,
 		UA:              req.UA,
 		WBA:             req.WBA,
@@ -543,7 +631,7 @@ func logRequest(ctx context.Context, req *http.Request, body []byte) {
 		e = e.Str("authorization", redactSecret(token))
 	}
 	if len(body) > 0 {
-		e = e.Str("request_body", authLogBodyRedactor.Redact(req.URL.Path, body))
+		e = e.Str("request_body", authLogRequestBodyRedactor.Redact(req.URL.Path, body))
 	}
 	e.Msg("auth request")
 }
@@ -567,7 +655,7 @@ func logResponse(ctx context.Context, method, rawURL string, reqBody []byte, sta
 			Str("status", status).
 			Str("response_body", loggedBody)
 		if len(reqBody) > 0 {
-			e = e.Str("request_body", authLogBodyRedactor.Redact(path, reqBody))
+			e = e.Str("request_body", authLogRequestBodyRedactor.Redact(path, reqBody))
 		}
 		e.Msg("auth response error")
 	}

@@ -33,6 +33,9 @@ const (
 	// ErrorCodeUnrecognizedIcon means a submitted icon name did not match the
 	// icon manifest; no consent attempt is consumed.
 	ErrorCodeUnrecognizedIcon ErrorCode = "unrecognized_icon"
+	// ErrorCodeMalformedCode means a submitted confirmation code was not in the
+	// code format; no consent attempt is consumed.
+	ErrorCodeMalformedCode ErrorCode = "malformed_code"
 	// ErrorCodeEntitlementRequired means the org lacks the entitlement the
 	// operation needs. When accepting terms grants it, the problem carries a
 	// "terms_url" to accept them at.

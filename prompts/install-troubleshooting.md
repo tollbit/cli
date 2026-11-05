@@ -81,7 +81,7 @@ These are the hosts installing needs:
 | `raw.githubusercontent.com` | `install.sh`, `install.ps1` | https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh |
 | `api.github.com` | the scripts, to find the latest version (not needed when a version is given) | https://api.github.com/repos/tollbit/cli/releases/latest |
 | `github.com` | every method: release downloads, and Claude Code's `/plugin marketplace add` | https://github.com/tollbit/cli/releases |
-| `release-assets.githubusercontent.com` | every method: GitHub redirects release downloads here | https://github.com/tollbit/cli/releases/download/v0.5.0/tollbit_0.5.0_checksums.txt (follows the redirect) |
+| `release-assets.githubusercontent.com` | every method: GitHub redirects release downloads here | https://github.com/tollbit/cli/releases/download/v0.5.1/tollbit_0.5.1_checksums.txt (follows the redirect) |
 | `registry.npmjs.org` | npm | https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest |
 
 `release-assets.githubusercontent.com` has no probe of its own: rate it by the release download line, after the redirect. If `github.com` passes and the release download fails, `release-assets.githubusercontent.com` is the blocked host.
@@ -91,7 +91,7 @@ for url in \
   https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh \
   https://api.github.com/repos/tollbit/cli/releases/latest \
   https://github.com/tollbit/cli/releases \
-  https://github.com/tollbit/cli/releases/download/v0.5.0/tollbit_0.5.0_checksums.txt \
+  https://github.com/tollbit/cli/releases/download/v0.5.1/tollbit_0.5.1_checksums.txt \
   https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest
 do
   echo "== $url"
@@ -105,7 +105,7 @@ $urls = @(
   'https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh',
   'https://api.github.com/repos/tollbit/cli/releases/latest',
   'https://github.com/tollbit/cli/releases',
-  'https://github.com/tollbit/cli/releases/download/v0.5.0/tollbit_0.5.0_checksums.txt',
+  'https://github.com/tollbit/cli/releases/download/v0.5.1/tollbit_0.5.1_checksums.txt',
   'https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest'
 )
 foreach ($u in $urls) {
@@ -195,8 +195,8 @@ If none exists and the release download was **ok** in step 3, test a fresh copy 
 
 ```bash
 t="$(mktemp -d)"; cd "$t"
-base=https://github.com/tollbit/cli/releases/download/v0.5.0
-curl -fsSLO "$base/tollbit_0.5.0_checksums.txt"
+base=https://github.com/tollbit/cli/releases/download/v0.5.1
+curl -fsSLO "$base/tollbit_0.5.1_checksums.txt"
 a="$(grep -o 'tollbit_[^ ]*_<os>_<arch>.tar.gz' tollbit_*_checksums.txt)"
 curl -fsSLO "$base/$a" && grep " $a\$" tollbit_*_checksums.txt | (shasum -a 256 -c 2>/dev/null || sha256sum -c) \
   && tar -xzf "$a" && ./tollbit version
@@ -205,8 +205,8 @@ cd - >/dev/null; rm -rf "$t"
 
 ```powershell
 $t = Join-Path $env:TEMP "tollbit-test-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory $t | Out-Null
-$base = 'https://github.com/tollbit/cli/releases/download/v0.5.0'
-Invoke-WebRequest "$base/tollbit_0.5.0_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
+$base = 'https://github.com/tollbit/cli/releases/download/v0.5.1'
+Invoke-WebRequest "$base/tollbit_0.5.1_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
 $line = Select-String -Path "$t\sums.txt" -Pattern '_windows_<arch>\.zip$' | Select-Object -First 1
 $sum, $a = $line.Line -split '\s+'
 Invoke-WebRequest "$base/$a" -OutFile "$t\$a" -UseBasicParsing

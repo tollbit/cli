@@ -42,6 +42,7 @@ type (
 // template ("### Install: <title>").
 var installSections = map[string]string{
 	"script":        "script",
+	"codex":         "Codex",
 	"claude-plugin": "Claude plugin",
 	"mcp":           "MCP (coming soon)",
 	"not-supported": "not supported",

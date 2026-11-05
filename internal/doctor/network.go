@@ -34,6 +34,15 @@ const (
 
 var proxyEnvVars = []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY", "no_proxy"}
 
+// sandboxEnvVars are set by agent harnesses that run commands with the
+// network turned off. A harness's general "in a sandbox" variable does not
+// belong here: its sandbox may still have network access.
+var sandboxEnvVars = []string{"CODEX_SANDBOX_NETWORK_DISABLED"}
+
+// sandboxHintLead goes in front of a DNS hint. It keeps that hint rather than
+// replacing it, because broken corporate DNS can also fail every host.
+const sandboxHintLead = "This may be a sandbox with no network. Allow network access, or run this in your own terminal. Otherwise, "
+
 type target struct {
 	host string
 	// uses names the config settings that point at host.
@@ -49,9 +58,41 @@ type target struct {
 func networkChecks(ctx context.Context, opts Options) []Check {
 	checks := proxyChecks(opts)
 	targets := hostTargets(opts)
-	return append(checks, parallel(targets, func(t target) Check {
+	hosts := parallel(targets, func(t target) Check {
 		return probeHost(ctx, opts, t)
-	})...)
+	})
+	return append(checks, withSandboxHint(hosts, opts)...)
+}
+
+// withSandboxHint leads the DNS hints of hosts with the sandbox when one is
+// the likely cause: every host failed DNS, or the harness says the network is
+// off. Each probe sees only its own host, so this runs once they all finish.
+// When only some hosts fail DNS, the network works and those hosts are blocked.
+func withSandboxHint(hosts []Check, opts Options) []Check {
+	dnsFailures := 0
+	for _, c := range hosts {
+		if c.ErrorKind == KindDNS {
+			dnsFailures++
+		}
+	}
+	if dnsFailures == 0 || (dnsFailures < len(hosts) && !sandboxEnvSet(opts)) {
+		return hosts
+	}
+	for i := range hosts {
+		if hosts[i].ErrorKind == KindDNS {
+			hosts[i].Hint = sandboxHintLead + hosts[i].Hint
+		}
+	}
+	return hosts
+}
+
+func sandboxEnvSet(opts Options) bool {
+	for _, name := range sandboxEnvVars {
+		if strings.TrimSpace(opts.Getenv(name)) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func proxyChecks(opts Options) []Check {

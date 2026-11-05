@@ -1,6 +1,6 @@
 ---
 name: tollbit-cli
-version: 0.5.0
+version: 0.5.1
 description: Search for news and articles and ground answers in licensed publisher content on the TollBit network. Use whenever the user wants to find news, articles, reporting, or sources on a topic or current event — searches the catalog, then prices and fetches full article content (paid) with the tollbit CLI.
 ---
 
@@ -69,17 +69,18 @@ Configured local flow: local browser
 - For local authorization, run `tollbit auth login` in the same environment as the end user's browser. The CLI opens the browser when configured to do so, waits for the loopback callback, and completes authorization automatically.
 - No detached completion command is used for the local browser flow; if authorization is interrupted, rerun `tollbit auth login`.
 
-Configured remote flow: detached icon confirmation
+Configured remote flow: detached code authorization
 
-- For remote authorization, run `tollbit auth login` and relay only the printed consent URL to the end user. Do not send the valid icon vocabulary to the user; it is for the agent's spelling reference only.
-- After the end user authorizes in their browser, they will read back three icon names. Verify the icon names against the list of valid icons previously provided in `auth login`. Then run `tollbit auth complete <first> <second> <third>` using those names in exactly the displayed order.
+- For remote authorization, run `tollbit auth login` and relay only the printed consent URL to the end user. After they sign in and click Authorize, the page shows a confirmation code in the form XXXX-XXXX. Ask them to paste it back to you.
+- Run `tollbit auth complete <code>` with the code the end user pasted back. Case, hyphens, and spaces do not matter. A wrong code ends the authorization, so use the code exactly as given. The code is a secret: do not repeat it to the end user or save it anywhere.
 
 Remote troubleshooting:
-- `unrecognized icon name`: one submitted word did not match the icon manifest and no attempt was consumed; confirm spelling with the end user using the printed vocabulary, then rerun `tollbit auth complete <first> <second> <third>`.
-- `authorization denied`: the icons or order were wrong and the challenge is dead; restart with `tollbit auth login`.
-- `authorization still pending`: the end user has not clicked Authorize yet; wait for the end user to finish, then rerun `tollbit auth complete <first> <second> <third>`.
+- `malformed confirmation code`: the code is not in the XXXX-XXXX format and no attempt was consumed; confirm the code with the end user, then rerun `tollbit auth complete <code>`.
+- `authorization denied`: the code was wrong and the challenge is dead; restart with `tollbit auth login`.
+- `authorization still pending`: the end user has not clicked Authorize yet; wait for the end user to finish, then rerun `tollbit auth complete <code>`.
+- `authorization expired or invalid`: the challenge can no longer be completed; restart with `tollbit auth login`.
 
-If `auth login` or `auth complete` reports that authorization is still pending, it exits with code 3 and keeps the pending authorization. Wait for the end user to finish and run `auth complete` again (`auth complete` takes: pending auth plus three icon names). After authorization succeeds, retry the command that required user/org authorization. Use `tollbit runtime status` to inspect the current setting. When the agent environment is known, prefer `tollbit runtime set --end-user-proximity local|remote` so future commands use the right flow automatically. Use `--end-user-proximity local|remote` only for a one-off override.
+If `auth login` or `auth complete` reports that authorization is still pending, it exits with code 3 and keeps the pending authorization. Wait for the end user to finish and run `auth complete` again (`auth complete` takes: pending auth plus the confirmation code). After authorization succeeds, retry the command that required user/org authorization. Use `tollbit runtime status` to inspect the current setting. When the agent environment is known, prefer `tollbit runtime set --end-user-proximity local|remote` so future commands use the right flow automatically. Use `--end-user-proximity local|remote` only for a one-off override.
 
 ## For automation
 
@@ -95,4 +96,4 @@ If `auth login` or `auth complete` reports that authorization is still pending, 
 Install this skill: `tollbit guide --install <SKILLS_DIR>`.
 Compare frontmatter `version` with `tollbit version` when updating.
 
-Auth instructions rendered for local=redirect, remote=agent_confirms_icons; re-run `tollbit guide --install <SKILLS_DIR>` if the CLI's auth configuration changes.
+Auth instructions rendered for local=redirect, remote=code_authorization; re-run `tollbit guide --install <SKILLS_DIR>` if the CLI's auth configuration changes.

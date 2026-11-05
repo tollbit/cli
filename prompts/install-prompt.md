@@ -37,8 +37,8 @@ Users often get their platform wrong, so decide from your own evidence. If the u
    | Claude Code (terminal) | `CLAUDE_CODE_ENTRYPOINT=cli` | Install: script |
    | Claude Code on the web | `CLAUDE_CODE_ENTRYPOINT=remote`, in a cloud Linux container | Install: script |
    | Claude Duet | untested: your instructions name Claude Duet | Install: MCP (coming soon) |
-   | Codex (ChatGPT desktop app) | `CODEX_SANDBOX`, plus `CODEX_APP_RUNTIME_CLI_PATH` and `CODEX_APP_TOOLS_PIPE_PATH` | Install: script |
-   | Codex CLI | `CODEX_SANDBOX`, without any `CODEX_APP_*` variables | Install: script |
+   | Codex (ChatGPT desktop app) | `CODEX_SANDBOX`, plus `CODEX_APP_RUNTIME_CLI_PATH` and `CODEX_APP_TOOLS_PIPE_PATH` | Install: Codex |
+   | Codex CLI | `CODEX_SANDBOX`, without any `CODEX_APP_*` variables | Install: Codex |
    | Cursor | `CURSOR_AGENT=1`, plus `CURSOR_LAYOUT` and `VSCODE_*` variables | Install: script |
    | Cursor CLI | `CURSOR_AGENT=1`, without `CURSOR_LAYOUT` or `VSCODE_*` variables | Install: script |
    | Gemini app | no shell; your instructions say "You are Gemini" | Install: MCP (coming soon) |
@@ -67,23 +67,54 @@ Tell the user you're installing the TollBit CLI, then run the installer. The dow
 On macOS or Linux:
 
 ```bash
-installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.5.0/scripts/install.sh" && bash "$installer" --version v0.5.0
+installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.5.1/scripts/install.sh" && bash "$installer" --version v0.5.1
 ```
 
 On Windows (PowerShell):
 
 ```powershell
-& ([scriptblock]::Create((irm -TimeoutSec 120 "https://raw.githubusercontent.com/tollbit/cli/v0.5.0/scripts/install.ps1"))) -Version v0.5.0
+& ([scriptblock]::Create((irm -TimeoutSec 120 "https://raw.githubusercontent.com/tollbit/cli/v0.5.1/scripts/install.ps1"))) -Version v0.5.1
 ```
 
 - **Approvals.** Many agents ask the user before running a command. If yours does, tell the user what the command does and ask them to approve it.
-- **Network.** The installer downloads from GitHub. If your commands run without network access (Codex does by default), ask the user to allow network access for this one command. In a cloud sandbox with an allowlist, it needs `raw.githubusercontent.com`, `api.github.com`, `github.com` and `release-assets.githubusercontent.com`.
+- **Network.** The installer downloads from GitHub, and `tollbit` commands need network access too. Some agents run commands without network access. If yours does, ask the user to allow it. The fallbacks below need network access too, so don't try them. If you can't get access, give the user the command to run in their own terminal. In a cloud sandbox with an allowlist, the installer needs `raw.githubusercontent.com`, `api.github.com`, `github.com` and `release-assets.githubusercontent.com`.
 - **A hang is a failure.** If the installer times out, or prints nothing for two minutes, stop it and go to the fallbacks below. Don't wait, and don't retry the same command.
 - **If the installer fails,** use the first of these that works:
-  1. **npm, but only if it's already installed** (`npm --version` works): `npm install -g @tollbit/tollbit-cli@0.5.0`. Don't install Node.js or Git to get it: on a managed work computer, those installers can wait for an administrator prompt the user never sees.
-  2. **The release, from github.com.** Download `tollbit_0.5.0_<os>_<arch>.tar.gz` (`.zip` on Windows; `<os>` is `darwin`, `linux` or `windows`, and `<arch>` is `amd64` or `arm64`) and `tollbit_0.5.0_checksums.txt` from `https://github.com/tollbit/cli/releases/download/v0.5.0/`, with the same two-minute limit. Check the archive's SHA-256 against the checksums file, unpack it, and put `tollbit` (`tollbit.exe` on Windows) in a directory on the user's PATH, such as `~/.local/bin`.
+  1. **npm, but only if it's already installed** (`npm --version` works): `npm install -g @tollbit/tollbit-cli@0.5.1`. Don't install Node.js or Git to get it: on a managed work computer, those installers can wait for an administrator prompt the user never sees.
+  2. **The release, from github.com.** Download `tollbit_0.5.1_<os>_<arch>.tar.gz` (`.zip` on Windows; `<os>` is `darwin`, `linux` or `windows`, and `<arch>` is `amd64` or `arm64`) and `tollbit_0.5.1_checksums.txt` from `https://github.com/tollbit/cli/releases/download/v0.5.1/`, with the same two-minute limit. Check the archive's SHA-256 against the checksums file, unpack it, and put `tollbit` (`tollbit.exe` on Windows) in a directory on the user's PATH, such as `~/.local/bin`.
 - **Check it** with `tollbit doctor`, which exits 1 if a check fails. If `tollbit` isn't found, the installer put it in `~/.local/bin`: run it from there, or start a new shell.
-- **If it still fails,** don't try other sources. Get the troubleshooting prompt from https://assets.cdn.tollbit.com/cli/prompts/install-troubleshooting.md, or if that fails, from https://github.com/tollbit/cli/releases/download/v0.5.0/install-troubleshooting.md. Follow it: it finds where the install breaks and writes a report for TollBit support.
+- **If it still fails,** don't try other sources. Get the troubleshooting prompt from https://assets.cdn.tollbit.com/cli/prompts/install-troubleshooting.md, or if that fails, from https://github.com/tollbit/cli/releases/download/v0.5.1/install-troubleshooting.md. Follow it: it finds where the install breaks and writes a report for TollBit support.
+
+### Install: Codex
+
+Codex runs your commands in a sandbox with no network access, where only your workspace is writable. The install and every `tollbit` command need network access and write to `~/.local/bin` or `~/.config/tollbit`, so allowing only the install isn't enough.
+
+Don't run the installer to see what happens, and don't try npm, a release download or the troubleshooting prompt. They all need the same access.
+
+1. **Choose how to install.** If you have a `request_permissions` tool, and `ls -ld ~/.local ~/.local/bin ~/.config ~/.config/tollbit` shows no symlinks (a missing path is fine), go to step 2. Otherwise go to step 3.
+2. **Install from here.** Make one `request_permissions` call for network access and write access to the full paths of `~/.local/bin` and `~/.config/tollbit`. Ask for nothing else, and never for a shell profile such as `~/.zshrc`: Codex can't grant a symlink, and asking for one can break your shell tool until the user starts a new chat. Ask the user to approve it for the whole session if Codex offers that. Once it's granted, run this in your shell tool, not a Node REPL or any other tool, because their sandboxes differ:
+
+   ```bash
+   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.5.1/scripts/install.sh" && bash "$installer" --version v0.5.1 --no-modify-path
+   ```
+
+   Then run `tollbit doctor` and follow "After installing" straight away, because the access may end with this turn. If `tollbit` isn't found, the installer put it in `~/.local/bin`: run it from there, and give the user the PATH line the installer printed. If anything here fails, go to step 3.
+3. **Hand it to the user.** Tell them the Codex sandbox stops you doing this, and show them both of these commands in full, to run in their own terminal, not in Codex. The first installs TollBit. The second adds a Codex rule that lets `tollbit` commands, and nothing else, run outside the sandbox without asking. Tell them that includes paid commands such as `tollbit content`.
+
+   ```bash
+   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.5.1/scripts/install.sh" && bash "$installer" --version v0.5.1
+   ```
+
+   ```bash
+   mkdir -p ~/.codex/rules && r='prefix_rule(pattern = ["tollbit"], decision = "allow")' && { grep -qsxF "$r" ~/.codex/rules/default.rules || printf '\n%s\n' "$r" >> ~/.codex/rules/default.rules; }
+   ```
+
+   On Windows, the first command is the PowerShell one in "Install: script", and the second is adding `prefix_rule(pattern = ["tollbit"], decision = "allow")` as a line in `%USERPROFILE%\.codex\rules\default.rules`.
+
+   Then they restart Codex and ask you to carry on. In the CLI, `codex resume --last` brings this conversation back. When they do, run `tollbit doctor` and follow "After installing".
+4. **Keep TollBit working.** If you installed in step 2, finish by telling the user that the access they approved ends with this turn or this session, so TollBit will need their approval again after that. Do this even if they approved it for the session. To avoid that, offer them the second command in step 3, say what it does, including that it covers paid commands such as `tollbit content`, and tell them to restart Codex after running it. If they'd rather not add the rule, they can switch Codex to Full access, or run `tollbit` in their own terminal.
+
+Once the rule is in place, run each `tollbit` command on its own. Don't chain it with other commands, because the rule covers only `tollbit`.
 
 ### Install: Claude plugin
 

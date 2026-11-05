@@ -15,6 +15,7 @@ const (
 	ConsentMethodRedirect           ConsentMethod = "redirect"
 	ConsentMethodBrowserSelectIcon  ConsentMethod = "browser_select_icon"
 	ConsentMethodAgentConfirmsIcons ConsentMethod = "agent_confirms_icons"
+	ConsentMethodCodeAuthorization  ConsentMethod = "code_authorization"
 )
 
 type (
@@ -36,6 +37,7 @@ type (
 
 	CompleteDetachedInput struct {
 		IconNames []string
+		Code      string
 	}
 
 	ConsentGuidance struct {

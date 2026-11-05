@@ -186,3 +186,23 @@ func TestBuildConsentStrategyAgentConfirmsIcons(t *testing.T) {
 		t.Fatalf("unexpected guidance: %#v", strategy.Guidance())
 	}
 }
+
+func TestBuildConsentStrategyCodeAuthorization(t *testing.T) {
+	config := testConfig(t)
+	config.Runtime.EndUserProximity = configuration.RuntimeEndUserProximityRemote
+	config.Auth.Consent.Strategy.Remote = configuration.ConsentStrategyCodeAuthorization
+	app, err := New(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	strategy, err := app.ConsentStrategy(agentauth.ConsentMethodCodeAuthorization)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strategy.Method() != agentauth.ConsentMethodCodeAuthorization {
+		t.Fatalf("expected code_authorization method, got %q", strategy.Method())
+	}
+	if !strategy.SupportsDetachedCompletion() || strategy.AutoOpensBrowser() {
+		t.Fatalf("expected a detached strategy that leaves the browser to the end user, got %#v", strategy)
+	}
+}

@@ -14,6 +14,8 @@
 #              platform without detection gets no row.
 #   install:   the install section it follows:
 #                script         "Install: script", install.sh or install.ps1
+#                codex          "Install: Codex", the installer and a sandbox
+#                               rule for tollbit, in the Codex CLI and app
 #                claude-plugin  "Install: Claude plugin", the plugin and its
 #                               install skill, in Claude chat
 #                mcp            "Install: MCP (coming soon)"
@@ -51,10 +53,10 @@ platforms:
     install: mcp
   - name: Codex (ChatGPT desktop app)
     detection: '`CODEX_SANDBOX`, plus `CODEX_APP_RUNTIME_CLI_PATH` and `CODEX_APP_TOOLS_PIPE_PATH`'
-    install: script
+    install: codex
   - name: Codex CLI
     detection: '`CODEX_SANDBOX`, without any `CODEX_APP_*` variables'
-    install: script
+    install: codex
   - name: Cursor
     detection: '`CURSOR_AGENT=1`, plus `CURSOR_LAYOUT` and `VSCODE_*` variables'
     install: script

@@ -13,6 +13,8 @@ const testTemplate = `Intro.
 
 ### Install: script
 
+### Install: Codex
+
 ### Install: Claude plugin
 
 ### Install: MCP (coming soon)

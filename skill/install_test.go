@@ -1,4 +1,4 @@
-package cli
+package skill
 
 import (
 	"os"
@@ -6,22 +6,22 @@ import (
 	"testing"
 )
 
-func TestSkillNameFromMarkdown(t *testing.T) {
-	name, err := skillNameFromMarkdown(skillMarkdown)
+func TestName(t *testing.T) {
+	name, err := Name(TollbitCLISkill)
 	if err != nil {
-		t.Fatalf("skillNameFromMarkdown: %v", err)
+		t.Fatalf("Name: %v", err)
 	}
 	if name != "tollbit-cli" {
 		t.Fatalf("name=%q want tollbit-cli", name)
 	}
 }
 
-func TestResolveSkillInstallDirectory(t *testing.T) {
+func TestInstallDir(t *testing.T) {
 	const skillName = "tollbit-cli"
 	tmp := t.TempDir()
 
 	t.Run("parent_skills_dir", func(t *testing.T) {
-		got := resolveSkillInstallDirectory(tmp, skillName)
+		got := InstallDir(tmp, skillName)
 		want := filepath.Join(tmp, "tollbit-cli")
 		if got != want {
 			t.Fatalf("got %q want %q", got, want)
@@ -33,7 +33,7 @@ func TestResolveSkillInstallDirectory(t *testing.T) {
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		got := resolveSkillInstallDirectory(skillDir, skillName)
+		got := InstallDir(skillDir, skillName)
 		if got != filepath.Clean(skillDir) {
 			t.Fatalf("got %q want %q", got, skillDir)
 		}
@@ -41,7 +41,7 @@ func TestResolveSkillInstallDirectory(t *testing.T) {
 
 	t.Run("skill_dir_with_trailing_separator", func(t *testing.T) {
 		skillDir := filepath.Join(t.TempDir(), "trail", skillName) + string(os.PathSeparator)
-		got := resolveSkillInstallDirectory(skillDir, skillName)
+		got := InstallDir(skillDir, skillName)
 		want := filepath.Clean(skillDir)
 		if got != want {
 			t.Fatalf("got %q want %q", got, want)

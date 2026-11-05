@@ -1,6 +1,6 @@
 ---
 name: tollbit-analytics
-version: 0.5.0
+version: 0.5.1
 description: Query TollBit analytics for the sites of the organization the agent works for — which bots, crawlers and AI agents visit, how often, which pages they request, referrer traffic, and extracted entities and brands. Use whenever the user asks about traffic to their own sites from bots or agents, crawler activity, or TollBit analytics, with the tollbit CLI's read-only SQL.
 ---
 

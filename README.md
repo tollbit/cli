@@ -21,7 +21,7 @@ curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.s
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.5.0
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.5.1
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
@@ -37,7 +37,7 @@ Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
 irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
-Install-Tollbit -Version v0.5.0 -Force
+Install-Tollbit -Version v0.5.1 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -172,15 +172,16 @@ Install writes `<dir>/<skill-name>/SKILL.md` (name from embedded frontmatter, e.
 ```bash
 tollbit doctor
 tollbit doctor --json
+tollbit doctor --skills-dir ~/.claude/skills
 ```
 
 Checks that the CLI can work on this machine, and is the first thing to run when it installs but does not work:
 
 - **Execution:** version, OS/arch, install method, the binary's path, and whether `tollbit` on PATH is this binary.
 - **Directories:** that the CLI can create and write its state (`TOLLBIT_RUNTIME_STATE_DIR`) and credentials (`TOLLBIT_CREDENTIALS_STORAGE_DIR`) directories, and whether it can update itself in its install directory.
-- **Network:** proxy environment variables (credentials redacted), and for each host the CLI is configured to call (auth, gateway, and GitHub releases, following the redirect to the asset host) whether it resolves, completes TLS and answers. Failures name their kind: `dns`, `connect`, `timeout`, `proxy_unreachable`, `proxy_rejected`, `proxy_auth_required`, `tls_intercepted` (with the certificate issuer), `tls_other`, or `http_<status>`. On Windows it warns when a system proxy is set but `HTTPS_PROXY` is not, since the CLI only uses the environment variables.
+- **Network:** proxy environment variables (credentials redacted), and for each host the CLI is configured to call (auth, gateway, and GitHub releases, following the redirect to the asset host) whether it resolves, completes TLS and answers. Failures name their kind: `dns`, `connect`, `timeout`, `proxy_unreachable`, `proxy_rejected`, `proxy_auth_required`, `tls_intercepted` (with the certificate issuer), `tls_other`, or `http_<status>`. When every host fails DNS, or `CODEX_SANDBOX_NETWORK_DISABLED` is set, the DNS hints lead with a sandbox that has no network, and still mention DNS, VPN and IT. On Windows it warns when a system proxy is set but `HTTPS_PROXY` is not, since the CLI only uses the environment variables.
 - **Auth:** whether a token is stored and when it expires, read from disk only. Informational; it never fails.
-- **Skills:** the agent skills bundled with this CLI (`tollbit-cli`, `tollbit-analytics`) and their version, with the command to install or update each. Doctor does not look for installed copies, since every agent keeps skills in its own place; an agent compares the `version:` line of the SKILL.md it loaded. Informational; it never fails.
+- **Skills:** the agent skills bundled with this CLI (`tollbit-cli`, `tollbit-analytics`) and their version, with the command to install or update each. By default doctor does not look for installed copies, since every agent keeps skills in its own place; an agent compares the `version:` line of the SKILL.md it loaded. With `--skills-dir <dir>`, the folder given to `tollbit guide --install`, doctor checks `<dir>/<skill-name>/SKILL.md` for each skill: `PASS` when the version matches this CLI, `WARN` when it is missing, out of date or has no version, and `WARN` when the folder itself is missing or unreadable. The hint gives the command to run, and `--json` adds `path` and `installed_version`. It doesn't see skills installed through the Claude plugin, which live elsewhere. Skill checks never fail, so they never change the exit code.
 
 Each line is `PASS`, `WARN`, `FAIL` or `INFO`, with a hint for anything not passing. Exits `1` when any check fails. Never prints tokens or credentials. `doctor` skips the automatic update check, so it runs even when an update is required.
 
@@ -210,7 +211,7 @@ Installer channel updates:
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.5.0 --force
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.5.1 --force
 ```
 
 ```powershell

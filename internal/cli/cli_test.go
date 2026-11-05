@@ -980,6 +980,227 @@ func TestRunGuideRendersAgentConfirmsIconsCompleteInputs(t *testing.T) {
 	}
 }
 
+func TestRunGuideRendersCodeAuthorizationCompleteInputs(t *testing.T) {
+	config := testConfig()
+	config.Auth.Consent.Strategy.Remote = configuration.ConsentStrategyCodeAuthorization
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"guide"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+	for _, want := range []string{"Configured remote flow: detached code authorization", "relay only the printed consent URL", "`auth complete` takes: pending auth plus the confirmation code", "`malformed confirmation code`"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected guide output to contain %q, got %q", want, stdout.String())
+		}
+	}
+}
+
+func TestRunAuthLoginRemoteCodeAuthorizationPendingUsesRetryExitCode(t *testing.T) {
+	storageDir := t.TempDir()
+	baseToken := testAgentJWT(t)
+	var sawStart bool
+
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/agent/v1/tokens/identity":
+			_ = json.NewEncoder(w).Encode(map[string]string{"token": baseToken})
+		case "/agent/v1/consent/code-authorization/start":
+			if r.Header.Get("Authorization") != "Bearer "+baseToken {
+				t.Fatalf("unexpected start authorization: %q", r.Header.Get("Authorization"))
+			}
+			sawStart = true
+			_ = json.NewEncoder(w).Encode(auth.ConsentCodeAuthorizationStartResponse{
+				ChallengeID: "ach_pending",
+				ConsentURL:  "https://tollbit.example.test/build/oauth/consent/code-authorization?consent_challenge=ach_pending",
+				ExpiresAt:   time.Now().Add(time.Minute).UTC().Format(time.RFC3339),
+			})
+		default:
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.RequestURI())
+		}
+	}))
+	defer authSrv.Close()
+
+	config := testCodeAuthorizationConfig(authSrv.URL, storageDir)
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"--end-user-proximity", "remote", "auth", "login", "--name", "agent-test"}, nil, &stdout, &stderr)
+	if code != ExitCodeAuthorizationPending {
+		t.Fatalf("expected pending exit code %d, got %d stdout=%q stderr=%q", ExitCodeAuthorizationPending, code, stdout.String(), stderr.String())
+	}
+	if !sawStart {
+		t.Fatal("expected code-authorization start request")
+	}
+	for _, want := range []string{"Authorization flow: detached code authorization", "Relay ONLY this URL", "consent_challenge=ach_pending", "tollbit auth complete <code>"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected login stdout to contain %q, got %q", want, stdout.String())
+		}
+	}
+	if _, err := os.Stat(filepath.Join(storageDir, "pending-auth.json")); err != nil {
+		t.Fatalf("expected pending auth saved: %v", err)
+	}
+}
+
+func TestRunAuthCompleteCodeAuthorizationSucceeds(t *testing.T) {
+	storageDir := t.TempDir()
+	successToken := testAgentJWTWithOBO(t)
+	var sawRedeem bool
+	authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/agent/v1/whoami" {
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"agent_identifier":  "agent-test",
+				"organization_name": "Example Org",
+				"primary_email":     "user@example.com",
+			})
+			return
+		}
+		if r.Method != http.MethodPost || r.URL.Path != "/agent/v1/tokens/identity" {
+			t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["grant_type"] != "consent:code_authorization" || body["challenge_id"] != "ach_pending" || body["code_verifier"] != "verifier-1" || body["code"] != "K7QF-2MXP" {
+			t.Fatalf("unexpected redeem body: %#v", body)
+		}
+		sawRedeem = true
+		_ = json.NewEncoder(w).Encode(map[string]string{"token": successToken, "refresh_token": "refresh-1"})
+	}))
+	defer authSrv.Close()
+
+	config := testCodeAuthorizationConfig(authSrv.URL, storageDir)
+	writeCodeAuthorizationPendingForTest(t, storageDir)
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommandWithConfig(config, []string{"--end-user-proximity", "remote", "auth", "complete", "k7qf 2mxp"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected success, got code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !sawRedeem {
+		t.Fatal("expected redeem request")
+	}
+	if !strings.Contains(stderr.String(), "authorized as pending-agent (on behalf of user@example.com / Example Org)") {
+		t.Fatalf("expected authorized message, got stderr=%q", stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(storageDir, "pending-auth.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected pending auth cleared, stat err=%v", err)
+	}
+}
+
+func TestRunAuthCompleteCodeAuthorizationRejectsBadInputLocally(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantExit int
+		want     string
+	}{
+		{name: "no code", args: nil, wantExit: 2, want: "requires one confirmation code"},
+		{name: "unquoted code with a space", args: []string{"SECRET", "CODE"}, wantExit: 2, want: "quote the code"},
+		{name: "letters outside the alphabet", args: []string{"SECRET0L"}, wantExit: 1, want: "malformed confirmation code"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storageDir := t.TempDir()
+			authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Fatalf("unexpected auth request: %s %s", r.Method, r.URL.Path)
+			}))
+			defer authSrv.Close()
+
+			config := testCodeAuthorizationConfig(authSrv.URL, storageDir)
+			writeCodeAuthorizationPendingForTest(t, storageDir)
+			var stdout, stderr bytes.Buffer
+			args := append([]string{"--end-user-proximity", "remote", "auth", "complete"}, tt.args...)
+			code := executeTestCommandWithConfig(config, args, nil, &stdout, &stderr)
+			if code != tt.wantExit {
+				t.Fatalf("expected exit code %d, got %d stdout=%q stderr=%q", tt.wantExit, code, stdout.String(), stderr.String())
+			}
+			if !strings.Contains(stderr.String(), tt.want) {
+				t.Fatalf("expected stderr to contain %q, got %q", tt.want, stderr.String())
+			}
+			if strings.Contains(stdout.String()+stderr.String(), "SECRET") {
+				t.Fatalf("expected output to omit the submitted code, got stdout=%q stderr=%q", stdout.String(), stderr.String())
+			}
+			if _, err := os.Stat(filepath.Join(storageDir, "pending-auth.json")); err != nil {
+				t.Fatalf("expected pending authorization to be preserved: %v", err)
+			}
+		})
+	}
+}
+
+func TestRunAuthCompleteCodeAuthorizationServerRejections(t *testing.T) {
+	tests := []struct {
+		name        string
+		problemCode string
+		detail      string
+		wantExit    int
+		want        string
+		wantPending bool
+	}{
+		{name: "malformed code keeps the attempt", problemCode: "malformed_code", detail: "Code must be the 8 characters shown on the consent page, formatted XXXX-XXXX.", wantExit: 1, want: "The attempt was not used up", wantPending: true},
+		{name: "wrong code kills the challenge", problemCode: "access_denied", detail: "Consent authorization was denied.", wantExit: 1, want: "this authorization is dead"},
+		{name: "expired challenge", problemCode: "expired_token", detail: "Consent authorization expired.", wantExit: 1, want: "This authorization expired"},
+		{name: "invalid grant", problemCode: "invalid_grant", detail: "Invalid consent grant.", wantExit: 1, want: "can no longer be completed"},
+		{name: "not yet authorized", problemCode: "authorization_pending", detail: "Authorization is pending.", wantExit: ExitCodeAuthorizationPending, want: "authorization still pending", wantPending: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storageDir := t.TempDir()
+			authSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/problem+json")
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"title":  "Bad Request",
+					"status": http.StatusBadRequest,
+					"detail": tt.detail,
+					"code":   tt.problemCode,
+				})
+			}))
+			defer authSrv.Close()
+
+			config := testCodeAuthorizationConfig(authSrv.URL, storageDir)
+			writeCodeAuthorizationPendingForTest(t, storageDir)
+			var stdout, stderr bytes.Buffer
+			code := executeTestCommandWithConfig(config, []string{"--end-user-proximity", "remote", "auth", "complete", "K7QF-2MXP"}, nil, &stdout, &stderr)
+			if code != tt.wantExit {
+				t.Fatalf("expected exit code %d, got %d stdout=%q stderr=%q", tt.wantExit, code, stdout.String(), stderr.String())
+			}
+			if !strings.Contains(stderr.String(), tt.want) {
+				t.Fatalf("expected stderr to contain %q, got %q", tt.want, stderr.String())
+			}
+			if strings.Contains(stdout.String()+stderr.String(), "K7QF") {
+				t.Fatalf("expected output to omit the code, got stdout=%q stderr=%q", stdout.String(), stderr.String())
+			}
+			_, err := os.Stat(filepath.Join(storageDir, "pending-auth.json"))
+			if tt.wantPending && err != nil {
+				t.Fatalf("expected pending authorization to be preserved: %v", err)
+			}
+			if !tt.wantPending && !os.IsNotExist(err) {
+				t.Fatalf("expected pending authorization to be cleared, stat err=%v", err)
+			}
+		})
+	}
+}
+
+func testCodeAuthorizationConfig(authBaseURL, storageDir string) configuration.Config {
+	config := testConfig()
+	config.Auth.BaseURL = authBaseURL
+	config.Runtime.StateDir = storageDir
+	config.Credentials.StorageDir = storageDir
+	config.Auth.Consent.Strategy.Remote = configuration.ConsentStrategyCodeAuthorization
+	return config
+}
+
+func writeCodeAuthorizationPendingForTest(t *testing.T, storageDir string) {
+	t.Helper()
+	writePendingConsentForTest(t, storageDir, agentauth.PendingConsent{
+		Method:        agentauth.ConsentMethodCodeAuthorization,
+		ChallengeID:   "ach_pending",
+		AgentIdentity: auth.AgentIdentity{Name: "pending-agent"},
+		BaseToken:     testAgentJWT(t),
+		CodeVerifier:  "verifier-1",
+		CreatedAt:     time.Now().UTC(),
+		ExpiresAt:     time.Now().Add(time.Minute).UTC().Format(time.RFC3339),
+	})
+}
+
 func executeTestCommandWithConfig(config configuration.Config, args []string, stdin io.Reader, stdout, stderr *bytes.Buffer) int {
 	cmd := NewCommandTree(app.Factory{Config: config})
 	cmd.SetArgs(args)

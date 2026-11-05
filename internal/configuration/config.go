@@ -24,6 +24,7 @@ const (
 	ConsentStrategyRedirect           = "redirect"
 	ConsentStrategyBrowserSelectIcon  = "browser_select_icon"
 	ConsentStrategyAgentConfirmsIcons = "agent_confirms_icons"
+	ConsentStrategyCodeAuthorization  = "code_authorization"
 )
 
 func AssembleConfiguration(defaultConfig []byte) (Config, error) {
@@ -172,9 +173,9 @@ func validate(config Config) error {
 
 func validateConsentStrategy(name, strategy string) error {
 	switch strategy {
-	case ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons:
+	case ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons, ConsentStrategyCodeAuthorization:
 		return nil
 	default:
-		return fmt.Errorf("%s must be %q, %q, or %q", name, ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons)
+		return fmt.Errorf("%s must be %q, %q, %q, or %q", name, ConsentStrategyRedirect, ConsentStrategyBrowserSelectIcon, ConsentStrategyAgentConfirmsIcons, ConsentStrategyCodeAuthorization)
 	}
 }

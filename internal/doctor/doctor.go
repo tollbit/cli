@@ -43,17 +43,20 @@ const defaultHostTimeout = 10 * time.Second
 
 type (
 	// Check is one line of the report. Path is set for directory checks,
-	// Host and ErrorKind for host checks, Version for skill checks.
+	// Host and ErrorKind for host checks, Version for skill checks. A check of
+	// an installed skill also sets Path to its SKILL.md and, once that file is
+	// read, InstalledVersion; Version stays the bundled version.
 	Check struct {
-		Group     string `json:"group"`
-		Name      string `json:"name"`
-		Status    Status `json:"status"`
-		Detail    string `json:"detail"`
-		Hint      string `json:"hint,omitempty"`
-		Path      string `json:"path,omitempty"`
-		Host      string `json:"host,omitempty"`
-		ErrorKind string `json:"error_kind,omitempty"`
-		Version   string `json:"version,omitempty"`
+		Group            string `json:"group"`
+		Name             string `json:"name"`
+		Status           Status `json:"status"`
+		Detail           string `json:"detail"`
+		Hint             string `json:"hint,omitempty"`
+		Path             string `json:"path,omitempty"`
+		Host             string `json:"host,omitempty"`
+		ErrorKind        string `json:"error_kind,omitempty"`
+		Version          string `json:"version,omitempty"`
+		InstalledVersion string `json:"installed_version,omitempty"`
 	}
 
 	Report struct {
@@ -79,7 +82,10 @@ type (
 		// Credentials is read for the auth check; nil skips it.
 		Credentials CredentialStore
 		// Skills are the agent skills bundled with this CLI.
-		Skills      []Skill
+		Skills []Skill
+		// SkillsDir is the folder given to `tollbit guide --install`. When set,
+		// doctor checks the skills installed there; empty skips that.
+		SkillsDir   string
 		HostTimeout time.Duration
 	}
 )
@@ -95,7 +101,11 @@ func Run(ctx context.Context, opts Options) Report {
 	if opts.Credentials != nil {
 		checks = append(checks, authCheck(ctx, opts.Credentials))
 	}
-	checks = append(checks, skillChecks(opts.Skills)...)
+	if opts.SkillsDir != "" {
+		checks = append(checks, installedSkillChecks(opts.SkillsDir, opts.Skills)...)
+	} else {
+		checks = append(checks, skillChecks(opts.Skills)...)
+	}
 	report := Report{OK: true, Checks: checks}
 	for _, c := range checks {
 		if c.Status == StatusFail {

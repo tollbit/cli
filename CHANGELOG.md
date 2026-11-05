@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-05
+
+### Added
+
+- `tollbit doctor --skills-dir <dir>` checks the skills installed in the folder
+  you gave `tollbit guide --install`. It reports each bundled skill as matching,
+  missing or out of date, with the command to fix it. A problem here is a
+  warning and doesn't change doctor's exit code. Without the flag, doctor is
+  unchanged. Skills installed through the Claude plugin aren't checked.
+
+### Changed
+
+- Remote authorization now uses a confirmation code. `tollbit auth login`
+  prints a link for the user to open; after they click Authorize, the page
+  shows an `XXXX-XXXX` code, and the user pastes it back for
+  `tollbit auth complete <code>`. Case, hyphens, and spaces in the code don't
+  matter, and a typo that isn't a valid code doesn't use up the attempt. A
+  valid-looking wrong code ends the authorization, so log in again. This
+  replaces reading back three icons as the default remote flow.
+- `tollbit doctor` no longer sends you to IT first when a sandbox blocks the
+  network. When every host fails DNS, or a sandbox says the network is off
+  (`CODEX_SANDBOX_NETWORK_DISABLED`), the hint says to allow network access or
+  run the command in your own terminal, then mentions DNS, VPN and IT. If only
+  some hosts fail, the hint is unchanged.
+- The install prompt now has its own Codex section, for the Codex CLI and the
+  Codex app. The agent either makes one permission grant for the install or
+  gives you the commands to run in your own terminal, instead of trying
+  fallbacks that need the same network access. It also offers a Codex rule that
+  lets `tollbit` commands, and nothing else, run outside the sandbox. The rule
+  covers every `tollbit` command, including paid ones.
+
 ## [0.5.0] - 2026-11-05
 
 ### Added

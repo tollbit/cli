@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/tollbit/cli/internal/tokens/agent"
 	"github.com/tollbit/cli/internal/version"
 )
@@ -549,5 +551,118 @@ func TestClientRedeemAgentConsentAgentConfirmsIconsRequiresThreeIcons(t *testing
 	})
 	if err == nil || !strings.Contains(err.Error(), "exactly 3 icon names are required") {
 		t.Fatalf("expected exactly-3 error, got %v", err)
+	}
+}
+
+func TestClientStartAgentConsentCodeAuthorization(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/consent/code-authorization/start" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		if r.Header.Get("Authorization") != "Bearer unlinked-token" {
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+		var body ConsentCodeAuthorizationStartRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.CodeChallenge != "challenge" || body.CodeChallengeMethod != "S256" || body.Scope != "offline_access" {
+			t.Fatalf("unexpected body: %#v", body)
+		}
+		sawRequest = true
+		_ = json.NewEncoder(w).Encode(ConsentCodeAuthorizationStartResponse{
+			ChallengeID: "ach_123",
+			ConsentURL:  "https://tollbit.example.test/build/oauth/consent/code-authorization?consent_challenge=ach_123",
+			ExpiresAt:   "2026-07-20T12:00:00Z",
+		})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.StartAgentConsentCodeAuthorization(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentCodeAuthorizationStartRequest{
+		CodeChallenge: "challenge",
+		Scope:         "offline_access",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawRequest || resp.ChallengeID != "ach_123" || resp.ConsentURL == "" {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+}
+
+func TestClientRedeemAgentConsentCodeAuthorization(t *testing.T) {
+	var sawRequest bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.RequestURI() != "/agent/v1/tokens/identity" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.RequestURI())
+		}
+		if r.Header.Get("Authorization") != "Bearer unlinked-token" {
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+		var body identityTokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.GrantType != grantTypeConsentCodeAuthorization || body.AgentIdentifier != "agent-test" || body.ChallengeID != "ach_123" || body.Code != "K7QF-2MXP" || body.CodeVerifier != "verifier" {
+			t.Fatalf("unexpected body: %#v", body)
+		}
+		sawRequest = true
+		refreshToken := "refresh-token"
+		_ = json.NewEncoder(w).Encode(AgentTokenResponse{Token: "linked-token", RefreshToken: &refreshToken})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.RedeemAgentConsentCodeAuthorization(context.Background(), agent.Token{RawToken: "unlinked-token"}, ConsentCodeAuthorizationTokenRequest{
+		AgentIdentifier: "agent-test",
+		ChallengeID:     "ach_123",
+		Code:            "K7QF-2MXP",
+		CodeVerifier:    "verifier",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawRequest || resp.Token != "linked-token" || resp.RefreshToken == nil || *resp.RefreshToken != "refresh-token" {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+}
+
+func TestClientKeepsConfirmationCodeOutOfLogs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"title": "Bad Request", "status": http.StatusBadRequest, "code": "access_denied"})
+	}))
+	defer srv.Close()
+
+	c, err := New(ClientConfig{BaseURL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var logs bytes.Buffer
+	logger := zerolog.New(&logs)
+	_, err = c.RedeemAgentConsentCodeAuthorization(logger.WithContext(context.Background()), agent.Token{RawToken: "unlinked-token"}, ConsentCodeAuthorizationTokenRequest{
+		AgentIdentifier: "agent-test",
+		ChallengeID:     "ach_123",
+		Code:            "K7QF-2MXP",
+		CodeVerifier:    "secret-verifier",
+	})
+	if err == nil {
+		t.Fatal("expected redeem to fail")
+	}
+	for _, secret := range []string{"K7QF-2MXP", "secret-verifier"} {
+		if strings.Contains(logs.String(), secret) {
+			t.Fatalf("expected %q to stay out of logs, got %s", secret, logs.String())
+		}
+	}
+	if !strings.Contains(logs.String(), "access_denied") {
+		t.Fatalf("expected the problem code in logs, got %s", logs.String())
 	}
 }

@@ -178,6 +178,95 @@ func TestDNSFailure(t *testing.T) {
 	}
 }
 
+func TestDNSHintLeadsWithSandboxWhenEveryHostFails(t *testing.T) {
+	opts := testOptions(t, "https://doctor-check.invalid")
+	opts.Config.Gateway.BaseURL = "https://doctor-check-gateway.invalid"
+
+	report := Run(context.Background(), opts)
+
+	for _, host := range []string{"doctor-check.invalid", "doctor-check-gateway.invalid"} {
+		c := findCheck(t, report, host)
+		if c.ErrorKind != KindDNS {
+			t.Fatalf("expected dns, got %+v", c)
+		}
+		if !strings.HasPrefix(c.Hint, "This may be a sandbox with no network.") {
+			t.Fatalf("expected the hint to lead with the sandbox, got %q", c.Hint)
+		}
+		if want := "check your DNS or VPN, or ask IT whether " + host + " is blocked"; !strings.HasSuffix(c.Hint, want) {
+			t.Fatalf("expected the hint to end with %q, got %q", want, c.Hint)
+		}
+	}
+}
+
+func TestDNSHintWhenOnlySomeHostsFail(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	const blocked = "doctor-check.invalid"
+	const existingHint = "check your DNS or VPN, or ask IT whether " + blocked + " is blocked"
+
+	tests := []struct {
+		name     string
+		getenv   func(string) string
+		wantHint func(string) bool
+	}{
+		{
+			name:     "keeps the host hint",
+			getenv:   func(string) string { return "" },
+			wantHint: func(hint string) bool { return hint == existingHint },
+		},
+		{
+			name: "leads with the sandbox when the harness turned the network off",
+			getenv: func(name string) string {
+				if name == "CODEX_SANDBOX_NETWORK_DISABLED" {
+					return "1"
+				}
+				return ""
+			},
+			wantHint: func(hint string) bool { return hint == sandboxHintLead+existingHint },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := testOptions(t, "https://"+blocked)
+			opts.Config.Foundry.BaseURL = srv.URL + "/foundry"
+			opts.Config.Gateway.BaseURL = srv.URL
+			opts.Transport = trusting(srv)
+			opts.Getenv = tt.getenv
+
+			report := Run(context.Background(), opts)
+
+			if c := findCheck(t, report, hostOf(t, srv.URL)); c.Status != StatusPass {
+				t.Fatalf("expected the reachable host to pass, got %+v", c)
+			}
+			c := findCheck(t, report, blocked)
+			if c.ErrorKind != KindDNS || !tt.wantHint(c.Hint) {
+				t.Fatalf("unexpected check %+v", c)
+			}
+		})
+	}
+}
+
+func TestSandboxHintLeavesOtherFailuresAlone(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+	opts := testOptions(t, "https://doctor-check.invalid")
+	opts.Config.Foundry.BaseURL = srv.URL + "/foundry"
+	opts.Config.Gateway.BaseURL = srv.URL
+	opts.Transport = trusting(srv)
+
+	report := Run(context.Background(), opts)
+
+	// Every host failed, but a host that answered shows the network works.
+	if c := findCheck(t, report, "doctor-check.invalid"); strings.Contains(c.Hint, "sandbox") {
+		t.Fatalf("expected no sandbox hint, got %q", c.Hint)
+	}
+	if c := findCheck(t, report, hostOf(t, srv.URL)); c.Status != StatusFail || strings.Contains(c.Hint, "sandbox") {
+		t.Fatalf("expected a failure with no sandbox hint, got %+v", c)
+	}
+}
+
 func TestTimeout(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		<-r.Context().Done()

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	tollbitcli "github.com/tollbit/cli"
 )
 
 func TestAssembleConfigurationUsesEmbeddedDefaults(t *testing.T) {
@@ -199,16 +198,11 @@ func TestConfigWithOverridesAppliesRuntimeProximity(t *testing.T) {
 	}
 }
 
-func TestShippedRemoteConsentStrategyIsAgentConfirmsIcons(t *testing.T) {
-	config, err := assembleConfiguration(tollbitcli.DefaultConfig, func() (string, error) { return t.TempDir(), nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if config.Auth.Consent.Strategy.Local != ConsentStrategyRedirect {
-		t.Fatalf("expected shipped local strategy redirect, got %q", config.Auth.Consent.Strategy.Local)
-	}
-	if config.Auth.Consent.Strategy.Remote != ConsentStrategyAgentConfirmsIcons {
-		t.Fatalf("expected shipped remote strategy agent_confirms_icons, got %q", config.Auth.Consent.Strategy.Remote)
+func TestValidateConsentStrategyAcceptsCodeAuthorization(t *testing.T) {
+	config := assembleTestConfiguration(t, t.TempDir())
+	config.Auth.Consent.Strategy.Remote = ConsentStrategyCodeAuthorization
+	if err := validate(config); err != nil {
+		t.Fatalf("expected code_authorization to be valid: %v", err)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/tollbit/cli/internal/agentauth"
 	"github.com/tollbit/cli/internal/app"
 	"github.com/tollbit/cli/internal/version"
+	"github.com/tollbit/cli/skill"
 )
 
 type guideOptions struct {
@@ -61,11 +62,11 @@ func runGuide(cmd *cobra.Command, factory app.Factory, opts guideOptions) error 
 		return nil
 	}
 
-	skillName, err := skillNameFromMarkdown(markdown)
+	skillName, err := skill.Name(markdown)
 	if err != nil {
 		return RuntimeError(err)
 	}
-	destDir := resolveSkillInstallDirectory(opts.installPath, skillName)
+	destDir := skill.InstallDir(opts.installPath, skillName)
 	target := filepath.Join(destDir, "SKILL.md")
 	return writeGuideFile(target, markdown, cmd.OutOrStdout(), cmd.ErrOrStderr())
 }
