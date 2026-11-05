@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-05
+
+### Added
+
+- `tollbit doctor` checks that the CLI can run on this machine: the binary
+  and PATH, that it can write its state and credentials directories, and
+  that every host it calls resolves, completes TLS and answers, telling DNS
+  failures, proxy blocks, TLS interception and timeouts apart. It also lists
+  the bundled agent skills and their version, so an agent can tell whether
+  its installed SKILL.md is out of date. `--json` prints the report for
+  agents and support. Exits `1` when a check fails.
+- The README documents installing the Claude plugin in the Claude desktop and
+  web app (chat and Cowork), and the organization settings Team and
+  Enterprise plans need.
+- A `tollbit-install-troubleshoot` skill in the Claude plugin, and the same
+  instructions as a copy-paste prompt for any agent
+  (`prompts/install-troubleshooting.md`). The agent finds where installing the
+  CLI fails (a blocked host, a proxy, write access or PATH without admin, a
+  blocked binary) and writes a report for TollBit support.
+- An install prompt for any agent (`prompts/install-prompt.md`). The agent
+  works out which product it's running in from its own environment, even when
+  the user names the wrong one, then follows that platform's install steps or
+  says TollBit isn't available there yet. The install gives up on a download
+  that hangs and falls back to npm or the GitHub release.
+- Each release publishes the install prompts at
+  `https://assets.cdn.tollbit.com/cli/prompts/`, as `install-prompt.md` and
+  `install-troubleshooting.md`, and attaches them to the GitHub release with
+  their checksums.
+
+### Changed
+
+- The Claude plugin's `tollbit-install-claude` skill now names the agent, doesn't
+  sign in up front, and tells a user who asked for setup what TollBit offers.
+- When a command fails because the network, a proxy, TLS or a directory
+  write fails on this machine, the error now ends with a pointer to
+  `tollbit doctor`.
+
 ## [0.4.3] - 2026-10-30
 
 ### Added

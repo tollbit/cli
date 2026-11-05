@@ -17,7 +17,9 @@ The rest of this file covers building and working on the CLI from source.
 
 `tollbit guide` prints the embedded skills in [`skill/`](skill/): `--skill cli` (the default) is [`skill/tollbit-cli/SKILL.md`](skill/tollbit-cli/SKILL.md) and `--skill analytics` is [`skill/tollbit-analytics/SKILL.md`](skill/tollbit-analytics/SKILL.md). Edit those files only. They are Go templates: `version: {{ .Version }}` takes the CLI version, so a bump never edits them. A new skill needs a case in `bundledSkillMarkdown` (`internal/cli/guide.go`).
 
-The Claude plugin marketplace is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json); the plugin lives in [`plugins/tollbit/`](plugins/tollbit/). `make plugin` (`cmd/gen-plugin`, running `internal/generator/plugin`; neither is part of the `tollbit` binary) generates its skills from every `skill/*/SKILL.md`, each exactly as `tollbit guide` prints it; don't edit those by hand. `plugin.json` and `skills/tollbit-install-claude/` (which exists only in the plugin, for Claude's sandbox) are written by hand, except that `make plugin` sets the CLI version in each: `plugin.json`'s `version`, and the release tag the install skill fetches `install.sh` from. All of these are committed. A test fails when they are stale.
+The Claude plugin marketplace is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json); the plugin lives in [`plugins/tollbit/`](plugins/tollbit/). `make plugin` (`cmd/gen-plugin`, running `internal/generator/plugin`; neither is part of the `tollbit` binary) generates its skills from every `skill/*/SKILL.md`, each exactly as `tollbit guide` prints it; don't edit those by hand. `plugin.json` and `skills/tollbit-install-claude/` (which exists only in the plugin, for Claude's sandbox) are written by hand, except that `make plugin` sets the CLI version in each: `plugin.json`'s `version` and the release tag the install skill fetches `install.sh` from. `skills/tollbit-install-troubleshoot/` is generated from the install troubleshooting prompt's template, [`prompts/install-troubleshooting.template.md`](prompts/install-troubleshooting.template.md).
+
+The prompts agents are given live in [`prompts/`](prompts/). `make prompts` (`cmd/gen-prompts`, running `internal/generator/prompts`) generates [`prompts/install-prompt.md`](prompts/install-prompt.md) from [`prompts/install-prompt.template.md`](prompts/install-prompt.template.md) and [`platforms/supported-platforms.yaml`](platforms/supported-platforms.yaml), and [`prompts/install-troubleshooting.md`](prompts/install-troubleshooting.md) from [`prompts/install-troubleshooting.template.md`](prompts/install-troubleshooting.template.md). Every prompt is generated from a `prompts/*.template.md`, which names the release as `{{version}}`; edit the template, never the generated file. `make generate` runs `make prompts`, then `make plugin`. All of these are committed. A test fails when they are stale. Each release uploads both generated prompts to `https://assets.cdn.tollbit.com/cli/prompts/`, and attaches them to the GitHub release, listed in its checksums.
 
 The repo includes a small `Makefile`:
 
@@ -29,8 +31,10 @@ The repo includes a small `Makefile`:
 | `make alias` | Prints a one-line `alias` so you can point `tollbit` at that binary |
 | `make dev-install` | Builds and installs the repo binary into your `tollbit` command path, moving any existing installed binary to `tollbit-original` |
 | `make dev-uninstall` | Restores `tollbit-original` back to `tollbit` and removes the dev-installed binary |
-| `make bump VERSION=…` | Bumps `internal/version` and install examples in [README.md](README.md), then runs `make plugin` |
-| `make plugin` | Regenerates the plugin's skills from `skill/*/SKILL.md` and its `plugin.json` version from `internal/version` |
+| `make bump VERSION=…` | Bumps `internal/version` and install examples in [README.md](README.md), then runs `make generate` |
+| `make plugin` | Regenerates the plugin's skills from `skill/*/SKILL.md` and `prompts/install-troubleshooting.template.md`, and its `plugin.json` version from `internal/version` |
+| `make prompts` | Regenerates the prompts in `prompts/`: each from its `prompts/*.template.md`, with the install prompt's hints table from `platforms/supported-platforms.yaml` |
+| `make generate` | Runs `make prompts`, then `make plugin` |
 
 ```bash
 make test

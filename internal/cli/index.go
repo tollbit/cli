@@ -14,6 +14,7 @@ func NewCommandTree(factory app.Factory) *cobra.Command {
 		NewSearchCommand(factory),
 		NewRuntimeCommand(factory),
 		NewGuideCommand(factory),
+		NewDoctorCommand(factory),
 		NewVersionCommand(),
 	)
 	if factory.Config.Analytics.Enabled {

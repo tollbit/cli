@@ -38,11 +38,20 @@ archives:
       - THIRD-PARTY-NOTICES.md
       - README.md
 
+# The install prompts are also on the assets CDN. This copy and its checksums
+# are independent of AWS, so a CDN copy can be audited against them.
 checksum:
   name_template: "tollbit_{{ .Version }}_checksums.txt"
+  extra_files:
+    - glob: ./prompts/install-prompt.md
+    - glob: ./prompts/install-troubleshooting.md
 
-# Published artifacts are immutable: re-running a release keeps existing assets
-# rather than overwriting them (checksums included). To fix a bad release, cut a
-# new version — do not mutate a published one. Mirrors the immutable tag ruleset.
+# Assets already on a release are never replaced: with replace_existing_artifacts
+# off, uploading one fails, so a re-run that reaches the upload fails too. `mode`
+# only keeps the release notes. To fix a bad release, cut a new version — do not
+# mutate a published one. Mirrors the tag-immutable-releases ruleset.
 release:
   mode: keep-existing
+  extra_files:
+    - glob: ./prompts/install-prompt.md
+    - glob: ./prompts/install-troubleshooting.md

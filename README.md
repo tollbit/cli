@@ -21,7 +21,7 @@ curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.s
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.4.3
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.5.0
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
@@ -37,7 +37,7 @@ Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
 irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
-Install-Tollbit -Version v0.4.3 -Force
+Install-Tollbit -Version v0.5.0 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -51,16 +51,24 @@ Then run `tollbit` from any terminal (the package downloads the native binary fo
 
 ### Claude plugin
 
-This repo is a Claude plugin marketplace. The `tollbit` plugin adds the agent skills (what `tollbit guide --skill cli` and `--skill analytics` print) and a skill that installs and sets up the CLI in Claude's sandbox (chat and Cowork). In Claude Code:
+This repo is a Claude plugin marketplace. The `tollbit` plugin adds the agent skills (what `tollbit guide --skill cli` and `--skill analytics` print), a skill that installs and sets up the CLI in Claude's sandbox (chat and Cowork), and a skill that diagnoses failed installs. In Claude Code:
 
 ```
 /plugin marketplace add tollbit/cli
 /plugin install tollbit@tollbit
 ```
 
+In the Claude desktop or web app (chat and Cowork), go to **Customize → Plugins → Add → Add marketplace**, enter `tollbit/cli`, then install **tollbit**.
+
+On a Team or Enterprise plan, an organization owner must turn on **Skills**, **User-created skills** and **Cowork**; otherwise **Add marketplace** doesn't appear. To install the CLI in Claude's sandbox, **Code execution** must also allow package managers and GitHub, plus `oauth.tollbit.com` and `gateway.tollbit.com`.
+
 ### Manual install
 
 From **[GitHub Releases](https://github.com/tollbit/cli/releases)**, download the archive for your OS and CPU, verify SHA-256 against `tollbit_<version>_checksums.txt`, and put `tollbit` (or `tollbit.exe`) on your `PATH`.
+
+### If the install fails
+
+Paste the prompt in [prompts/install-troubleshooting.md](prompts/install-troubleshooting.md) into an AI agent on the computer where the install failed (Claude Code, Codex, Claude in the desktop app, ...). It finds where the install breaks, such as a blocked host, a proxy, missing write access or a blocked binary, and writes a report to send to TollBit support. The Claude plugin includes the same instructions as a skill.
 
 ### Build from source
 
@@ -159,6 +167,23 @@ tollbit guide --skill analytics --install ~/.claude/skills
 
 Install writes `<dir>/<skill-name>/SKILL.md` (name from embedded frontmatter, e.g. `tollbit-cli`).
 
+### Doctor
+
+```bash
+tollbit doctor
+tollbit doctor --json
+```
+
+Checks that the CLI can work on this machine, and is the first thing to run when it installs but does not work:
+
+- **Execution:** version, OS/arch, install method, the binary's path, and whether `tollbit` on PATH is this binary.
+- **Directories:** that the CLI can create and write its state (`TOLLBIT_RUNTIME_STATE_DIR`) and credentials (`TOLLBIT_CREDENTIALS_STORAGE_DIR`) directories, and whether it can update itself in its install directory.
+- **Network:** proxy environment variables (credentials redacted), and for each host the CLI is configured to call (auth, gateway, and GitHub releases, following the redirect to the asset host) whether it resolves, completes TLS and answers. Failures name their kind: `dns`, `connect`, `timeout`, `proxy_unreachable`, `proxy_rejected`, `proxy_auth_required`, `tls_intercepted` (with the certificate issuer), `tls_other`, or `http_<status>`. On Windows it warns when a system proxy is set but `HTTPS_PROXY` is not, since the CLI only uses the environment variables.
+- **Auth:** whether a token is stored and when it expires, read from disk only. Informational; it never fails.
+- **Skills:** the agent skills bundled with this CLI (`tollbit-cli`, `tollbit-analytics`) and their version, with the command to install or update each. Doctor does not look for installed copies, since every agent keeps skills in its own place; an agent compares the `version:` line of the SKILL.md it loaded. Informational; it never fails.
+
+Each line is `PASS`, `WARN`, `FAIL` or `INFO`, with a hint for anything not passing. Exits `1` when any check fails. Never prints tokens or credentials. `doctor` skips the automatic update check, so it runs even when an update is required.
+
 ### Version
 
 ```bash
@@ -185,7 +210,7 @@ Installer channel updates:
 curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.4.3 --force
+curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.5.0 --force
 ```
 
 ```powershell

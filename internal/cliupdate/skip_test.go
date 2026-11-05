@@ -17,6 +17,7 @@ func TestSkip(t *testing.T) {
 		runtime,
 		completion,
 		&cobra.Command{Use: "version"},
+		&cobra.Command{Use: "doctor"},
 		&cobra.Command{Use: "help"},
 		&cobra.Command{Use: cobra.ShellCompRequestCmd},
 		&cobra.Command{Use: cobra.ShellCompNoDescRequestCmd},
@@ -28,6 +29,7 @@ func TestSkip(t *testing.T) {
 	}{
 		{args: nil, want: true},
 		{args: []string{"version"}, want: true},
+		{args: []string{"doctor"}, want: true},
 		{args: []string{"help"}, want: true},
 		{args: []string{"runtime", "help"}, want: true},
 		{args: []string{"completion", "bash"}, want: true},

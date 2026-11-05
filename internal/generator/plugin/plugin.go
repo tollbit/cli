@@ -18,17 +18,20 @@ import (
 	"github.com/tollbit/cli/internal/app"
 	"github.com/tollbit/cli/internal/cli"
 	"github.com/tollbit/cli/internal/configuration"
+	"github.com/tollbit/cli/internal/generator/prompts"
 	"github.com/tollbit/cli/internal/version"
 	"github.com/tollbit/cli/skill"
 )
 
 // The Claude plugin's files, relative to the repo root. Skills under SkillsDir
 // are generated from skill/, except InstallSkillPath, which is written by hand
-// for the plugin only.
+// for the plugin only, and TroubleshootSkillPath, which is generated from the
+// install troubleshooting prompt (prompts.Troubleshoot).
 const (
-	SkillsDir        = "plugins/tollbit/skills"
-	ManifestPath     = "plugins/tollbit/.claude-plugin/plugin.json"
-	InstallSkillPath = "plugins/tollbit/skills/tollbit-install-claude/SKILL.md"
+	SkillsDir             = "plugins/tollbit/skills"
+	ManifestPath          = "plugins/tollbit/.claude-plugin/plugin.json"
+	InstallSkillPath      = "plugins/tollbit/skills/tollbit-install-claude/SKILL.md"
+	TroubleshootSkillPath = "plugins/tollbit/skills/tollbit-install-troubleshoot/SKILL.md"
 )
 
 // versioned are hand-written plugin files with one generated part: the CLI
@@ -42,6 +45,13 @@ var versioned = []struct {
 	// Pin the installer to this release's tag, not the moving main branch.
 	{InstallSkillPath, regexp.MustCompile(`raw\.githubusercontent\.com/tollbit/cli/[^/]+/scripts/install\.sh`), "raw.githubusercontent.com/tollbit/cli/v%s/scripts/install.sh"},
 }
+
+// troubleshootSkillFrontmatter opens TroubleshootSkillPath, before the
+// install troubleshooting prompt.
+const troubleshootSkillFrontmatter = "---\n" +
+	"name: tollbit-install-troubleshoot\n" +
+	"description: " + "Find out why installing the tollbit CLI fails, and write a report the user can send to TollBit support. Use when the install script (install.sh or install.ps1), `npm install -g @tollbit/tollbit-cli`, or the tollbit-install-claude skill fails, hangs, or leaves `tollbit` not found. Not for errors from tollbit commands after the CLI runs." + "\n" +
+	"---\n\n"
 
 // Files returns the content every generated plugin file should have, keyed by
 // its path relative to the repo root. It reads the hand-written files from
@@ -65,6 +75,11 @@ func Files(root string) (map[string][]byte, error) {
 		}
 		files[v.path] = v.pattern.ReplaceAll(content, []byte(fmt.Sprintf(v.format, version.Version)))
 	}
+	troubleshoot, err := prompts.Troubleshoot(root)
+	if err != nil {
+		return nil, err
+	}
+	files[TroubleshootSkillPath] = append([]byte(troubleshootSkillFrontmatter), troubleshoot...)
 	return files, nil
 }
 

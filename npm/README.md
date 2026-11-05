@@ -34,6 +34,10 @@ Run `tollbit guide` for orientation and the automation contract (exit codes, `--
 npm update -g @tollbit/tollbit-cli
 ```
 
+## If the install fails
+
+Paste the prompt in [prompts/install-troubleshooting.md](https://github.com/tollbit/cli/blob/main/prompts/install-troubleshooting.md) into an AI agent on the same computer. It finds where the install breaks and writes a report for TollBit support.
+
 ## Docs
 
 Full install options (curl / PowerShell / manual), configuration, and command reference:

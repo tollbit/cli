@@ -1,0 +1,84 @@
+# The AI agent platforms the TollBit CLI and services support: how an agent
+# tells it is on each one, and which install section it follows. make prompts
+# renders the install prompt's hints table (prompts/install-prompt.md) from this
+# file and prompts/install-prompt.template.md.
+#
+# Public: this file is published in tollbit/cli, so every value here is public.
+#
+# Platforms are sorted by name, ignoring case.
+#
+#   name:      the platform, as its users call it
+#   detection: one line for the hints table: what the agent sees on this
+#              platform. Only from recorded runs, or marked "untested:".
+#              Platforms with the same detection and install share a row; a
+#              platform without detection gets no row.
+#   install:   the install section it follows:
+#                script         "Install: script", install.sh or install.ps1
+#                claude-plugin  "Install: Claude plugin", the plugin and its
+#                               install skill, in Claude chat
+#                mcp            "Install: MCP (coming soon)"
+#                not-supported  "Install: not supported", no shell and no MCP
+
+platforms:
+  - name: Antigravity (desktop app and IDE)
+    detection: '`ANTIGRAVITY_*` variables, `__CFBundleIdentifier=com.google.antigravity`, no `TERM_PROGRAM`'
+    install: script
+  - name: Antigravity CLI
+    detection: '`ANTIGRAVITY_*` variables, and `TERM_PROGRAM` set'
+    install: script
+  - name: ChatGPT Work
+    detection: 'untested: your instructions name ChatGPT Work'
+    install: mcp
+  - name: Claude chat (desktop app)
+    detection: '`CLAUDE_CODE_ENTRYPOINT=remote_cowork`, in a cloud Linux container'
+    install: claude-plugin
+  - name: Claude chat (web)
+    detection: '`CLAUDE_CODE_ENTRYPOINT=remote_cowork`, in a cloud Linux container'
+    install: claude-plugin
+  - name: Claude Code (desktop app)
+    detection: '`CLAUDE_CODE_ENTRYPOINT=claude-desktop`'
+    install: script
+  - name: Claude Code (terminal)
+    detection: '`CLAUDE_CODE_ENTRYPOINT=cli`'
+    install: script
+  - name: Claude Code on the web
+    detection: '`CLAUDE_CODE_ENTRYPOINT=remote`, in a cloud Linux container'
+    install: script
+  - name: Claude Cowork
+    install: claude-plugin
+  - name: Claude Duet
+    detection: 'untested: your instructions name Claude Duet'
+    install: mcp
+  - name: Codex (ChatGPT desktop app)
+    detection: '`CODEX_SANDBOX`, plus `CODEX_APP_RUNTIME_CLI_PATH` and `CODEX_APP_TOOLS_PIPE_PATH`'
+    install: script
+  - name: Codex CLI
+    detection: '`CODEX_SANDBOX`, without any `CODEX_APP_*` variables'
+    install: script
+  - name: Cursor
+    detection: '`CURSOR_AGENT=1`, plus `CURSOR_LAYOUT` and `VSCODE_*` variables'
+    install: script
+  - name: Cursor CLI
+    detection: '`CURSOR_AGENT=1`, without `CURSOR_LAYOUT` or `VSCODE_*` variables'
+    install: script
+  - name: Gemini app
+    detection: 'no shell; your instructions say "You are Gemini"'
+    install: mcp
+  - name: Gemini Enterprise
+    detection: 'untested: your instructions name Gemini Enterprise'
+    install: mcp
+  - name: Gemini Spark
+    detection: 'untested: your instructions name Gemini Spark'
+    install: mcp
+  - name: GitHub Copilot CLI
+    detection: '`COPILOT_CLI`'
+    install: script
+  - name: Microsoft 365 Copilot
+    detection: 'untested: your instructions name Microsoft 365 Copilot'
+    install: mcp
+  - name: Perplexity
+    detection: 'untested: your instructions name Perplexity'
+    install: mcp
+  - name: Perplexity Computer
+    detection: 'untested: your instructions name Perplexity Computer'
+    install: mcp

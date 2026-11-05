@@ -14,7 +14,7 @@ func applyEnv(config *Config) error {
 		if !IsConfigurable(path) {
 			return nil
 		}
-		name := envName(path)
+		name := EnvName(path)
 		raw, ok := os.LookupEnv(name)
 		if !ok {
 			return nil
@@ -53,7 +53,9 @@ func setValueFromString(value reflect.Value, name string, raw string) error {
 	return nil
 }
 
-func envName(path string) string {
+// EnvName returns the environment variable that sets the config path, for
+// example TOLLBIT_RUNTIME_STATE_DIR for "runtime.state_dir".
+func EnvName(path string) string {
 	name := strings.ToUpper(strings.ReplaceAll(path, ".", "_"))
 	return envPrefix + "_" + name
 }

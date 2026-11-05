@@ -1,9 +1,13 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -152,5 +156,34 @@ func TestRenderErrorPlainTextForbiddenPassthrough(t *testing.T) {
 	}
 	if got := RenderError(RuntimeError(err)); got != err.Error() {
 		t.Fatalf("RenderError = %q, want %q", got, err.Error())
+	}
+}
+
+func TestRenderErrorSuggestsDoctor(t *testing.T) {
+	transport := &url.Error{Op: "Post", URL: "https://oauth.tollbit.com/agent/v1/tokens/identity", Err: errors.New("Forbidden")}
+	permission := &os.PathError{Op: "open", Path: "/home/u/.config/tollbit/.agent-credential.tmp", Err: fs.ErrPermission}
+	canceled := &url.Error{Op: "Post", URL: "https://gateway.tollbit.com", Err: context.Canceled}
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"transport", RuntimeError(fmt.Errorf("error searching: %w", transport)), true},
+		{"permission", RuntimeError(fmt.Errorf("error searching: create agent credential temp file: %w", permission)), true},
+		{"canceled", RuntimeError(fmt.Errorf("error searching: %w", canceled)), false},
+		{"problem", problemjson.Problem{Title: "Bad Request", Status: 400}, false},
+		{"usage", UsageError("search requires a query"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := RenderError(tt.err)
+			if !strings.HasPrefix(got, tt.err.Error()) {
+				t.Fatalf("RenderError = %q, want it to start with the error", got)
+			}
+			if has := strings.Contains(got, "tollbit doctor"); has != tt.want {
+				t.Fatalf("RenderError = %q, doctor hint = %v, want %v", got, has, tt.want)
+			}
+		})
 	}
 }

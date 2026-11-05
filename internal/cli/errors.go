@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io/fs"
+	"net/url"
 	"strings"
 
 	"github.com/tollbit/cli/internal/errorsx/problemjson"
@@ -55,7 +58,8 @@ func ExitCode(err error) int {
 // "CLI update required" rejections are rewritten into an update instruction
 // matching this binary's install method, and "entitlement required" rejections
 // gain instructions for obtaining the entitlement; everything else renders
-// as-is.
+// as-is, plus a pointer to `tollbit doctor` when the cause is likely this
+// machine rather than TollBit.
 func RenderError(err error) string {
 	var problem problemjson.Problem
 	if errors.As(err, &problem) {
@@ -68,7 +72,23 @@ func RenderError(err error) string {
 			return renderEntitlementRequired(err, problem)
 		}
 	}
+	if suggestsDoctor(err) {
+		return err.Error() + "\n" + doctorHint
+	}
 	return err.Error()
+}
+
+const doctorHint = "Run `tollbit doctor` to check this machine's network, proxy and directories."
+
+// suggestsDoctor reports whether err came from the transport (DNS, proxy,
+// TLS, timeout) or the file system refusing a write; HTTP responses from
+// TollBit, cancellations and usage errors do not qualify.
+func suggestsDoctor(err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	var urlErr *url.Error
+	return errors.As(err, &urlErr) || errors.Is(err, fs.ErrPermission)
 }
 
 // renderEntitlementRequired keeps the original error line and, when accepting

@@ -5,7 +5,7 @@ description: Install and set up the tollbit CLI in Claude's sandbox (Claude in t
 
 # Install and set up the TollBit CLI in Claude
 
-These steps are for Claude in the desktop or web app, in chat or Cowork. There, commands run in a temporary sandbox whose network goes through a proxy. Each new session starts without the CLI, so do both steps in every new session, before any other `tollbit` command.
+These steps are for Claude in the desktop or web app, in chat or Cowork. There, commands run in a temporary sandbox whose network goes through a proxy. Each new session starts without the CLI, so do these steps in every new session, before any other `tollbit` command.
 
 If you run on the user's own computer instead (for example, Claude Code in a terminal), these steps don't apply. Install the CLI as https://github.com/tollbit/cli#install describes.
 
@@ -26,7 +26,7 @@ The npm package downloads the CLI release from GitHub through the sandbox's prox
 
   ```bash
   installer="$(mktemp)"
-  curl -fsSL -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.4.3/scripts/install.sh"
+  curl -fsSL -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.5.0/scripts/install.sh"
   bash "$installer" --no-modify-path
   ~/.local/bin/tollbit version
   ```
@@ -34,6 +34,8 @@ The npm package downloads the CLI release from GitHub through the sandbox's prox
   Then run the CLI as `~/.local/bin/tollbit`.
 
 If a download or a `tollbit` command fails with a 403 or a blocked-host error, the organization's network settings are blocking it. Tell the user that an admin needs to change **Organization settings → Capabilities → Code execution** to allow package managers and GitHub, plus `oauth.tollbit.com` and `gateway.tollbit.com` under **Additional allowed domains** (or allow all domains), and then start a new session. Don't install from any other source.
+
+If the install still fails and the cause isn't clear, follow the tollbit-install-troubleshoot skill to find out where it breaks.
 
 ## 2. Choose end-user proximity
 
@@ -56,3 +58,19 @@ If `tollbit auth login` fails with `authorization timed out`, ask the user what 
 - No page opened for them, or they approved and their browser then couldn't connect: their browser isn't on this machine. Run `tollbit runtime set --end-user-proximity remote` and log in again.
 
 With `remote`, `tollbit auth login` prints a link. Give it to the user, and ask them to read back the three icons the page shows. Then run `tollbit auth complete` with those names, as the tollbit-cli skill describes.
+
+## 3. Name this agent
+
+If `tollbit auth status` shows no agent name, set one. Leave an existing name alone, because changing it clears any sign-in.
+
+```bash
+tollbit auth set --name "<name>"
+```
+
+The name is for the user, so choose one that means something to them, such as "Alex's Claude". Tell them the name you chose, and that you can change it if they'd like a different one.
+
+## 4. Finish
+
+Many operations don't need sign-in, so don't sign in up front. The user can sign in if they wish, and the CLI prompts when a command needs it.
+
+If the user asked you to set up TollBit, find out what it can do from your TollBit skills, then tell them what it offers, leading with the features that fit what you know about them and their work, and suggest one thing to try first. If they asked for something TollBit does, get on with that instead.

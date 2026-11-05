@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tollbit/cli/internal/generator/prompts"
 	"github.com/tollbit/cli/internal/version"
 )
 
@@ -43,8 +44,8 @@ func TestPluginFilesAreUpToDate(t *testing.T) {
 
 func TestGenerateWritesSkillsAndVersions(t *testing.T) {
 	root := t.TempDir()
-	for _, p := range []string{ManifestPath, InstallSkillPath} {
-		content := `"version": "0.0.0" raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh`
+	for _, p := range []string{ManifestPath, InstallSkillPath, prompts.TroubleshootTemplatePath} {
+		content := `"version": "0.0.0" raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh releases/download/v{{version}}/tollbit_{{version}}_checksums.txt`
 		if err := os.MkdirAll(filepath.Join(root, filepath.Dir(p)), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -82,11 +83,19 @@ func TestGenerateWritesSkillsAndVersions(t *testing.T) {
 	if !strings.Contains(string(install), "tollbit/cli/v"+version.Version+"/scripts/install.sh") {
 		t.Fatalf("installer not pinned to the release tag: %s", install)
 	}
+	pinned := "releases/download/v" + version.Version + "/tollbit_" + version.Version + "_checksums.txt"
+	troubleshoot, err := os.ReadFile(filepath.Join(root, TroubleshootSkillPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(troubleshoot), "---\nname: tollbit-install-troubleshoot\n") || !strings.Contains(string(troubleshoot), "---\n\n\"version\"") || !strings.Contains(string(troubleshoot), pinned) {
+		t.Fatalf("troubleshooting skill should be its frontmatter, then the prompt pinned to the release: %s", troubleshoot)
+	}
 }
 
 func TestFilesRejectsVersionedFileWithoutVersion(t *testing.T) {
 	root := t.TempDir()
-	for _, p := range []string{ManifestPath, InstallSkillPath} {
+	for _, p := range []string{ManifestPath, InstallSkillPath, prompts.TroubleshootTemplatePath} {
 		if err := os.MkdirAll(filepath.Join(root, filepath.Dir(p)), 0o755); err != nil {
 			t.Fatal(err)
 		}
