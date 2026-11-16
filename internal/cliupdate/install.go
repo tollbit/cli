@@ -50,7 +50,7 @@ func (h *Handler) ConfigureSelfInstall(config configuration.Config) {
 	h.autoUpdate = config.Update.AutoUpdate
 	h.installers = map[installmethod.Method]installer{
 		installmethod.MethodInstaller: release.Installer{
-			BaseURL:    config.Update.ReleaseBaseURL,
+			BaseURLs:   config.Update.ReleaseBaseURLs,
 			LockDir:    config.Runtime.StateDir,
 			Executable: h.executable,
 		},

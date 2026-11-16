@@ -80,7 +80,7 @@ func UpdateInstructions(method Method, latest string) string {
 	case MethodNPM:
 		return available + ". Run: npm update -g @tollbit/tollbit-cli"
 	case MethodInstaller:
-		return available + `. Run: curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --force`
+		return available + `. Run: curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --force`
 	case MethodGoInstall:
 		return available + ". Run: go install github.com/tollbit/cli/cmd/tollbit@latest"
 	default:
@@ -106,7 +106,7 @@ func RequiredInstructions(method Method, minimum, latest string) string {
 	case MethodNPM:
 		return msg + "Update to " + target + " with: npm update -g @tollbit/tollbit-cli"
 	case MethodInstaller:
-		return msg + "Update to " + target + ` with: curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --force`
+		return msg + "Update to " + target + ` with: curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --force`
 	case MethodGoInstall:
 		return msg + "Update to " + target + " with: go install github.com/tollbit/cli/cmd/tollbit@latest"
 	default:

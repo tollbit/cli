@@ -5,6 +5,7 @@ package configuration
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -46,8 +47,8 @@ func TestAssembleConfigurationIgnoresEndpointEnv(t *testing.T) {
 	if config.Auth.BrowserConsent.CallbackAddress != "127.0.0.1:54321" {
 		t.Fatalf("expected embedded callback address, got %q", config.Auth.BrowserConsent.CallbackAddress)
 	}
-	if config.Update.ReleaseBaseURL != "https://releases.example/download" {
-		t.Fatalf("expected embedded release base URL, got %q", config.Update.ReleaseBaseURL)
+	if want := []string{"https://releases.example/download"}; !slices.Equal(config.Update.ReleaseBaseURLs, want) {
+		t.Fatalf("expected embedded release base URLs %q, got %q", want, config.Update.ReleaseBaseURLs)
 	}
 }
 

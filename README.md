@@ -2,7 +2,7 @@
 
 CLI client for searching and grounding content for agents, allows access to all content in the [TollBit](https://tollbit.com) network.
 
-Binaries and installers are published on **[GitHub Releases](https://github.com/tollbit/cli/releases)**.
+Binaries and installers are published on **[GitHub Releases](https://github.com/tollbit/cli/releases)**, with a copy at `https://tollbit.com/.agents/cli/` for networks that block GitHub. The installers and the npm package download from `tollbit.com` first and fall back to GitHub.
 
 Primary workflow: install → `search` → `content pricing` → `content fetch`. Authentication is triggered automatically by the CLI when needed.
 
@@ -15,14 +15,14 @@ Primary workflow: install → `search` → `content pricing` → `content fetch`
 ### macOS and Linux
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
+curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash
 ```
 
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.5.1
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
+curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --version v0.5.2
+curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
 By default the binary goes under `~/.local/bin`; the installer can add that directory to your shell `PATH`. Use `--no-modify-path` to skip PATH changes in CI or locked environments.
@@ -30,14 +30,14 @@ By default the binary goes under `~/.local/bin`; the installer can add that dire
 ### Windows (PowerShell)
 
 ```powershell
-irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
+irm "https://tollbit.com/.agents/cli/install.ps1" | iex
 ```
 
 Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
-irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
-Install-Tollbit -Version v0.5.1 -Force
+irm "https://tollbit.com/.agents/cli/install.ps1" | iex
+Install-Tollbit -Version v0.5.2 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -60,11 +60,11 @@ This repo is a Claude plugin marketplace. The `tollbit` plugin adds the agent sk
 
 In the Claude desktop or web app (chat and Cowork), go to **Customize → Plugins → Add → Add marketplace**, enter `tollbit/cli`, then install **tollbit**.
 
-On a Team or Enterprise plan, an organization owner must turn on **Skills**, **User-created skills** and **Cowork**; otherwise **Add marketplace** doesn't appear. To install the CLI in Claude's sandbox, **Code execution** must also allow package managers and GitHub, plus `oauth.tollbit.com` and `gateway.tollbit.com`.
+On a Team or Enterprise plan, an organization owner must turn on **Skills**, **User-created skills** and **Cowork**; otherwise **Add marketplace** doesn't appear. To install the CLI in Claude's sandbox, **Code execution** must also allow package managers, plus `tollbit.com` and `*.tollbit.com`.
 
 ### Manual install
 
-From **[GitHub Releases](https://github.com/tollbit/cli/releases)**, download the archive for your OS and CPU, verify SHA-256 against `tollbit_<version>_checksums.txt`, and put `tollbit` (or `tollbit.exe`) on your `PATH`.
+From `https://tollbit.com/.agents/cli/v<version>/` or **[GitHub Releases](https://github.com/tollbit/cli/releases)**, download the archive for your OS and CPU, verify SHA-256 against `tollbit_<version>_checksums.txt`, and put `tollbit` (or `tollbit.exe`) on your `PATH`.
 
 ### If the install fails
 
@@ -179,7 +179,7 @@ Checks that the CLI can work on this machine, and is the first thing to run when
 
 - **Execution:** version, OS/arch, install method, the binary's path, and whether `tollbit` on PATH is this binary.
 - **Directories:** that the CLI can create and write its state (`TOLLBIT_RUNTIME_STATE_DIR`) and credentials (`TOLLBIT_CREDENTIALS_STORAGE_DIR`) directories, and whether it can update itself in its install directory.
-- **Network:** proxy environment variables (credentials redacted), and for each host the CLI is configured to call (auth, gateway, and GitHub releases, following the redirect to the asset host) whether it resolves, completes TLS and answers. Failures name their kind: `dns`, `connect`, `timeout`, `proxy_unreachable`, `proxy_rejected`, `proxy_auth_required`, `tls_intercepted` (with the certificate issuer), `tls_other`, or `http_<status>`. When every host fails DNS, or `CODEX_SANDBOX_NETWORK_DISABLED` is set, the DNS hints lead with a sandbox that has no network, and still mention DNS, VPN and IT. On Windows it warns when a system proxy is set but `HTTPS_PROXY` is not, since the CLI only uses the environment variables.
+- **Network:** proxy environment variables (credentials redacted), and for each host the CLI is configured to call (auth, gateway, and each release host: `tollbit.com` and GitHub releases, following the redirect to the asset host) whether it resolves, completes TLS and answers. Failures name their kind: `dns`, `connect`, `timeout`, `proxy_unreachable`, `proxy_rejected`, `proxy_auth_required`, `tls_intercepted` (with the certificate issuer), `tls_other`, or `http_<status>`. When every host fails with `dns`, `connect` or `timeout`, or `CODEX_SANDBOX_NETWORK_DISABLED` is set, the hints for those failures lead with a sandbox that has no network, and still give the usual DNS, VPN, IT or firewall advice. On Windows it warns when a system proxy is set but `HTTPS_PROXY` is not, since the CLI only uses the environment variables.
 - **Auth:** whether a token is stored and when it expires, read from disk only. Informational; it never fails.
 - **Skills:** the agent skills bundled with this CLI (`tollbit-cli`, `tollbit-analytics`) and their version, with the command to install or update each. By default doctor does not look for installed copies, since every agent keeps skills in its own place; an agent compares the `version:` line of the SKILL.md it loaded. With `--skills-dir <dir>`, the folder given to `tollbit guide --install`, doctor checks `<dir>/<skill-name>/SKILL.md` for each skill: `PASS` when the version matches this CLI, `WARN` when it is missing, out of date or has no version, and `WARN` when the folder itself is missing or unreadable. The hint gives the command to run, and `--json` adds `path` and `installed_version`. It doesn't see skills installed through the Claude plugin, which live elsewhere. Skill checks never fail, so they never change the exit code.
 
@@ -208,14 +208,14 @@ Installer channel updates:
 
 ```bash
 # Latest
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash
+curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh" | bash -s -- --version v0.5.1 --force
+curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --version v0.5.2 --force
 ```
 
 ```powershell
-irm "https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.ps1" | iex
+irm "https://tollbit.com/.agents/cli/install.ps1" | iex
 Install-Tollbit -Version latest -Force
 ```
 

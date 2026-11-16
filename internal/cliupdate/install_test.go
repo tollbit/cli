@@ -53,7 +53,7 @@ func newInstallEnv(t *testing.T, release selfinstalltest.Release, policy version
 	var config configuration.Config
 	config.Runtime.StateDir = t.TempDir()
 	config.Update.AutoUpdate = true
-	config.Update.ReleaseBaseURL = server.URL
+	config.Update.ReleaseBaseURLs = []string{server.URL}
 
 	out := new(bytes.Buffer)
 	handler := NewHandler(out)

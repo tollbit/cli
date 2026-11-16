@@ -167,10 +167,16 @@ func AssertBinary(t *testing.T, path, version string) {
 	}
 }
 
-// WriteBinary writes Binary(version) to path as an executable.
+// WriteBinary puts Binary(version) at path as an executable. It stages the
+// file and renames it into place, as the real installs do: macOS can kill the
+// next run of a binary that has run and was then overwritten in place.
 func WriteBinary(t *testing.T, path, version string) {
 	t.Helper()
-	if err := os.WriteFile(path, Binary(t, version), 0o755); err != nil {
+	staged := path + ".new"
+	if err := os.WriteFile(staged, Binary(t, version), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(staged, path); err != nil {
 		t.Fatal(err)
 	}
 }

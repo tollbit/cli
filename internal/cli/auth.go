@@ -676,13 +676,18 @@ func runAuthSet(cmd *cobra.Command, factory app.Factory, opts authSetOptions) er
 	if err != nil {
 		return RuntimeError(err)
 	}
-	if err := credentials.SaveIdentity(cmd.Context(), identity); err != nil {
+	cleared, err := credentials.SaveIdentity(cmd.Context(), identity)
+	if err != nil {
 		return RuntimeError(err)
 	}
-	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
-	fmt.Fprintf(stdout, "updated agent profile %s\n", identity.Name)
-	fmt.Fprintln(stderr, "cleared token — profile updated; run 'tollbit auth login'")
+	fmt.Fprintf(cmd.OutOrStdout(), "updated agent profile %s\n", identity.Name)
+	switch {
+	case cleared.Token:
+		fmt.Fprintln(stderr, "cleared token — profile updated; run 'tollbit auth login'")
+	case cleared.PendingConsent:
+		fmt.Fprintln(stderr, "canceled pending authorization — profile updated; run 'tollbit auth login'")
+	}
 	return nil
 }
 

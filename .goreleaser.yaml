@@ -38,13 +38,16 @@ archives:
       - THIRD-PARTY-NOTICES.md
       - README.md
 
-# The install prompts are also on the assets CDN. This copy and its checksums
-# are independent of AWS, so a CDN copy can be audited against them.
+# The install prompts and scripts are also on tollbit.com and the assets CDN.
+# This copy and its checksums are independent of AWS, so a CDN copy can be
+# audited against them.
 checksum:
   name_template: "tollbit_{{ .Version }}_checksums.txt"
   extra_files:
     - glob: ./prompts/install-prompt.md
     - glob: ./prompts/install-troubleshooting.md
+    - glob: ./scripts/install.sh
+    - glob: ./scripts/install.ps1
 
 # Assets already on a release are never replaced: with replace_existing_artifacts
 # off, uploading one fails, so a re-run that reaches the upload fails too. `mode`
@@ -55,3 +58,5 @@ release:
   extra_files:
     - glob: ./prompts/install-prompt.md
     - glob: ./prompts/install-troubleshooting.md
+    - glob: ./scripts/install.sh
+    - glob: ./scripts/install.ps1

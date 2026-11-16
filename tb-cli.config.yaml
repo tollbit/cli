@@ -33,4 +33,7 @@ update:
   check_enabled: true
   check_interval: 1h
   auto_update: true
-  release_base_url: https://github.com/tollbit/cli/releases/download
+  # Tried in order; GitHub is the fallback for networks that block tollbit.com.
+  release_base_urls:
+    - https://tollbit.com/.agents/cli
+    - https://github.com/tollbit/cli/releases/download

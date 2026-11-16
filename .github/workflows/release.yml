@@ -59,12 +59,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Signs the built archives with keyless sigstore provenance, verifiable
-      # with `gh attestation verify <archive> --repo tollbit/cli`.
+      # Signs the built archives, install scripts and install prompts with
+      # keyless sigstore provenance, verifiable with
+      # `gh attestation verify <file> --repo tollbit/cli`.
       - name: Attest build provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: "dist/*.tar.gz,dist/*.zip"
+          subject-path: "dist/*.tar.gz,dist/*.zip,scripts/install.sh,scripts/install.ps1,prompts/install-prompt.md,prompts/install-troubleshooting.md"
 
   npm-publish:
     needs: goreleaser

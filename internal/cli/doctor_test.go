@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -221,32 +222,50 @@ func TestDoctorRejectsEmptySkillsDir(t *testing.T) {
 }
 
 func TestRunDoctorTextAndJSONGiveTheSameSandboxHint(t *testing.T) {
-	config := testConfig()
-	config.Runtime.StateDir = t.TempDir()
-	config.Credentials.StorageDir = config.Runtime.StateDir
-	config.Auth.BaseURL = "https://doctor-check.invalid"
-	config.Foundry.BaseURL = "https://doctor-check.invalid/foundry"
-	config.Gateway.BaseURL = "https://doctor-check.invalid"
-	config.Update.CheckEnabled = false
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	refusedHost := listener.Addr().String()
+	listener.Close()
 
-	var jsonOut, textOut, stderr bytes.Buffer
-	executeTestCommandWithConfig(config, []string{"doctor", "--json"}, nil, &jsonOut, &stderr)
-	executeTestCommandWithConfig(config, []string{"doctor"}, nil, &textOut, &stderr)
+	tests := []struct {
+		name string
+		host string
+	}{
+		{name: "dns", host: "doctor-check.invalid"},
+		{name: "connect", host: refusedHost},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := testConfig()
+			config.Runtime.StateDir = t.TempDir()
+			config.Credentials.StorageDir = config.Runtime.StateDir
+			config.Auth.BaseURL = "https://" + tt.host
+			config.Foundry.BaseURL = "https://" + tt.host + "/foundry"
+			config.Gateway.BaseURL = "https://" + tt.host
+			config.Update.CheckEnabled = false
 
-	var report doctor.Report
-	if err := json.Unmarshal(jsonOut.Bytes(), &report); err != nil {
-		t.Fatalf("expected JSON report, got %q: %v", jsonOut.String(), err)
-	}
-	var hint string
-	for _, c := range report.Checks {
-		if c.Host == "doctor-check.invalid" {
-			hint = c.Hint
-		}
-	}
-	if !strings.HasPrefix(hint, "This may be a sandbox with no network.") {
-		t.Fatalf("expected the JSON hint to lead with the sandbox, got %q", hint)
-	}
-	if !strings.Contains(textOut.String(), "hint: "+hint+"\n") {
-		t.Fatalf("expected text output to carry the JSON hint %q, got %q", hint, textOut.String())
+			var jsonOut, textOut, stderr bytes.Buffer
+			executeTestCommandWithConfig(config, []string{"doctor", "--json"}, nil, &jsonOut, &stderr)
+			executeTestCommandWithConfig(config, []string{"doctor"}, nil, &textOut, &stderr)
+
+			var report doctor.Report
+			if err := json.Unmarshal(jsonOut.Bytes(), &report); err != nil {
+				t.Fatalf("expected JSON report, got %q: %v", jsonOut.String(), err)
+			}
+			var hint string
+			for _, c := range report.Checks {
+				if c.Host == tt.host {
+					hint = c.Hint
+				}
+			}
+			if !strings.HasPrefix(hint, "This may be a sandbox with no network.") {
+				t.Fatalf("expected the JSON hint to lead with the sandbox, got %q", hint)
+			}
+			if !strings.Contains(textOut.String(), "hint: "+hint+"\n") {
+				t.Fatalf("expected text output to carry the JSON hint %q, got %q", hint, textOut.String())
+			}
+		})
 	}
 }

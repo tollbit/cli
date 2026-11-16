@@ -19,11 +19,12 @@ const (
 	PromptPath    = "prompts/install-prompt.md"
 )
 
-// The template's hints table placeholder, and the heading where the published
-// prompt ends.
+// The template's placeholders for the hints table and the troubleshooting
+// steps, and the heading where the published prompt ends.
 const (
-	hintsPlaceholder = "{{hints_table}}"
-	todoHeading      = "\n## TODO\n"
+	hintsPlaceholder        = "{{hints_table}}"
+	troubleshootPlaceholder = "{{troubleshooting}}"
+	todoHeading             = "\n## TODO\n"
 )
 
 type (
@@ -63,13 +64,22 @@ func installFiles(root string) (map[string][]byte, error) {
 	if err := yaml.Unmarshal(raw, &m); err != nil {
 		return nil, fmt.Errorf("%s: %w", PlatformsPath, err)
 	}
-	return render(template, m, version.Version)
+	troubleshoot, err := os.ReadFile(filepath.Join(root, TroubleshootTemplatePath))
+	if err != nil {
+		return nil, err
+	}
+	return render(template, troubleshoot, m, version.Version)
 }
 
-// render builds the published prompt: the template up to its TODO section, with the hints table filled in from the
-// platforms file and {{version}} set to the release.
-func render(template []byte, m platformList, release string) (map[string][]byte, error) {
+// render builds the published prompt: the template up to its TODO section,
+// with the hints table filled in from the platforms file, the troubleshooting
+// template embedded, and {{version}} set to the release.
+func render(template, troubleshoot []byte, m platformList, release string) (map[string][]byte, error) {
 	if err := check(template, m); err != nil {
+		return nil, err
+	}
+	steps, err := embedTroubleshooting(troubleshoot)
+	if err != nil {
 		return nil, err
 	}
 	body, _, found := bytes.Cut(template, []byte(todoHeading))
@@ -78,6 +88,7 @@ func render(template []byte, m platformList, release string) (map[string][]byte,
 	}
 	prompt := strings.TrimRight(string(body), "\n") + "\n"
 	prompt = strings.Replace(prompt, hintsPlaceholder, hintsTable(m), 1)
+	prompt = strings.Replace(prompt, troubleshootPlaceholder, steps, 1)
 	filled, err := fill(TemplatePath, prompt, release)
 	if err != nil {
 		return nil, err
@@ -89,6 +100,9 @@ func render(template []byte, m platformList, release string) (map[string][]byte,
 func check(template []byte, m platformList) error {
 	if !bytes.Contains(template, []byte(hintsPlaceholder)) {
 		return fmt.Errorf("%s has no %s", TemplatePath, hintsPlaceholder)
+	}
+	if !bytes.Contains(template, []byte("\n"+troubleshootPlaceholder+"\n")) {
+		return fmt.Errorf("%s has no %s on a line of its own", TemplatePath, troubleshootPlaceholder)
 	}
 	for _, title := range installSections {
 		if !bytes.Contains(template, []byte("\n### Install: "+title+"\n")) {
@@ -106,6 +120,27 @@ func check(template []byte, m platformList) error {
 		}
 	}
 	return nil
+}
+
+func embedTroubleshooting(template []byte) (string, error) {
+	title, body, _ := strings.Cut(strings.TrimSpace(string(template)), "\n")
+	if !strings.HasPrefix(title, "# ") {
+		return "", fmt.Errorf("%s doesn't start with a \"# \" title", TroubleshootTemplatePath)
+	}
+	lines := strings.Split(strings.TrimSpace(body), "\n")
+	inCode := false
+	for i, line := range lines {
+		switch {
+		case strings.HasPrefix(strings.TrimSpace(line), "```"):
+			inCode = !inCode
+		case !inCode && strings.HasPrefix(line, "#"):
+			lines[i] = "#" + line
+		}
+	}
+	if inCode {
+		return "", fmt.Errorf("%s has a code block that never closes", TroubleshootTemplatePath)
+	}
+	return strings.Join(lines, "\n"), nil
 }
 
 // hintsTable renders the platforms that have a detection line, in file

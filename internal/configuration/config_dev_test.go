@@ -5,6 +5,7 @@ package configuration
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -52,7 +53,7 @@ func TestAssembleConfigurationAppliesDevEndpointEnv(t *testing.T) {
 	t.Setenv("TOLLBIT_GATEWAY_BASE_URL", "https://gateway-development.example.com")
 	t.Setenv("TOLLBIT_AGENT_REGISTER_USER_AGENT_URL", "https://hack-development.example/my-agents")
 	t.Setenv("TOLLBIT_AUTH_BROWSER_CONSENT_CALLBACK_ADDRESS", "127.0.0.1:65432")
-	t.Setenv("TOLLBIT_UPDATE_RELEASE_BASE_URL", "http://127.0.0.1:8899/releases")
+	t.Setenv("TOLLBIT_UPDATE_RELEASE_BASE_URLS", "http://127.0.0.1:8899/releases, http://127.0.0.1:8899/fallback")
 
 	config := assembleTestConfiguration(t, t.TempDir())
 
@@ -68,8 +69,8 @@ func TestAssembleConfigurationAppliesDevEndpointEnv(t *testing.T) {
 	if config.Auth.BrowserConsent.CallbackAddress != "127.0.0.1:65432" {
 		t.Fatalf("expected callback env override, got %q", config.Auth.BrowserConsent.CallbackAddress)
 	}
-	if config.Update.ReleaseBaseURL != "http://127.0.0.1:8899/releases" {
-		t.Fatalf("expected release base URL env override, got %q", config.Update.ReleaseBaseURL)
+	if want := []string{"http://127.0.0.1:8899/releases", "http://127.0.0.1:8899/fallback"}; !slices.Equal(config.Update.ReleaseBaseURLs, want) {
+		t.Fatalf("expected release base URLs env override %q, got %q", want, config.Update.ReleaseBaseURLs)
 	}
 }
 

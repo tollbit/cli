@@ -1,14 +1,15 @@
 "use strict";
 
 // Tests for install.js's downloads: proxy selection, the CONNECT tunnel,
-// redirects and the time limit. Run with: node --test npm/
+// redirects, the time limit and the fallback from tollbit.com to GitHub.
+// Run with: node --test npm/
 
 const assert = require("assert");
 const http = require("http");
 const net = require("net");
 const { after, before, describe, it } = require("node:test");
 
-const { download, proxyForUrl } = require("./install.js");
+const { download, fetchRelease, proxyForUrl, releaseSources } = require("./install.js");
 
 describe("proxyForUrl", () => {
   const proxy = (url, env) => {
@@ -208,3 +209,76 @@ async function unusedPort() {
   await new Promise((resolve) => server.close(resolve));
   return port;
 }
+
+describe("releaseSources", () => {
+  it("tries tollbit.com, then GitHub, for the default repository", () => {
+    const urls = releaseSources("tollbit/cli", "v1.2.3").map((source) => source.url);
+    assert.deepStrictEqual(urls, [
+      "https://tollbit.com/.agents/cli/v1.2.3",
+      "https://github.com/tollbit/cli/releases/download/v1.2.3"
+    ]);
+  });
+
+  it("uses GitHub only for any other repository", () => {
+    const urls = releaseSources("tollbit/cli-prereleases", "v1.2.3-preview.1").map((source) => source.url);
+    assert.deepStrictEqual(urls, ["https://github.com/tollbit/cli-prereleases/releases/download/v1.2.3-preview.1"]);
+  });
+});
+
+describe("fetchRelease", () => {
+  const sources = [
+    { url: "https://mirror.test/v1.2.3", timeoutMs: 1 },
+    { url: "https://github.test/v1.2.3", timeoutMs: 2 }
+  ];
+
+  // fakeFetch serves files by URL and fails for any URL it does not have.
+  function fakeFetch(files) {
+    const requested = [];
+    const fetch = async (url) => {
+      requested.push(url);
+      if (!(url in files)) {
+        throw new Error(`Download failed (404) for ${url}`);
+      }
+      return Buffer.from(files[url]);
+    };
+    return { fetch, requested };
+  }
+
+  it("uses tollbit.com when it serves both files", async () => {
+    const { fetch, requested } = fakeFetch({
+      "https://mirror.test/v1.2.3/sums.txt": "mirror sums",
+      "https://mirror.test/v1.2.3/a.tar.gz": "mirror archive"
+    });
+    const logs = [];
+
+    const got = await fetchRelease(sources, "sums.txt", "a.tar.gz", { fetch, log: (line) => logs.push(line) });
+
+    assert.strictEqual(got.archive.toString(), "mirror archive");
+    assert.ok(requested.every((url) => url.startsWith("https://mirror.test/")));
+    assert.deepStrictEqual(logs, []);
+  });
+
+  it("downloads both files from GitHub when tollbit.com is missing one", async () => {
+    const { fetch } = fakeFetch({
+      "https://mirror.test/v1.2.3/sums.txt": "mirror sums",
+      "https://github.test/v1.2.3/sums.txt": "github sums",
+      "https://github.test/v1.2.3/a.tar.gz": "github archive"
+    });
+    const logs = [];
+
+    const got = await fetchRelease(sources, "sums.txt", "a.tar.gz", { fetch, log: (line) => logs.push(line) });
+
+    assert.strictEqual(got.checksums.toString(), "github sums");
+    assert.strictEqual(got.archive.toString(), "github archive");
+    assert.match(logs.join("\n"), /Could not download from https:\/\/mirror\.test\/v1\.2\.3: .*\nTrying GitHub instead\./);
+  });
+
+  it("fails with the last source's error when every source fails", async () => {
+    const { fetch } = fakeFetch({});
+
+    await assert.rejects(
+      fetchRelease(sources, "sums.txt", "a.tar.gz", { fetch, log: () => {} }),
+      /https:\/\/github\.test\/v1\.2\.3\//
+    );
+  });
+});

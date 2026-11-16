@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-16
+
+### Added
+
+- Each GitHub Release now includes `install.sh` and `install.ps1`, listed in
+  its checksums file. Its build provenance attestation now covers them and the
+  install prompts, so the copies on tollbit.com can be checked against it.
+- Each release is now also published to `https://tollbit.com/.agents/cli/`,
+  for networks that block GitHub: the archives and checksums under `vX.Y.Z/`,
+  `install.sh`, `install.ps1`, the install prompts under `prompts/`, and
+  `latest`, a text file with a `version=vX.Y.Z` line.
+
+### Changed
+
+- `tollbit doctor` now suspects a sandbox for connection failures and timeouts
+  too, not just DNS failures. When every host fails, or a sandbox says the
+  network is off (`CODEX_SANDBOX_NETWORK_DISABLED`), the hint says to allow
+  network access or run the command in your own terminal, then gives the
+  firewall advice. If one host fails and the others work, the hint is unchanged.
+- The install prompt now tells agents that install skills with
+  `tollbit guide --install <dir>` to check them with
+  `tollbit doctor --skills-dir <dir>` and read the skill lines, since a missing
+  or out-of-date skill only warns and doctor still exits 0.
+- The install prompt now includes the install troubleshooting steps, instead
+  of telling the agent to download them. An install usually fails because the
+  network is blocked, which also stopped the agent fetching the steps. The
+  separate troubleshooting prompt is still published.
+- The install prompt's installer commands now delete the downloaded install
+  script when they finish, whether or not the install worked, and still exit
+  with the installer's status.
+- The install prompt runs `tollbit doctor` only once something has installed;
+  when nothing installed, the agent goes straight to the troubleshooting steps.
+- The install troubleshooting steps now end with "stop": after the report the
+  agent doesn't retry the install or carry on with setup unless the user asks.
+  Step 3 says to rerun its host probes, not the install, once a sandbox has
+  network access.
+- Every install method now downloads from `https://tollbit.com/.agents/cli/`
+  first, so installs work on networks that block GitHub but allow
+  `tollbit.com`: `install.sh`, `install.ps1`, the npm package and self-update.
+  If `tollbit.com` can't be reached, they fall back to GitHub Releases as
+  before. A checksum mismatch still fails and never falls back. `--repo`
+  (`-Repo`) or `TOLLBIT_NPM_REPO` with any other repository uses only GitHub.
+  `--base-url` (`-BaseUrl`) sets where the scripts download from first.
+- The README, the install prompt, the update instruction for script installs
+  and the Claude plugin's install skill now fetch `install.sh` and
+  `install.ps1` from `tollbit.com` instead of `raw.githubusercontent.com`. The
+  prompt and the skill pin the version with `--version`.
+- `tollbit doctor` now checks each release host: `tollbit.com` and GitHub.
+- The install troubleshooting steps probe and report `tollbit.com`, and their
+  allowlist advice, like the README's, names `tollbit.com` and `*.tollbit.com`
+  instead of the GitHub hosts.
+
+### Fixed
+
+- Two self-updates starting at the same moment can no longer both clear a stale
+  update lock and run at once.
+- `tollbit doctor` now reports a connection the OS blocks or can't route, such
+  as a sandbox refusing it with "operation not permitted", as `connect` with a
+  hint. It was `other` with no hint. On Windows the same now applies to a
+  refused or reset connection.
+- `tollbit auth set` only says it cleared a token when it removed one, so a
+  fresh install no longer gets that warning. If the change canceled a login
+  that was still waiting on authorization, it says that instead.
+
 ## [0.5.1] - 2026-11-05
 
 ### Added

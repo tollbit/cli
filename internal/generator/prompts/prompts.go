@@ -1,6 +1,7 @@
 // Package prompts generates the prompts in prompts/ that agents are given,
 // each from its template (prompts/*.template.md): the install prompt, with its
-// hints table from the platforms file, and the install troubleshooting prompt.
+// hints table from the platforms file, and the install troubleshooting prompt,
+// which the install prompt also embeds as its last section.
 // Templates name the release as {{version}}. cmd/gen-prompts (make prompts)
 // runs it.
 package prompts

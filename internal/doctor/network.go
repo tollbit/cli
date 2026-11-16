@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/tollbit/cli/internal/version"
@@ -39,8 +38,10 @@ var proxyEnvVars = []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_pr
 // belong here: its sandbox may still have network access.
 var sandboxEnvVars = []string{"CODEX_SANDBOX_NETWORK_DISABLED"}
 
-// sandboxHintLead goes in front of a DNS hint. It keeps that hint rather than
-// replacing it, because broken corporate DNS can also fail every host.
+// sandboxHintLead goes in front of a DNS, connect or timeout hint. It keeps
+// that hint rather than replacing it, because broken corporate DNS or a strict
+// firewall can also fail every host. Those hints start in lower case to follow
+// its "Otherwise, ".
 const sandboxHintLead = "This may be a sandbox with no network. Allow network access, or run this in your own terminal. Otherwise, "
 
 type target struct {
@@ -64,26 +65,33 @@ func networkChecks(ctx context.Context, opts Options) []Check {
 	return append(checks, withSandboxHint(hosts, opts)...)
 }
 
-// withSandboxHint leads the DNS hints of hosts with the sandbox when one is
-// the likely cause: every host failed DNS, or the harness says the network is
-// off. Each probe sees only its own host, so this runs once they all finish.
-// When only some hosts fail DNS, the network works and those hosts are blocked.
+// withSandboxHint leads the hints of hosts the network could not reach with the
+// sandbox when one is the likely cause: every host failed that way, or the
+// harness says the network is off. Each probe sees only its own host, so this
+// runs once they all finish. When only some hosts fail, the network works and
+// those hosts are blocked.
 func withSandboxHint(hosts []Check, opts Options) []Check {
-	dnsFailures := 0
+	unreachable := 0
 	for _, c := range hosts {
-		if c.ErrorKind == KindDNS {
-			dnsFailures++
+		if networkUnreachable(c.ErrorKind) {
+			unreachable++
 		}
 	}
-	if dnsFailures == 0 || (dnsFailures < len(hosts) && !sandboxEnvSet(opts)) {
+	if unreachable == 0 || (unreachable < len(hosts) && !sandboxEnvSet(opts)) {
 		return hosts
 	}
 	for i := range hosts {
-		if hosts[i].ErrorKind == KindDNS {
+		if networkUnreachable(hosts[i].ErrorKind) {
 			hosts[i].Hint = sandboxHintLead + hosts[i].Hint
 		}
 	}
 	return hosts
+}
+
+// networkUnreachable reports whether kind is a failure a sandbox with no
+// network causes. A proxy, TLS or HTTP failure means something answered.
+func networkUnreachable(kind string) bool {
+	return kind == KindDNS || kind == KindConnect || kind == KindTimeout
 }
 
 func sandboxEnvSet(opts Options) bool {
@@ -157,7 +165,9 @@ func hostTargets(opts Options) []target {
 	}
 	if cfg.Update.CheckEnabled {
 		v := version.Version
-		add("update", strings.TrimRight(cfg.Update.ReleaseBaseURL, "/")+"/v"+v+"/tollbit_"+v+"_checksums.txt", true)
+		for _, base := range cfg.Update.ReleaseBaseURLs {
+			add("update", strings.TrimRight(base, "/")+"/v"+v+"/tollbit_"+v+"_checksums.txt", true)
+		}
 	}
 	return targets
 }
@@ -299,12 +309,26 @@ func classify(err error, connectStatus int, proxyURL *url.URL, host string, time
 	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &netErr) && netErr.Timeout():
 		return KindTimeout, fmt.Sprintf("no answer within %s", timeout),
 			"a firewall may be dropping traffic to " + host + ", or this network needs a proxy (set HTTPS_PROXY)"
-	case errors.Is(err, syscall.ECONNREFUSED), errors.Is(err, syscall.ECONNRESET), errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+	case isAny(err, refusedErrors), errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
 		return KindConnect, "connection refused or reset: " + rootCause(err),
+			"a firewall may be blocking " + host + " on port 443"
+	// The OS refused to connect, or has no route. A sandbox that leaves DNS
+	// working blocks here, with EPERM from macOS sandbox-exec.
+	case isAny(err, blockedErrors):
+		return KindConnect, "connection blocked: " + rootCause(err),
 			"a firewall may be blocking " + host + " on port 443"
 	default:
 		return KindOther, rootCause(err), ""
 	}
+}
+
+func isAny(err error, targets []error) bool {
+	for _, target := range targets {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func failed(c Check, kind, detail, hint string) Check {

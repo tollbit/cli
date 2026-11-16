@@ -18,22 +18,22 @@ npm install -g @tollbit/tollbit-cli
 tollbit version
 ```
 
-The npm package downloads the CLI release from GitHub through the sandbox's proxy (`HTTPS_PROXY`) and checks it against the release's SHA-256 checksums.
+The npm package downloads the CLI release from `tollbit.com`, or from GitHub if `tollbit.com` is blocked, through the sandbox's proxy (`HTTPS_PROXY`), and checks it against the release's SHA-256 checksums.
 
 - If `tollbit` is not found afterwards, run `hash -r` and try again.
-- If the install fails with `no data for 60s`, the download is not getting through the proxy. Treat it like a blocked host (below).
+- If the install fails with `no data for 30s` or `no data for 60s`, the download is not getting through the proxy. Treat it like a blocked host (below).
 - If npm is not available, use the installer script instead:
 
   ```bash
   installer="$(mktemp)"
-  curl -fsSL -o "$installer" "https://raw.githubusercontent.com/tollbit/cli/v0.5.1/scripts/install.sh"
-  bash "$installer" --no-modify-path
+  curl -fsSL -o "$installer" "https://tollbit.com/.agents/cli/install.sh"
+  bash "$installer" --version v0.5.2 --no-modify-path
   ~/.local/bin/tollbit version
   ```
 
   Then run the CLI as `~/.local/bin/tollbit`.
 
-If a download or a `tollbit` command fails with a 403 or a blocked-host error, the organization's network settings are blocking it. Tell the user that an admin needs to change **Organization settings → Capabilities → Code execution** to allow package managers and GitHub, plus `oauth.tollbit.com` and `gateway.tollbit.com` under **Additional allowed domains** (or allow all domains), and then start a new session. Don't install from any other source.
+If a download or a `tollbit` command fails with a 403 or a blocked-host error, the organization's network settings are blocking it. Tell the user that an admin needs to change **Organization settings → Capabilities → Code execution** to allow package managers, plus `tollbit.com` and `*.tollbit.com` under **Additional allowed domains** (or allow all domains), and then start a new session. Don't install from any other source.
 
 If the install still fails and the cause isn't clear, follow the tollbit-install-troubleshoot skill to find out where it breaks.
 

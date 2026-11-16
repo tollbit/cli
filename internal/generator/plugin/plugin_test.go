@@ -45,7 +45,7 @@ func TestPluginFilesAreUpToDate(t *testing.T) {
 func TestGenerateWritesSkillsAndVersions(t *testing.T) {
 	root := t.TempDir()
 	for _, p := range []string{ManifestPath, InstallSkillPath, prompts.TroubleshootTemplatePath} {
-		content := `"version": "0.0.0" raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh releases/download/v{{version}}/tollbit_{{version}}_checksums.txt`
+		content := `"version": "0.0.0" bash "$installer" --version v0.0.0 --no-modify-path releases/download/v{{version}}/tollbit_{{version}}_checksums.txt`
 		if err := os.MkdirAll(filepath.Join(root, filepath.Dir(p)), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -80,8 +80,8 @@ func TestGenerateWritesSkillsAndVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(install), "tollbit/cli/v"+version.Version+"/scripts/install.sh") {
-		t.Fatalf("installer not pinned to the release tag: %s", install)
+	if !strings.Contains(string(install), `bash "$installer" --version v`+version.Version+" --no-modify-path") {
+		t.Fatalf("installer not pinned to the release: %s", install)
 	}
 	pinned := "releases/download/v" + version.Version + "/tollbit_" + version.Version + "_checksums.txt"
 	troubleshoot, err := os.ReadFile(filepath.Join(root, TroubleshootSkillPath))

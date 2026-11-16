@@ -738,7 +738,7 @@ func TestIdentityCredentialRoundTrip(t *testing.T) {
 		WBA:       &auth.WebBotAuth{Dir: "https://example.com/.well-known/web-bot-auth", Req: true, Ver: 1},
 	}
 
-	if err := mgr.SaveIdentity(context.Background(), identity); err != nil {
+	if _, err := mgr.SaveIdentity(context.Background(), identity); err != nil {
 		t.Fatal(err)
 	}
 	got, exists, err := mgr.GetStoredIdentity(context.Background())
@@ -823,7 +823,7 @@ func TestResolveIdentityUsesStoredIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := mgr.SaveIdentity(context.Background(), auth.AgentIdentity{Name: " stored-agent ", UserAgent: " stored-agent/0.1 "}); err != nil {
+	if _, err := mgr.SaveIdentity(context.Background(), auth.AgentIdentity{Name: " stored-agent ", UserAgent: " stored-agent/0.1 "}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -841,7 +841,7 @@ func TestResolveIdentityNameOverrideWinsOverStoredIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := mgr.SaveIdentity(context.Background(), auth.AgentIdentity{Name: "stored-agent", UserAgent: "stored-agent/0.1"}); err != nil {
+	if _, err := mgr.SaveIdentity(context.Background(), auth.AgentIdentity{Name: "stored-agent", UserAgent: "stored-agent/0.1"}); err != nil {
 		t.Fatal(err)
 	}
 	name := " explicit-agent "
@@ -860,7 +860,7 @@ func TestResolveIdentityUserAgentOverrideWinsOverStoredIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := mgr.SaveIdentity(context.Background(), auth.AgentIdentity{Name: "stored-agent", UserAgent: "stored-agent/0.1"}); err != nil {
+	if _, err := mgr.SaveIdentity(context.Background(), auth.AgentIdentity{Name: "stored-agent", UserAgent: "stored-agent/0.1"}); err != nil {
 		t.Fatal(err)
 	}
 	userAgent := " explicit-agent/0.1 "
@@ -901,11 +901,59 @@ func TestSaveIdentityClearsToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mgr.SaveIdentity(context.Background(), testAgentIdentity()); err != nil {
+	if _, err := mgr.SaveIdentity(context.Background(), testAgentIdentity()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(tokenPath); !os.IsNotExist(err) {
 		t.Fatalf("expected token to be cleared, got err=%v", err)
+	}
+}
+
+func TestSaveIdentityReportsWhatItCleared(t *testing.T) {
+	tests := []struct {
+		name  string
+		files []string
+		want  ClearedCredentials
+	}{
+		{name: "nothing stored"},
+		{name: "agent token", files: []string{tokenFilename}, want: ClearedCredentials{Token: true}},
+		{name: "refresh token only", files: []string{refreshFilename}, want: ClearedCredentials{Token: true}},
+		{name: "pending authorization only", files: []string{pendingFilename}, want: ClearedCredentials{PendingConsent: true}},
+		{
+			name:  "token and pending authorization",
+			files: []string{tokenFilename, pendingFilename},
+			want:  ClearedCredentials{Token: true, PendingConsent: true},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			mgr := newTestManager(t, dir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = json.NewEncoder(w).Encode(auth.RevokeRefreshTokenResponse{Revoked: true})
+			}))
+			for _, name := range tt.files {
+				content := "{}"
+				if name == refreshFilename {
+					content = `{"refresh_token":"agrt_old"}`
+				}
+				if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			got, err := mgr.SaveIdentity(context.Background(), testAgentIdentity())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Fatalf("SaveIdentity reported %+v, want %+v", got, tt.want)
+			}
+			for _, name := range tt.files {
+				if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+					t.Fatalf("expected %s removed, got err=%v", name, err)
+				}
+			}
+		})
 	}
 }
 
@@ -915,7 +963,7 @@ func TestClearIdentityRemovesIdentityAndToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := mgr.SaveIdentity(context.Background(), testAgentIdentity()); err != nil {
+	if _, err := mgr.SaveIdentity(context.Background(), testAgentIdentity()); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, tokenFilename), []byte(testJWT(t, validClaims())), 0o600); err != nil {

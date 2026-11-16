@@ -29,6 +29,14 @@ type (
 		UserAgent *string
 	}
 
+	// ClearedCredentials reports which stored credentials a save removed.
+	ClearedCredentials struct {
+		// Token is true when an agent token or a refresh token was removed.
+		Token bool
+		// PendingConsent is true when an unfinished authorization was removed.
+		PendingConsent bool
+	}
+
 	RefreshTokenStatus struct {
 		Present   bool   `json:"present"`
 		ExpiresAt string `json:"expires_at,omitempty"`

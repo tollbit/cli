@@ -130,7 +130,7 @@ func testConfig() configuration.Config {
 		Credentials: configuration.CredentialsConfig{StorageDir: storageDir},
 		Foundry:     configuration.FoundryConfig{BaseURL: foundryBaseURL},
 		Gateway:     configuration.GatewayConfig{BaseURL: gatewayBaseURL},
-		Update:      configuration.UpdateConfig{ReleaseBaseURL: "https://github.com/tollbit/cli/releases/download"},
+		Update:      configuration.UpdateConfig{ReleaseBaseURLs: []string{"https://github.com/tollbit/cli/releases/download"}},
 	}
 }
 
@@ -777,14 +777,14 @@ func TestRunAuthStatusWhoAmIFailureFallsBack(t *testing.T) {
 func TestRunAuthSetNameChangeClearsToken(t *testing.T) {
 	storageDir := t.TempDir()
 	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
-	if err := os.WriteFile(filepath.Join(storageDir, "agent-token.jwt"), []byte(testAgentJWT(t)), 0o600); err != nil {
-		t.Fatal(err)
-	}
 
 	var stdout, stderr bytes.Buffer
 	code := executeTestCommand([]string{"auth", "set", "--name", "agent-test", "--user-agent", "agent-test/0.1"}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("auth set failed: code=%d stderr=%q", code, stderr.String())
+	}
+	if err := os.WriteFile(filepath.Join(storageDir, "agent-token.jwt"), []byte(testAgentJWT(t)), 0o600); err != nil {
+		t.Fatal(err)
 	}
 
 	stdout.Reset()
@@ -808,6 +808,45 @@ func TestRunAuthSetNameChangeClearsToken(t *testing.T) {
 	}
 	if statusLineValue(stdout.String(), "User agent:") != "agent-test/0.1" {
 		t.Fatalf("expected user agent preserved, got %q", stdout.String())
+	}
+}
+
+func TestRunAuthSetWithoutTokenDoesNotClaimClear(t *testing.T) {
+	t.Setenv(testCredentialsStorageDirEnvVar, t.TempDir())
+
+	for _, name := range []string{"agent-test", "other-agent"} {
+		var stdout, stderr bytes.Buffer
+		code := executeTestCommand([]string{"auth", "set", "--name", name}, nil, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("auth set failed: code=%d stderr=%q", code, stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "updated agent profile "+name) {
+			t.Fatalf("expected profile update, got stdout=%q", stdout.String())
+		}
+		if stderr.Len() != 0 {
+			t.Fatalf("expected no notice without a token, got stderr=%q", stderr.String())
+		}
+	}
+}
+
+func TestRunAuthSetWithPendingAuthorizationSaysItWasCanceled(t *testing.T) {
+	storageDir := t.TempDir()
+	t.Setenv(testCredentialsStorageDirEnvVar, storageDir)
+	writeCodeAuthorizationPendingForTest(t, storageDir)
+
+	var stdout, stderr bytes.Buffer
+	code := executeTestCommand([]string{"auth", "set", "--name", "agent-test"}, nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("auth set failed: code=%d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "updated agent profile agent-test") {
+		t.Fatalf("expected profile update, got stdout=%q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "canceled pending authorization") {
+		t.Fatalf("expected pending notice, got stderr=%q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "cleared token") {
+		t.Fatalf("expected no token notice, got stderr=%q", stderr.String())
 	}
 }
 

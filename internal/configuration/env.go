@@ -41,6 +41,19 @@ func setValueFromString(value reflect.Value, name string, raw string) error {
 			return fmt.Errorf("read %s: %w", name, err)
 		}
 		value.SetBool(parsed)
+	case reflect.Slice:
+		if value.Type().Elem().Kind() != reflect.String {
+			return fmt.Errorf("read %s: unsupported config type %s", name, value.Type())
+		}
+		// A comma-separated list, for example
+		// TOLLBIT_UPDATE_RELEASE_BASE_URLS=https://a.example,https://b.example.
+		var items []string
+		for _, item := range strings.Split(raw, ",") {
+			if item = strings.TrimSpace(item); item != "" {
+				items = append(items, item)
+			}
+		}
+		value.Set(reflect.ValueOf(items))
 	case reflect.Int32:
 		parsed, err := strconv.ParseInt(raw, 10, 32)
 		if err != nil {

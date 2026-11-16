@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	lockFilename = "self-install.lock"
-	lockPoll     = 250 * time.Millisecond
+	lockFilename   = "self-install.lock"
+	lockPoll       = 250 * time.Millisecond
+	takeoverSuffix = ".takeover"
 )
 
 // lockWait is how long to wait for another process's install to finish. It
@@ -37,8 +38,7 @@ func acquireLock(ctx context.Context, path string, wait, stale time.Duration) (f
 		if !errors.Is(err, os.ErrExist) {
 			return nil, fmt.Errorf("create lock file: %w", err)
 		}
-		if info, statErr := os.Stat(path); statErr == nil && time.Since(info.ModTime()) > stale {
-			_ = os.Remove(path)
+		if clearStaleLock(path, stale) {
 			continue
 		}
 		if time.Now().After(deadline) {
@@ -50,4 +50,27 @@ func acquireLock(ctx context.Context, path string, wait, stale time.Duration) (f
 		case <-time.After(lockPoll):
 		}
 	}
+}
+
+func clearStaleLock(path string, stale time.Duration) bool {
+	if !isOlderThan(path, stale) {
+		return false
+	}
+	takeover := path + takeoverSuffix
+	f, err := os.OpenFile(takeover, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		if isOlderThan(takeover, stale) {
+			_ = os.Remove(takeover)
+		}
+		return false
+	}
+	_ = f.Close()
+	defer func() { _ = os.Remove(takeover) }()
+
+	return isOlderThan(path, stale) && os.Remove(path) == nil
+}
+
+func isOlderThan(path string, age time.Duration) bool {
+	info, err := os.Stat(path)
+	return err == nil && time.Since(info.ModTime()) > age
 }

@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -153,6 +155,82 @@ func TestInstallLockedTakesOverStaleLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	selfinstalltest.AssertBinary(t, env.exe, "0.2.0")
+}
+
+func TestAcquireLockLetsOneCallerTakeOverStaleLock(t *testing.T) {
+	const callers = 8
+	path := filepath.Join(t.TempDir(), lockFilename)
+	old := time.Now().Add(-time.Hour)
+	for round := range 1000 {
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatal(err)
+		}
+
+		// Nobody releases, so the first lock taken stops every other caller.
+		start := make(chan struct{})
+		var holders atomic.Int32
+		var wg sync.WaitGroup
+		for range callers {
+			wg.Go(func() {
+				<-start
+				if _, err := acquireLock(context.Background(), path, 0, time.Minute); err == nil {
+					holders.Add(1)
+				}
+			})
+		}
+		close(start)
+		wg.Wait()
+
+		if got := holders.Load(); got != 1 {
+			t.Fatalf("round %d: expected one holder, got %d", round, got)
+		}
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestAcquireLockLeavesStaleLockWhileAnotherProcessTakesOver(t *testing.T) {
+	path := filepath.Join(t.TempDir(), lockFilename)
+	old := time.Now().Add(-time.Hour)
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+takeoverSuffix, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := acquireLock(context.Background(), path, 0, time.Minute)
+
+	if err == nil || !strings.Contains(err.Error(), "in progress") {
+		t.Fatalf("expected the takeover to stop this process, got %v", err)
+	}
+}
+
+func TestAcquireLockRecoversFromDeadTakeover(t *testing.T) {
+	path := filepath.Join(t.TempDir(), lockFilename)
+	old := time.Now().Add(-time.Hour)
+	for _, stale := range []string{path, path + takeoverSuffix} {
+		if err := os.WriteFile(stale, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(stale, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	unlock, err := acquireLock(context.Background(), path, time.Minute, time.Minute)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock()
 }
 
 // TestRestartHelper is the process TestRestartRunsCommandAgain restarts.

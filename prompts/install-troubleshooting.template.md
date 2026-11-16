@@ -65,7 +65,7 @@ What the results mean:
 - Each install method finds the proxy in a different place:
   - `install.sh` (curl) reads the `HTTPS_PROXY` environment variable.
   - `install.ps1` (`Invoke-WebRequest`) uses the Windows proxy in Internet Settings, and also `HTTPS_PROXY` in PowerShell 7.
-  - npm fetches the package with its own `proxy`/`https-proxy` settings. The package's install step (`npm/install.js`) then downloads the binary from GitHub using only the `HTTPS_PROXY`/`NO_PROXY` environment variables.
+  - npm fetches the package with its own `proxy`/`https-proxy` settings. The package's install step (`npm/install.js`) then downloads the binary from `tollbit.com`, or from GitHub if that fails, using only the `HTTPS_PROXY`/`NO_PROXY` environment variables.
 - **A proxy set in npm but not in `HTTPS_PROXY`:** npm gets the package, then the binary download goes direct and fails with `no data for 60s` or a connection error.
 - **A system proxy is set but `HTTPS_PROXY` isn't** (macOS `HTTPSEnable : 1` from `scutil --proxy`, or Windows `ProxyEnable` 1): browsers use it, but curl, Node and the CLI don't. Setting `HTTPS_PROXY` to the same address fixes the install.
 - **Only a PAC file is set** (Windows `AutoConfigURL`, macOS `ProxyAutoConfigEnable : 1` or `ProxyAutoDiscoveryEnable : 1`): curl and Node can't use a PAC file. The user needs the actual proxy address from IT.
@@ -78,16 +78,18 @@ These are the hosts installing needs:
 
 | Host | Needed by | Probe URL |
 |---|---|---|
-| `raw.githubusercontent.com` | `install.sh`, `install.ps1` | https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh |
-| `api.github.com` | the scripts, to find the latest version (not needed when a version is given) | https://api.github.com/repos/tollbit/cli/releases/latest |
-| `github.com` | every method: release downloads, and Claude Code's `/plugin marketplace add` | https://github.com/tollbit/cli/releases |
-| `release-assets.githubusercontent.com` | every method: GitHub redirects release downloads here | https://github.com/tollbit/cli/releases/download/v{{version}}/tollbit_{{version}}_checksums.txt (follows the redirect) |
+| `tollbit.com` | every method: `install.sh`, `install.ps1` and release downloads. When it fails, they fall back to the GitHub hosts below. | https://tollbit.com/.agents/cli/latest |
+| `raw.githubusercontent.com` | older install commands that fetch `install.sh` or `install.ps1` from GitHub | https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh |
+| `api.github.com` | the scripts, when `tollbit.com` fails, to find the latest version (not needed when a version is given) | https://api.github.com/repos/tollbit/cli/releases/latest |
+| `github.com` | release downloads when `tollbit.com` fails, and Claude Code's `/plugin marketplace add` | https://github.com/tollbit/cli/releases |
+| `release-assets.githubusercontent.com` | release downloads when `tollbit.com` fails: GitHub redirects them here | https://github.com/tollbit/cli/releases/download/v{{version}}/tollbit_{{version}}_checksums.txt (follows the redirect) |
 | `registry.npmjs.org` | npm | https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest |
 
 `release-assets.githubusercontent.com` has no probe of its own: rate it by the release download line, after the redirect. If `github.com` passes and the release download fails, `release-assets.githubusercontent.com` is the blocked host.
 
 ```bash
 for url in \
+  https://tollbit.com/.agents/cli/latest \
   https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh \
   https://api.github.com/repos/tollbit/cli/releases/latest \
   https://github.com/tollbit/cli/releases \
@@ -102,6 +104,7 @@ done
 
 ```powershell
 $urls = @(
+  'https://tollbit.com/.agents/cli/latest',
   'https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh',
   'https://api.github.com/repos/tollbit/cli/releases/latest',
   'https://github.com/tollbit/cli/releases',
@@ -136,7 +139,7 @@ Name each host's result with one of these (`tollbit doctor` uses the same names)
 | **proxy_rejected** | `CONNECT tunnel failed, response 403` (blocked) or `407` (the proxy wants a login), or a 403 or "blocked" page that names the proxy or the company. In Claude's app sandbox this means the organization's allowlist blocks the host. |
 | **`http_<code>`** | Any other HTTP error from the host itself, for example `http_404`. On `api.github.com`, a 403 or 429 with `x-ratelimit-remaining: 0` is GitHub's rate limit (many users share one office IP address), not a block: write `http_403 (rate limit)`. Giving the scripts a version (`--version` or `-Version`) avoids the call. |
 
-If every host fails the same way and you are in an agent sandbox (Codex, or Claude Code with sandboxing turned on), your sandbox may be what blocks the network. Ask the user to allow network access for the command and run it again before blaming their network.
+If every host fails the same way and you are in an agent sandbox (Codex, or Claude Code with sandboxing turned on), your sandbox may be what blocks the network. Ask the user to allow network access, then run this step's probes again before blaming their network. If they pass then, your sandbox was the cause: carry on with the remaining steps, and name it as the likely cause in the report.
 
 ## 4. Write access and PATH, without admin
 
@@ -191,11 +194,11 @@ Get-Item "$env:LOCALAPPDATA\Programs\tollbit\bin\tollbit.exe", "$p\node_modules\
 
 Run each binary you find by its full path, with `version`.
 
-If none exists and the release download was **ok** in step 3, test a fresh copy in a temporary directory. This checks the binary on its own, apart from any installer. The `<os>_<arch>` part is `darwin_arm64`, `linux_amd64`, `windows_amd64` and so on.
+If none exists and `tollbit.com` or the GitHub release download was **ok** in step 3, test a fresh copy in a temporary directory. If only GitHub was ok, set `base` to `https://github.com/tollbit/cli/releases/download/v{{version}}` instead. This checks the binary on its own, apart from any installer. The `<os>_<arch>` part is `darwin_arm64`, `linux_amd64`, `windows_amd64` and so on.
 
 ```bash
 t="$(mktemp -d)"; cd "$t"
-base=https://github.com/tollbit/cli/releases/download/v{{version}}
+base=https://tollbit.com/.agents/cli/v{{version}}
 curl -fsSLO "$base/tollbit_{{version}}_checksums.txt"
 a="$(grep -o 'tollbit_[^ ]*_<os>_<arch>.tar.gz' tollbit_*_checksums.txt)"
 curl -fsSLO "$base/$a" && grep " $a\$" tollbit_*_checksums.txt | (shasum -a 256 -c 2>/dev/null || sha256sum -c) \
@@ -205,7 +208,7 @@ cd - >/dev/null; rm -rf "$t"
 
 ```powershell
 $t = Join-Path $env:TEMP "tollbit-test-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory $t | Out-Null
-$base = 'https://github.com/tollbit/cli/releases/download/v{{version}}'
+$base = 'https://tollbit.com/.agents/cli/v{{version}}'
 Invoke-WebRequest "$base/tollbit_{{version}}_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
 $line = Select-String -Path "$t\sums.txt" -Pattern '_windows_<arch>\.zip$' | Select-Object -First 1
 $sum, $a = $line.Line -split '\s+'
@@ -241,7 +244,8 @@ Proxy:  env <HTTPS_PROXY / none>; npm <proxy / none>; system <macOS or Windows p
 TLS inspection: <none seen | issuer "...">; NODE_EXTRA_CA_CERTS <set / not set>
 
 Hosts:
-  raw.githubusercontent.com             <ok | dns | connect | timeout | proxy_rejected | tls_intercepted | tls_other | http_<code>>  <detail>
+  tollbit.com                           <ok | dns | connect | timeout | proxy_rejected | tls_intercepted | tls_other | http_<code>>  <detail>
+  raw.githubusercontent.com             <...>
   api.github.com                        <...>
   github.com                            <...>
   release-assets.githubusercontent.com  <...>
@@ -259,15 +263,16 @@ For **Likely cause**, name the first thing that breaks the install method the us
 
 | Finding | Suggested next step | Who |
 |---|---|---|
-| `raw.githubusercontent.com` blocked, GitHub release downloads OK | Install with npm, or manually from https://github.com/tollbit/cli/releases (download the archive, check its SHA-256, put the binary on PATH). | you |
-| `github.com` or `release-assets.githubusercontent.com` blocked | Every install method downloads from GitHub Releases. Allow both hosts. | IT administrators |
-| npm registry OK, GitHub download fails in npm's install step | Set `HTTPS_PROXY` to the same proxy npm uses, then install again; or allow the GitHub hosts. | you, or IT administrators |
+| `tollbit.com` and the GitHub release hosts (`github.com`, `release-assets.githubusercontent.com`) all blocked | Every install method downloads from `tollbit.com`, then GitHub Releases. Allow `tollbit.com` and `*.tollbit.com`, which `tollbit` commands need anyway. | IT administrators |
+| npm registry OK, the download fails in npm's install step | Set `HTTPS_PROXY` to the same proxy npm uses, then install again; or allow `tollbit.com`. | you, or IT administrators |
 | TLS inspection | IT provides the corporate root certificate (a PEM file); for npm, set `NODE_EXTRA_CA_CERTS` to it. Don't turn off verification. | IT administrators, then you |
 | npm prefix needs admin | Use the script installer, or set a user-owned npm prefix. If Node is installed and managed by the company, IT may need to do this. | you, or IT administrators |
 | PowerShell `ConstrainedLanguage` | The PowerShell installer can't run. Install manually from GitHub Releases, if policy allows running it. | IT administrators |
 | Binary blocked by AppLocker, WDAC or antivirus | Allow `tollbit.exe` from https://github.com/tollbit/cli/releases. Each release can be verified with `gh attestation verify <archive> --repo tollbit/cli`. | IT administrators |
-| Claude app sandbox, proxy_rejected on GitHub or npm | Allow package managers and GitHub under **Organization settings → Capabilities → Code execution**; then start a new session. | Claude organization admin |
+| Claude app sandbox, proxy_rejected on `tollbit.com` or npm | Allow package managers, plus `tollbit.com` and `*.tollbit.com` under **Additional allowed domains**, in **Organization settings → Capabilities → Code execution**; then start a new session. | Claude organization admin |
 | Codex or sandboxed Claude Code, every host fails the same way | Allow network access for the agent, then try again. | you |
 | Checksum mismatch, a binary that crashes, or no cause found | TollBit support looks into it. | TollBit |
 
 Fill in **Fix likely needs** from the **Who** column. On a managed work computer that is often the user's IT administrators, since only they can change the network, the proxy or what programs may run. Tell the user so, and that TollBit support will bring in their IT administrators where needed. The user sends the report to TollBit support only, not to their IT administrators.
+
+After the report, stop. Don't try the install again, and don't carry on with any other setup steps, unless the user asks you to.

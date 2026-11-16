@@ -11,11 +11,20 @@ import (
 	"github.com/tollbit/cli/internal/client/auth"
 )
 
-func (m *CredentialManager) SaveIdentity(ctx context.Context, identity auth.AgentIdentity) error {
+// SaveIdentity stores identity and clears the stored auth state, which was
+// issued for the previous identity. It reports what was there to clear.
+func (m *CredentialManager) SaveIdentity(ctx context.Context, identity auth.AgentIdentity) (ClearedCredentials, error) {
 	if err := m.WriteIdentity(ctx, identity); err != nil {
-		return err
+		return ClearedCredentials{}, err
 	}
-	return m.ClearAuthTokens(ctx, false)
+	cleared := ClearedCredentials{
+		Token:          credentialFileExists(m.tokenPath) || credentialFileExists(m.refreshPath),
+		PendingConsent: credentialFileExists(m.pendingPath),
+	}
+	if err := m.ClearAuthTokens(ctx, false); err != nil {
+		return ClearedCredentials{}, err
+	}
+	return cleared, nil
 }
 
 func (m *CredentialManager) WriteIdentity(ctx context.Context, identity auth.AgentIdentity) error {
@@ -103,6 +112,11 @@ func (m *CredentialManager) ClearIdentity(ctx context.Context, force bool) error
 		return fmt.Errorf("clear agent identity credential: %w", err)
 	}
 	return clearErr // nil on full success; ErrRevokeFailed signal on force
+}
+
+func credentialFileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
 func validIdentity(id auth.AgentIdentity) (auth.AgentIdentity, error) {

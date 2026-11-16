@@ -165,8 +165,13 @@ func validate(config Config) error {
 	if config.Update.CheckInterval < 0 {
 		return errors.New("update.check_interval must be non-negative")
 	}
-	if strings.TrimSpace(config.Update.ReleaseBaseURL) == "" {
-		return errors.New("update.release_base_url is required")
+	if len(config.Update.ReleaseBaseURLs) == 0 {
+		return errors.New("update.release_base_urls is required")
+	}
+	for _, u := range config.Update.ReleaseBaseURLs {
+		if strings.TrimSpace(u) == "" {
+			return errors.New("update.release_base_urls must not contain a blank URL")
+		}
 	}
 	return nil
 }

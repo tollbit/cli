@@ -3,6 +3,7 @@ package doctor
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -283,6 +284,109 @@ func TestTimeout(t *testing.T) {
 	}
 }
 
+// closedPortURL returns an https URL that refuses connections.
+func closedPortURL(t *testing.T) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	return "https://" + l.Addr().String()
+}
+
+func TestConnectAndTimeoutHintsLeadWithSandboxWhenEveryHostFails(t *testing.T) {
+	hanging := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer hanging.Close()
+	refused := closedPortURL(t)
+	opts := testOptions(t, refused)
+	opts.Config.Foundry.BaseURL = hanging.URL + "/foundry"
+	opts.Config.Gateway.BaseURL = hanging.URL
+	opts.Transport = trusting(hanging)
+	opts.HostTimeout = 200 * time.Millisecond
+
+	report := Run(context.Background(), opts)
+
+	host := hostOf(t, refused)
+	c := findCheck(t, report, host)
+	if want := sandboxHintLead + "a firewall may be blocking " + host + " on port 443"; c.ErrorKind != KindConnect || c.Hint != want {
+		t.Fatalf("expected connect with hint %q, got %+v", want, c)
+	}
+	host = hostOf(t, hanging.URL)
+	c = findCheck(t, report, host)
+	if want := sandboxHintLead + "a firewall may be dropping traffic to " + host + ", or this network needs a proxy (set HTTPS_PROXY)"; c.ErrorKind != KindTimeout || c.Hint != want {
+		t.Fatalf("expected timeout with hint %q, got %+v", want, c)
+	}
+}
+
+func TestConnectHintWhenOnlyOneHostFails(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	refused := closedPortURL(t)
+	host := hostOf(t, refused)
+	existingHint := "a firewall may be blocking " + host + " on port 443"
+
+	tests := []struct {
+		name     string
+		getenv   func(string) string
+		wantHint string
+	}{
+		{
+			name:     "keeps the firewall hint",
+			getenv:   func(string) string { return "" },
+			wantHint: existingHint,
+		},
+		{
+			name: "leads with the sandbox when the harness turned the network off",
+			getenv: func(name string) string {
+				if name == "CODEX_SANDBOX_NETWORK_DISABLED" {
+					return "1"
+				}
+				return ""
+			},
+			wantHint: sandboxHintLead + existingHint,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := testOptions(t, refused)
+			opts.Config.Foundry.BaseURL = srv.URL + "/foundry"
+			opts.Config.Gateway.BaseURL = srv.URL
+			opts.Transport = trusting(srv)
+			opts.Getenv = tt.getenv
+
+			report := Run(context.Background(), opts)
+
+			if c := findCheck(t, report, hostOf(t, srv.URL)); c.Status != StatusPass {
+				t.Fatalf("expected the reachable host to pass, got %+v", c)
+			}
+			if c := findCheck(t, report, host); c.ErrorKind != KindConnect || c.Hint != tt.wantHint {
+				t.Fatalf("expected connect with hint %q, got %+v", tt.wantHint, c)
+			}
+		})
+	}
+}
+
+func TestClassifyTreatsBlockedDialAsConnect(t *testing.T) {
+	for _, blocked := range blockedErrors {
+		t.Run(blocked.Error(), func(t *testing.T) {
+			err := &url.Error{Op: "Get", URL: "https://host.example", Err: &net.OpError{
+				Op:  "dial",
+				Net: "tcp",
+				Err: os.NewSyscallError("connect", blocked),
+			}}
+
+			kind, detail, hint := classify(err, 0, nil, "host.example", time.Second)
+
+			if kind != KindConnect || !strings.Contains(detail, blocked.Error()) || !strings.Contains(hint, "host.example") {
+				t.Fatalf("unexpected result: %q, %q, %q", kind, detail, hint)
+			}
+		})
+	}
+}
+
 func TestUnreachableProxy(t *testing.T) {
 	opts := testOptions(t, "https://gateway.example.invalid")
 	opts.Proxy = func(*http.Request) (*url.URL, error) { return url.Parse("http://127.0.0.1:1") }
@@ -302,7 +406,7 @@ func TestReleaseProbeFollowsRedirectToAssetHost(t *testing.T) {
 	}))
 	defer releases.Close()
 	opts := testOptions(t, assets.URL)
-	opts.Config.Update = configuration.UpdateConfig{CheckEnabled: true, ReleaseBaseURL: releases.URL + "/download"}
+	opts.Config.Update = configuration.UpdateConfig{CheckEnabled: true, ReleaseBaseURLs: []string{releases.URL + "/download"}}
 	// Both servers share httptest's certificate.
 	opts.Transport = trusting(releases)
 
@@ -310,6 +414,25 @@ func TestReleaseProbeFollowsRedirectToAssetHost(t *testing.T) {
 
 	if c.Status != StatusPass || !strings.Contains(c.Detail, "via "+hostOf(t, assets.URL)) {
 		t.Fatalf("expected a pass naming the asset host, got %+v", c)
+	}
+}
+
+func TestProbesEveryReleaseBaseURL(t *testing.T) {
+	mirror := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer mirror.Close()
+	github := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer github.Close()
+	opts := testOptions(t, mirror.URL)
+	opts.Config.Update = configuration.UpdateConfig{CheckEnabled: true, ReleaseBaseURLs: []string{mirror.URL + "/cli", github.URL + "/download"}}
+	// Both servers share httptest's certificate.
+	opts.Transport = trusting(mirror)
+
+	report := Run(context.Background(), opts)
+
+	for _, server := range []*httptest.Server{mirror, github} {
+		if c := findCheck(t, report, hostOf(t, server.URL)); c.Status != StatusPass {
+			t.Fatalf("expected a pass for %s, got %+v", server.URL, c)
+		}
 	}
 }
 
@@ -428,7 +551,7 @@ func TestReleaseProbeStopsRedirectLoop(t *testing.T) {
 	}))
 	defer srv.Close()
 	opts := testOptions(t, "https://unused.invalid")
-	opts.Config.Update = configuration.UpdateConfig{CheckEnabled: true, ReleaseBaseURL: srv.URL + "/download"}
+	opts.Config.Update = configuration.UpdateConfig{CheckEnabled: true, ReleaseBaseURLs: []string{srv.URL + "/download"}}
 	opts.Transport = trusting(srv)
 
 	c := findCheck(t, Run(context.Background(), opts), hostOf(t, srv.URL))

@@ -154,8 +154,12 @@ func TestConfigWithOverridesRejectsInvalidConfig(t *testing.T) {
 			overrides: OverrideOptions{UpdateCheckInterval: &negativeInterval},
 		},
 		{
+			name:      "no release base URLs",
+			overrides: OverrideOptions{UpdateReleaseBaseURLs: &[]string{}},
+		},
+		{
 			name:      "blank release base URL",
-			overrides: OverrideOptions{UpdateReleaseBaseURL: &blank},
+			overrides: OverrideOptions{UpdateReleaseBaseURLs: &[]string{"https://releases.example", blank}},
 		},
 	}
 

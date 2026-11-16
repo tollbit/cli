@@ -33,4 +33,5 @@ update:
   check_enabled: true
   check_interval: 1h
   auto_update: false
-  release_base_url: https://releases.example/download
+  release_base_urls:
+    - https://releases.example/download

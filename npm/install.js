@@ -10,7 +10,8 @@ const path = require("path");
 const tls = require("tls");
 const { execFileSync } = require("child_process");
 
-const repo = process.env.TOLLBIT_NPM_REPO || "tollbit/cli";
+const defaultRepo = "tollbit/cli";
+const repo = process.env.TOLLBIT_NPM_REPO || defaultRepo;
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
 const version = process.env.TOLLBIT_VERSION_OVERRIDE || `v${pkg.version}`;
 
@@ -26,6 +27,10 @@ const archMap = {
 };
 
 const downloadTimeoutMs = 60 * 1000;
+// tollbit.com gets a shorter limit, so a network that silently drops it falls
+// back to GitHub quickly.
+const mirrorBaseUrl = "https://tollbit.com/.agents/cli";
+const mirrorTimeoutMs = 30 * 1000;
 const maxRedirects = 5;
 
 function fail(message) {
@@ -254,6 +259,41 @@ async function download(url, options = {}) {
   return result.data;
 }
 
+// releaseSources lists where to download release version from, in order:
+// tollbit.com, then GitHub Releases. Any repository other than the default
+// (TOLLBIT_NPM_REPO) uses GitHub only.
+function releaseSources(repo, version) {
+  const github = { url: `https://github.com/${repo}/releases/download/${version}`, timeoutMs: downloadTimeoutMs };
+  if (repo !== defaultRepo) {
+    return [github];
+  }
+  return [{ url: `${mirrorBaseUrl}/${version}`, timeoutMs: mirrorTimeoutMs }, github];
+}
+
+// fetchRelease downloads the checksums and archive from the first source that
+// serves both. The caller checks the archive against the checksums, so a
+// mismatch fails the install and never moves on to the next source.
+async function fetchRelease(sources, checksumsName, archiveName, options = {}) {
+  const { fetch = download, log = console.error } = options;
+  let lastError;
+  for (const [index, source] of sources.entries()) {
+    try {
+      const [checksums, archive] = await Promise.all([
+        fetch(`${source.url}/${checksumsName}`, { timeoutMs: source.timeoutMs }),
+        fetch(`${source.url}/${archiveName}`, { timeoutMs: source.timeoutMs })
+      ]);
+      return { checksums, archive };
+    } catch (error) {
+      lastError = error;
+      if (index < sources.length - 1) {
+        log(`Could not download from ${source.url}: ${error.message}`);
+        log("Trying GitHub instead.");
+      }
+    }
+  }
+  throw lastError;
+}
+
 function checksumForAsset(checksums, assetName) {
   const line = checksums
     .toString("utf8")
@@ -302,11 +342,7 @@ async function main() {
   const assetBase = `tollbit_${versionWithoutV}_${platform}_${arch}`;
   const archiveName = platform === "windows" ? `${assetBase}.zip` : `${assetBase}.tar.gz`;
   const checksumsName = `tollbit_${versionWithoutV}_checksums.txt`;
-  const baseUrl = `https://github.com/${repo}/releases/download/${version}`;
-  const archiveUrl = `${baseUrl}/${archiveName}`;
-  const checksumsUrl = `${baseUrl}/${checksumsName}`;
-
-  const [checksums, archive] = await Promise.all([download(checksumsUrl), download(archiveUrl)]);
+  const { checksums, archive } = await fetchRelease(releaseSources(repo, version), checksumsName, archiveName);
   const expected = checksumForAsset(checksums, archiveName);
   verifyChecksum(archive, expected);
 
@@ -342,4 +378,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { download, proxyForUrl };
+module.exports = { download, fetchRelease, proxyForUrl, releaseSources };

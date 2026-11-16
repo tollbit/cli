@@ -65,10 +65,11 @@ type GatewayConfig struct {
 }
 
 type UpdateConfig struct {
-	CheckEnabled   bool          `mapstructure:"check_enabled"`
-	CheckInterval  time.Duration `mapstructure:"check_interval" configurable:"release"`
-	AutoUpdate     bool          `mapstructure:"auto_update" configurable:"release"`
-	ReleaseBaseURL string        `mapstructure:"release_base_url" configurable:"dev"`
+	CheckEnabled  bool          `mapstructure:"check_enabled"`
+	CheckInterval time.Duration `mapstructure:"check_interval" configurable:"release"`
+	AutoUpdate    bool          `mapstructure:"auto_update" configurable:"release"`
+	// ReleaseBaseURLs are tried in order.
+	ReleaseBaseURLs []string `mapstructure:"release_base_urls" configurable:"dev"`
 }
 
 type BrowserConsentConfig struct {
@@ -93,7 +94,7 @@ type OverrideOptions struct {
 	GatewayBaseURL                    *string
 	UpdateCheckInterval               *time.Duration
 	UpdateAutoUpdate                  *bool
-	UpdateReleaseBaseURL              *string
+	UpdateReleaseBaseURLs             *[]string
 }
 
 func (c Config) WithOverrides(opts OverrideOptions) (Config, error) {
@@ -142,8 +143,8 @@ func (c Config) WithOverrides(opts OverrideOptions) (Config, error) {
 	if opts.UpdateAutoUpdate != nil {
 		c.Update.AutoUpdate = *opts.UpdateAutoUpdate
 	}
-	if opts.UpdateReleaseBaseURL != nil {
-		c.Update.ReleaseBaseURL = *opts.UpdateReleaseBaseURL
+	if opts.UpdateReleaseBaseURLs != nil {
+		c.Update.ReleaseBaseURLs = *opts.UpdateReleaseBaseURLs
 	}
 	var err error
 	c, err = resolveDefaults(c)

@@ -42,8 +42,9 @@ var versioned = []struct {
 	format  string
 }{
 	{ManifestPath, regexp.MustCompile(`"version":\s*"[^"]*"`), `"version": "%s"`},
-	// Pin the installer to this release's tag, not the moving main branch.
-	{InstallSkillPath, regexp.MustCompile(`raw\.githubusercontent\.com/tollbit/cli/[^/]+/scripts/install\.sh`), "raw.githubusercontent.com/tollbit/cli/v%s/scripts/install.sh"},
+	// The installer script on tollbit.com always installs the latest release
+	// unless told a version, so pin it to the release this plugin ships with.
+	{InstallSkillPath, regexp.MustCompile(`bash "\$installer" --version v\S+`), `bash "$installer" --version v%s`},
 }
 
 // troubleshootSkillFrontmatter opens TroubleshootSkillPath, before the
@@ -73,7 +74,7 @@ func Files(root string) (map[string][]byte, error) {
 		if !v.pattern.Match(content) {
 			return nil, fmt.Errorf("%s has nothing matching %s", v.path, v.pattern)
 		}
-		files[v.path] = v.pattern.ReplaceAll(content, []byte(fmt.Sprintf(v.format, version.Version)))
+		files[v.path] = v.pattern.ReplaceAllLiteral(content, []byte(fmt.Sprintf(v.format, version.Version)))
 	}
 	troubleshoot, err := prompts.Troubleshoot(root)
 	if err != nil {

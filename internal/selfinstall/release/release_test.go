@@ -3,6 +3,8 @@ package release
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,7 +45,7 @@ func newInstallEnv(t *testing.T, current string, release selfinstalltest.Release
 	server := selfinstalltest.Serve(t, release)
 	return installEnv{
 		installer: Installer{
-			BaseURL:    server.URL,
+			BaseURLs:   []string{server.URL},
 			LockDir:    t.TempDir(),
 			Executable: exe,
 			goos:       release.GOOS,
@@ -155,6 +157,55 @@ func TestInstallStopsOnChecksumMismatch(t *testing.T) {
 	if got := dirNames(t, filepath.Dir(env.exe)); !slices.Equal(got, []string{filepath.Base(env.exe)}) {
 		t.Fatalf("expected only the binary to remain, got %v", got)
 	}
+}
+
+func TestInstallFallsBackToNextBaseURLWhenDownloadFails(t *testing.T) {
+	env := newInstallEnv(t, "0.1.0", selfinstalltest.Release{Version: "0.2.0"})
+	missing := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(missing.Close)
+	env.installer.BaseURLs = []string{missing.URL, env.server.URL}
+
+	result, err := env.installer.Install(context.Background(), "0.1.0", "0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !result.Installed || result.Version != "0.2.0" {
+		t.Fatalf("unexpected result %+v", result)
+	}
+	selfinstalltest.AssertBinary(t, env.exe, "0.2.0")
+}
+
+func TestInstallDoesNotFallBackOnChecksumMismatch(t *testing.T) {
+	env := newInstallEnv(t, "0.1.0", selfinstalltest.Release{Version: "0.2.0", BadChecksum: true})
+	good := selfinstalltest.Serve(t, selfinstalltest.Release{Version: "0.2.0"})
+	env.installer.BaseURLs = []string{env.server.URL, good.URL}
+
+	_, err := env.installer.Install(context.Background(), "0.1.0", "0.2.0")
+
+	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("expected a checksum mismatch, got %v", err)
+	}
+	if got := good.Requests.Load(); got != 0 {
+		t.Fatalf("expected no requests to the next source, got %d", got)
+	}
+	selfinstalltest.AssertBinary(t, env.exe, "0.1.0")
+}
+
+func TestInstallReportsEveryFailedBaseURL(t *testing.T) {
+	env := newInstallEnv(t, "0.1.0", selfinstalltest.Release{Version: "0.2.0"})
+	first := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(first.Close)
+	second := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(second.Close)
+	env.installer.BaseURLs = []string{first.URL, second.URL}
+
+	_, err := env.installer.Install(context.Background(), "0.1.0", "0.2.0")
+
+	if err == nil || !strings.Contains(err.Error(), first.URL) || !strings.Contains(err.Error(), second.URL) {
+		t.Fatalf("expected an error naming both sources, got %v", err)
+	}
+	selfinstalltest.AssertBinary(t, env.exe, "0.1.0")
 }
 
 func TestInstallRefusesVersionNotAboveRunning(t *testing.T) {
