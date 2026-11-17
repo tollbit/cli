@@ -27,7 +27,7 @@ The npm package downloads the CLI release from `tollbit.com`, or from GitHub if 
   ```bash
   installer="$(mktemp)"
   curl -fsSL -o "$installer" "https://tollbit.com/.agents/cli/install.sh"
-  bash "$installer" --version v0.5.2 --no-modify-path
+  bash "$installer" --version v0.5.3 --no-modify-path
   ~/.local/bin/tollbit version
   ```
 

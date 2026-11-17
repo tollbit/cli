@@ -36,6 +36,7 @@ type (
 		Name      string `yaml:"name"`
 		Detection string `yaml:"detection"`
 		Install   string `yaml:"install"`
+		Fallback  string `yaml:"fallback"`
 	}
 )
 
@@ -44,8 +45,9 @@ type (
 var installSections = map[string]string{
 	"script":        "script",
 	"codex":         "Codex",
-	"claude-plugin": "Claude plugin",
-	"mcp":           "MCP (coming soon)",
+	"mcp":           "MCP",
+	"mcp-instead":   "MCP instead",
+	"mcp-admin":     "MCP through an admin",
 	"not-supported": "not supported",
 }
 
@@ -115,6 +117,14 @@ func check(template []byte, m platformList) error {
 				return fmt.Errorf("%s: %s has install %q, which names no install section", PlatformsPath, p.Name, p.Install)
 			}
 		}
+		if p.Fallback != "" {
+			if _, ok := installSections[p.Fallback]; !ok {
+				return fmt.Errorf("%s: %s has fallback %q, which names no install section", PlatformsPath, p.Name, p.Fallback)
+			}
+			if p.Install == "" {
+				return fmt.Errorf("%s: %s has a fallback but no install", PlatformsPath, p.Name)
+			}
+		}
 		if p.Detection != "" && p.Install == "" {
 			return fmt.Errorf("%s: %s has a detection line but no install", PlatformsPath, p.Name)
 		}
@@ -144,11 +154,11 @@ func embedTroubleshooting(template []byte) (string, error) {
 }
 
 // hintsTable renders the platforms that have a detection line, in file
-// order. Platforms with the same detection and install share a row.
+// order. Platforms with the same detection, install and fallback share a row.
 func hintsTable(m platformList) string {
 	type row struct {
-		names              []string
-		detection, install string
+		names                        []string
+		detection, install, fallback string
 	}
 	var rows []*row
 	byKey := map[string]*row{}
@@ -156,21 +166,25 @@ func hintsTable(m platformList) string {
 		if p.Detection == "" {
 			continue
 		}
-		key := p.Detection + "\x00" + p.Install
+		key := p.Detection + "\x00" + p.Install + "\x00" + p.Fallback
 		if r, ok := byKey[key]; ok {
 			r.names = append(r.names, p.Name)
 			continue
 		}
-		r := &row{names: []string{p.Name}, detection: p.Detection, install: p.Install}
+		r := &row{names: []string{p.Name}, detection: p.Detection, install: p.Install, fallback: p.Fallback}
 		byKey[key] = r
 		rows = append(rows, r)
 	}
 
 	var b strings.Builder
-	b.WriteString("   | Platform | What we saw | Install |\n   |---|---|---|\n")
+	b.WriteString("   | Platform | What to look for | Install |\n   |---|---|---|\n")
 	for _, r := range rows {
-		fmt.Fprintf(&b, "   | %s | %s | Install: %s |\n", strings.Join(r.names, " or "), r.detection, installSections[r.install])
+		install := "Install: " + installSections[r.install]
+		if r.fallback != "" {
+			install += ", then Install: " + installSections[r.fallback]
+		}
+		fmt.Fprintf(&b, "   | %s | %s | %s |\n", strings.Join(r.names, " or "), r.detection, install)
 	}
-	b.WriteString("   | Any other agent with no shell | only your instructions | Install: " + installSections["not-supported"] + " |")
+	b.WriteString("   | Any other agent with no shell | only your instructions | Install: " + installSections["mcp"] + " if the user can add a custom MCP server there, otherwise Install: " + installSections["not-supported"] + " |")
 	return b.String()
 }

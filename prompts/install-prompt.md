@@ -25,30 +25,36 @@ Users often get their platform wrong, so decide from your own evidence. If the u
    foreach ($v in 'CLAUDE_CODE_ENTRYPOINT','CURSOR_AGENT','TERM_PROGRAM') { $x = [Environment]::GetEnvironmentVariable($v); if ($null -ne $x) { "$v=$x" } }
    ```
 
-3. Compare what you found with these hints. They are what each platform showed when we tested it. Products change them, so they are hints, not rules: weigh them with your instructions. The last column names the install section to follow.
+3. Compare what you found with these hints. They are what each platform shows, or is expected to show. Products change them, so they are hints, not rules: weigh them with your instructions. The last column names the install section to follow.
 
-   | Platform | What we saw | Install |
+   | Platform | What to look for | Install |
    |---|---|---|
-   | Antigravity (desktop app and IDE) | `ANTIGRAVITY_*` variables, `__CFBundleIdentifier=com.google.antigravity`, no `TERM_PROGRAM` | Install: script |
-   | Antigravity CLI | `ANTIGRAVITY_*` variables, and `TERM_PROGRAM` set | Install: script |
-   | ChatGPT Work | untested: your instructions name ChatGPT Work | Install: MCP (coming soon) |
-   | Claude chat (desktop app) or Claude chat (web) | `CLAUDE_CODE_ENTRYPOINT=remote_cowork`, in a cloud Linux container | Install: Claude plugin |
-   | Claude Code (desktop app) | `CLAUDE_CODE_ENTRYPOINT=claude-desktop` | Install: script |
-   | Claude Code (terminal) | `CLAUDE_CODE_ENTRYPOINT=cli` | Install: script |
-   | Claude Code on the web | `CLAUDE_CODE_ENTRYPOINT=remote`, in a cloud Linux container | Install: script |
-   | Claude Duet | untested: your instructions name Claude Duet | Install: MCP (coming soon) |
-   | Codex (ChatGPT desktop app) | `CODEX_SANDBOX`, plus `CODEX_APP_RUNTIME_CLI_PATH` and `CODEX_APP_TOOLS_PIPE_PATH` | Install: Codex |
-   | Codex CLI | `CODEX_SANDBOX`, without any `CODEX_APP_*` variables | Install: Codex |
-   | Cursor | `CURSOR_AGENT=1`, plus `CURSOR_LAYOUT` and `VSCODE_*` variables | Install: script |
-   | Cursor CLI | `CURSOR_AGENT=1`, without `CURSOR_LAYOUT` or `VSCODE_*` variables | Install: script |
-   | Gemini app | no shell; your instructions say "You are Gemini" | Install: MCP (coming soon) |
-   | Gemini Enterprise | untested: your instructions name Gemini Enterprise | Install: MCP (coming soon) |
-   | Gemini Spark | untested: your instructions name Gemini Spark | Install: MCP (coming soon) |
-   | GitHub Copilot CLI | `COPILOT_CLI` | Install: script |
-   | Microsoft 365 Copilot | untested: your instructions name Microsoft 365 Copilot | Install: MCP (coming soon) |
-   | Perplexity | untested: your instructions name Perplexity | Install: MCP (coming soon) |
-   | Perplexity Computer | untested: your instructions name Perplexity Computer | Install: MCP (coming soon) |
-   | Any other agent with no shell | only your instructions | Install: not supported |
+   | Antigravity (desktop app and IDE) | `ANTIGRAVITY_*` variables, `__CFBundleIdentifier=com.google.antigravity`, no `TERM_PROGRAM` | Install: script, then Install: MCP instead |
+   | Antigravity CLI | `ANTIGRAVITY_*` variables, and `TERM_PROGRAM` set | Install: script, then Install: MCP instead |
+   | ChatGPT | your instructions name ChatGPT | Install: MCP |
+   | ChatGPT Work | your instructions name ChatGPT Work | Install: MCP |
+   | Claude chat (desktop app) or Claude chat (web) | `CLAUDE_CODE_ENTRYPOINT=remote_cowork`, in a cloud Linux container | Install: MCP |
+   | Claude Code (desktop app) | `CLAUDE_CODE_ENTRYPOINT=claude-desktop` | Install: script, then Install: MCP instead |
+   | Claude Code (terminal) | `CLAUDE_CODE_ENTRYPOINT=cli` | Install: script, then Install: MCP instead |
+   | Claude Code on the web | `CLAUDE_CODE_ENTRYPOINT=remote`, in a cloud Linux container | Install: script, then Install: MCP instead |
+   | Claude Duet | your instructions name Claude Duet | Install: MCP |
+   | Claude mobile apps | your instructions name the Claude iOS or Android app | Install: MCP |
+   | Codex (ChatGPT desktop app) | `CODEX_SANDBOX`, plus `CODEX_APP_RUNTIME_CLI_PATH` and `CODEX_APP_TOOLS_PIPE_PATH` | Install: Codex, then Install: MCP instead |
+   | Codex CLI | `CODEX_SANDBOX`, without any `CODEX_APP_*` variables | Install: Codex, then Install: MCP instead |
+   | Cursor | `CURSOR_AGENT=1`, plus `CURSOR_LAYOUT` and `VSCODE_*` variables | Install: script, then Install: MCP instead |
+   | Cursor CLI | `CURSOR_AGENT=1`, without `CURSOR_LAYOUT` or `VSCODE_*` variables | Install: script, then Install: MCP instead |
+   | Gemini app | no shell; your instructions say "You are Gemini" | Install: MCP |
+   | Gemini Enterprise | your instructions name Gemini Enterprise | Install: MCP through an admin |
+   | Gemini Spark | your instructions name Gemini Spark | Install: MCP |
+   | GitHub Copilot CLI | `COPILOT_CLI` | Install: script, then Install: MCP instead |
+   | Grok | your instructions name Grok, the chat app (not Grok Bot) | Install: MCP |
+   | Microsoft 365 Copilot | your instructions name Microsoft 365 Copilot | Install: MCP through an admin |
+   | Microsoft Copilot Studio | your instructions name Microsoft Copilot Studio | Install: MCP through an admin |
+   | Mistral Vibe | your instructions name Mistral Vibe | Install: MCP |
+   | Perplexity | your instructions name Perplexity | Install: MCP |
+   | Perplexity Computer | your instructions name Perplexity Computer | Install: MCP |
+   | Slackbot | your instructions name Slackbot | Install: MCP through an admin |
+   | Any other agent with no shell | only your instructions | Install: MCP if the user can add a custom MCP server there, otherwise Install: not supported |
 
 4. Decide. If your instructions and environment clearly point to one platform, that's your answer, even if the user said something else. If they don't, decide what you can:
    - Can you run shell commands at all?
@@ -58,7 +64,7 @@ Users often get their platform wrong, so decide from your own evidence. If the u
 
 ## Install
 
-Follow the one section the hints table names for your platform, and skip the others. If your platform isn't in the table: use "Install: script" if you can run shell commands, and "Install: not supported" if you can't.
+Follow the one section the hints table names for your platform, and skip the others. If your platform isn't in the table and you can run shell commands, use "Install: script". If you can't, use "Install: MCP" if the user can add a custom MCP server or connector in this product, and "Install: not supported" if they can't. If you can run shell commands but can't get a working CLI, follow "Install: MCP instead", which connects TollBit to you as an MCP server.
 
 ### Install: script
 
@@ -67,23 +73,24 @@ Tell the user you're installing the TollBit CLI, then run the installer. The dow
 On macOS or Linux:
 
 ```bash
-installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.2; rc=$?; rm -f "$installer"; (exit $rc)
+installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.3; rc=$?; rm -f "$installer"; (exit $rc)
 ```
 
 On Windows (PowerShell):
 
 ```powershell
-& ([scriptblock]::Create((irm -TimeoutSec 120 "https://tollbit.com/.agents/cli/install.ps1"))) -Version v0.5.2
+& ([scriptblock]::Create((irm -TimeoutSec 120 "https://tollbit.com/.agents/cli/install.ps1"))) -Version v0.5.3
 ```
 
 - **Approvals.** Many agents ask the user before running a command. If yours does, tell the user what the command does and ask them to approve it.
 - **Network.** The installer downloads from `tollbit.com`, or from GitHub if that fails, and `tollbit` commands need network access too. Some agents run commands without network access. If yours does, ask the user to allow it. The fallbacks below need network access too, so don't try them. If you can't get access, give the user the command to run in their own terminal. In a cloud sandbox with an allowlist, allow `tollbit.com` and `*.tollbit.com`: the installer needs `tollbit.com`, and `tollbit` commands need its subdomains.
 - **A hang is a failure.** If the installer times out, or prints nothing for two minutes, stop it and go to the fallbacks below. Don't wait, and don't retry the same command.
 - **If the installer fails,** use the first of these that works:
-  1. **npm, but only if it's already installed** (`npm --version` works): `npm install -g @tollbit/tollbit-cli@0.5.2`. Don't install Node.js or Git to get it: on a managed work computer, those installers can wait for an administrator prompt the user never sees.
-  2. **The release, downloaded directly.** Download `tollbit_0.5.2_<os>_<arch>.tar.gz` (`.zip` on Windows; `<os>` is `darwin`, `linux` or `windows`, and `<arch>` is `amd64` or `arm64`) and `tollbit_0.5.2_checksums.txt` from `https://tollbit.com/.agents/cli/v0.5.2/`, or from `https://github.com/tollbit/cli/releases/download/v0.5.2/` if that fails, with the same two-minute limit. Take both files from the same place. Check the archive's SHA-256 against the checksums file, unpack it, and put `tollbit` (`tollbit.exe` on Windows) in a directory on the user's PATH, such as `~/.local/bin`.
+  1. **npm, but only if it's already installed** (`npm --version` works): `npm install -g @tollbit/tollbit-cli@0.5.3`. Don't install Node.js or Git to get it: on a managed work computer, those installers can wait for an administrator prompt the user never sees.
+  2. **The release, downloaded directly.** Download `tollbit_0.5.3_<os>_<arch>.tar.gz` (`.zip` on Windows; `<os>` is `darwin`, `linux` or `windows`, and `<arch>` is `amd64` or `arm64`) and `tollbit_0.5.3_checksums.txt` from `https://tollbit.com/.agents/cli/v0.5.3/`, or from `https://github.com/tollbit/cli/releases/download/v0.5.3/` if that fails, with the same two-minute limit. Take both files from the same place. Check the archive's SHA-256 against the checksums file, unpack it, and put `tollbit` (`tollbit.exe` on Windows) in a directory on the user's PATH, such as `~/.local/bin`.
 - **Once the installer or a fallback has installed it, check it** with `tollbit doctor`, which exits 1 if a check fails. If `tollbit` isn't found, the installer put it in `~/.local/bin`: run it from there, or start a new shell.
-- **If nothing installed, or `tollbit doctor` fails,** don't try other sources. Follow "Troubleshoot a failed install" at the end of these instructions: it finds where the install breaks and writes a report for TollBit support.
+- **If nothing installed,** don't try other sources. Follow "Install: MCP instead".
+- **If `tollbit` installed but `tollbit doctor` fails,** follow "Troubleshoot a failed install" at the end of these instructions: it finds where the install breaks and writes a report for TollBit support. Once the user has the report, follow "Install: MCP instead".
 
 ### Install: Codex
 
@@ -95,14 +102,14 @@ Don't run the installer to see what happens, and don't try npm, a release downlo
 2. **Install from here.** Make one `request_permissions` call for network access and write access to the full paths of `~/.local/bin` and `~/.config/tollbit`. Ask for nothing else, and never for a shell profile such as `~/.zshrc`: Codex can't grant a symlink, and asking for one can break your shell tool until the user starts a new chat. Ask the user to approve it for the whole session if Codex offers that. Once it's granted, run this in your shell tool, not a Node REPL or any other tool, because their sandboxes differ:
 
    ```bash
-   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.2 --no-modify-path; rc=$?; rm -f "$installer"; (exit $rc)
+   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.3 --no-modify-path; rc=$?; rm -f "$installer"; (exit $rc)
    ```
 
    Then run `tollbit doctor` and follow "After installing" straight away, because the access may end with this turn. If `tollbit` isn't found, the installer put it in `~/.local/bin`: run it from there, and give the user the PATH line the installer printed. If anything here fails, go to step 3.
 3. **Hand it to the user.** Tell them the Codex sandbox stops you doing this, and show them both of these commands in full, to run in their own terminal, not in Codex. The first installs TollBit. The second adds a Codex rule that lets `tollbit` commands, and nothing else, run outside the sandbox without asking. Tell them that includes paid commands such as `tollbit content`.
 
    ```bash
-   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.2; rc=$?; rm -f "$installer"; (exit $rc)
+   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.3; rc=$?; rm -f "$installer"; (exit $rc)
    ```
 
    ```bash
@@ -116,21 +123,104 @@ Don't run the installer to see what happens, and don't try npm, a release downlo
 
 Once the rule is in place, run each `tollbit` command on its own. Don't chain it with other commands, because the rule covers only `tollbit`.
 
-### Install: Claude plugin
+If the user can't get `tollbit` installed in their own terminal either, or `tollbit doctor` fails, follow "Install: MCP instead".
 
-In Claude chat, TollBit comes as a Claude plugin, and its `tollbit-install-claude` skill installs the CLI in your sandbox.
+### Install: MCP
 
-1. **Allow network access.** The CLI has to reach TollBit from your sandbox. Ask the user to open **Settings → Capabilities**, keep **Create and edit files** and **Use the internet while making files** on, then under **Allowed websites → Manage** add `tollbit.com`, `oauth.tollbit.com` and `gateway.tollbit.com`. On a Team or Enterprise plan, an admin sets this instead, under **Organization settings → Capabilities → Code execution**.
-2. **Add the plugin, if you don't have that skill.** You can't do this yourself. Ask the user to go to **Customize → Plugins → Add → Add marketplace**, enter `tollbit/cli`, then install the **tollbit** plugin. Then they start a new chat and ask it to set up TollBit, which runs the skill. They don't need to paste these instructions again. On a Team or Enterprise plan, if **Add marketplace** isn't there, an organization owner has to turn on Skills, User-created skills and Cowork first.
-3. **Follow the `tollbit-install-claude` skill.**
+On this platform, TollBit connects as an MCP server, which these products call a custom connector, app or plugin. You can't add it yourself, so walk the user through it. For any product:
 
-### Install: MCP (coming soon)
+- **Name:** TollBit
+- **URL:** `https://mcp.tollbit.com/mcp`
+- **Authentication:** OAuth, if the product asks. Leave any client ID and secret empty: TollBit registers the product itself.
 
-On this platform, TollBit will connect through its MCP server, which isn't available yet. Tell the user it's coming soon, and that these instructions will be updated when it is. Until then, TollBit works in agents that can run commands, such as Claude Code, Codex, Cursor and GitHub Copilot CLI.
+Where to add it, with the product's own guide. Show the user the steps and the guide link for their product, so they can check the guide if a menu has moved:
+
+- **Claude chat, the Claude mobile apps, Claude Cowork and Claude Duet:** on claude.ai or in the Claude desktop app, go to **Customize → Connectors → + Add → Add custom connector**, enter the name and URL, and click **Add**. Turn it on in a chat from the **+** menu. On a Team or Enterprise plan, an owner adds it under **Organization settings → Connectors**, and each member then clicks **Connect**. The Claude mobile apps and Claude Duet use the connectors on the user's Claude account, so add it on claude.ai or in the desktop app, and it then works there too. Guide: https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp
+- **ChatGPT and ChatGPT Work:** on the web, go to **Plugins** (`https://chatgpt.com/plugins`) → **+** → **Add custom MCP server**. Enter the name and URL, choose OAuth, accept the warning, click **Create as a plugin**, then install it. In a chat or a Work task, type `@` and pick TollBit; it then works on desktop and mobile too. Not every ChatGPT plan can add custom MCP servers. In a ChatGPT workspace, an admin may have to allow plugins with custom MCP servers first. Guide: https://learn.chatgpt.com/docs/plugins (for admins: https://learn.chatgpt.com/docs/enterprise/apps-and-connectors)
+- **Gemini app and Gemini Spark:** on a computer, open `https://gemini.google.com` and go to **Settings → Connected Apps → Custom apps → Add a custom app**. Enter the URL and click **Next**. Custom apps can only be added on the web, but then work in the mobile app too. They need a personal Google account in the US, and a plan that includes custom apps. Guide: https://support.google.com/gemini/answer/17209137
+- **Perplexity and Perplexity Computer:** go to **Customize → Connectors → Add custom → Add MCP connector → Remote**. Enter the name and URL, choose OAuth under the advanced options, tick the acknowledgement, and click **Add**. Then click the connector's card to connect. In Perplexity Computer, use it in a task from **/ → Plugins**. On an Enterprise plan, an admin may have to allow members to add custom connectors. Guide: https://www.perplexity.ai/help-center/en/articles/13915507-adding-custom-remote-connectors
+- **Grok:** go to **Connectors** (`https://grok.com/connectors`) → **New Connector** → **Custom**. Enter the URL and complete the sign-in. On Grok Business or Enterprise, a team admin adds it first in the xAI console under **Grok Business → Connectors → + Add Connector → Other**, and members then connect it on `https://grok.com/connectors`. Guide: https://docs.x.ai/grok/connectors (for admins: https://docs.x.ai/grok/connector-management)
+- **Mistral Vibe:** open the **Connectors** page → **+ Add Connector** → **Custom MCP Connector**. Enter the name and URL, click **Connect**, and complete the sign-in. Only an admin can add connectors; on the Free, Pro and Student plans, the account owner is the admin. Guide: https://docs.mistral.ai/vibe/work/connectors/mcp-connectors
+
+When the user connects, TollBit's sign-in page offers **Sign in** or **Continue as guest**. A guest can search and check prices. Buying content and analytics need a TollBit account: when a tool needs one, the product asks the user to sign in again, and they choose **Sign in**.
+
+If the option to add it isn't there, the user's plan, country or an admin setting is blocking it. Tell them which, from the notes above, and that their plan or their admin can turn it on. Don't suggest other ways to install.
+
+Once TollBit is connected, skip "After installing", which is for the CLI. Instead, look at TollBit's tools, tell the user what they offer, leading with what fits what you know about them and their work, and suggest one thing to try first.
+
+### Install: MCP instead
+
+Follow this section when you can run commands but couldn't get a working TollBit CLI, and "Install: script", "Install: Codex" or "Troubleshoot a failed install" sends you here. Tell the user the CLI isn't working here, that TollBit can still connect to you as an MCP server, and set that up. For any agent:
+
+- **Name:** `TollBit`
+- **URL:** `https://mcp.tollbit.com/mcp`, Streamable HTTP.
+- **Authentication:** OAuth. Leave any client ID and secret empty: TollBit registers the agent itself.
+
+How to add it, with the agent's own guide. Show the user the steps and the guide link for their agent, so they can check the guide if a command has changed. When you edit a config file that already exists, add the `TollBit` entry and keep the others. If a command fails because you have no network access or can't write to the user's home directory, give it to the user to run in their own terminal.
+
+- **Claude Code in a terminal:** run `claude mcp add --transport http --scope user TollBit https://mcp.tollbit.com/mcp`. `--scope user` makes it available in all the user's projects. Then ask the user to run `/mcp`, select `TollBit` and sign in in the browser. If `TollBit` isn't listed, they restart Claude Code; `claude --continue` brings this conversation back. Guide: https://code.claude.com/docs/en/mcp
+- **Claude Code in the desktop app and on the web:** these sessions use the connectors on the user's Claude account. The user adds TollBit as a custom connector on claude.ai, as for Claude chat in "Install: MCP", then starts a new session. Guide: https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp
+- **Codex CLI and Codex in the ChatGPT desktop app:** your sandbox can't write to `~/.codex` or reach the network, so show the user these commands to run in their own terminal. The first adds the server to `~/.codex/config.toml`, which the CLI, the desktop app and the IDE extension share. The second opens a browser to sign in.
+
+  ```bash
+  codex mcp add TollBit --url https://mcp.tollbit.com/mcp
+  codex mcp login TollBit
+  ```
+
+  Then they restart Codex. In the CLI, `codex resume --last` brings this conversation back. Guide: https://learn.chatgpt.com/docs/extend/mcp
+- **Cursor and Cursor CLI:** both read `~/.cursor/mcp.json`. Add this to it:
+
+  ```json
+  { "mcpServers": { "TollBit": { "url": "https://mcp.tollbit.com/mcp" } } }
+  ```
+
+  In Cursor, the user turns TollBit on and signs in from **Customize** in the sidebar, and restarts Cursor if it isn't listed. In Cursor CLI, they run `agent mcp login TollBit`. Guides: https://cursor.com/docs/mcp and, for the CLI, https://cursor.com/docs/cli/mcp
+- **Antigravity (desktop app and IDE) and Antigravity CLI:** the IDE and the CLI read `~/.gemini/config/mcp_config.json`. Add this to it:
+
+  ```json
+  { "mcpServers": { "TollBit": { "serverUrl": "https://mcp.tollbit.com/mcp" } } }
+  ```
+
+  The desktop app shows its own file under **Customizations → Installed → MCP Servers → Copy Config File Path**; if that's a different file, ask the user for the path and add the entry there too. Antigravity signs in with OAuth itself. In the desktop app, the user clicks **Authenticate** next to TollBit under **Customizations → Installed**, signs in in the browser, and pastes the code back. In the CLI, `/mcp` reloads the servers. Guide: https://antigravity.google/docs/mcp
+- **GitHub Copilot CLI:** run `copilot mcp add --transport http TollBit https://mcp.tollbit.com/mcp`, which adds it to `~/.copilot/mcp-config.json`. If `/mcp` doesn't list `TollBit`, the user restarts Copilot CLI. If it shows as needing sign-in, they run `/mcp auth TollBit`, which opens a browser. Guide: https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers
+- **Any other agent:** add a remote MCP server with the name and URL above, the way your product's own documentation describes, and sign in with OAuth when it asks. Show the user the documentation page you used. If your product can't add a remote MCP server, or you can't find how, tell the user and stop.
+
+When the user signs in, TollBit's sign-in page offers **Sign in** or **Continue as guest**. A guest can search and check prices. Buying content and analytics need a TollBit account: when a tool needs one, the agent asks the user to sign in again, and they choose **Sign in**.
+
+If TollBit's tools still don't appear, stop and tell the user. Don't try other ways to install.
+
+Once TollBit is connected, skip "After installing", which is for the CLI. Instead, look at TollBit's tools, tell the user what they offer, leading with what fits what you know about them and their work, and suggest one thing to try first.
+
+### Install: MCP through an admin
+
+On this platform, only an admin or the agent's builder can add an MCP server. Tell the user that, and show them these details and the steps for their product, with its guide link, to pass on:
+
+- **URL:** `https://mcp.tollbit.com/mcp`, Streamable HTTP.
+- **Authentication:** OAuth with dynamic client registration. Leave any client ID and secret empty.
+- **Microsoft Copilot Studio:** the agent's maker opens the agent's **Tools** page → **Add a tool** → **New tool** → **Model Context Protocol**, enters the name and URL, chooses **OAuth 2.0** → **Dynamic discovery**, and clicks **Create**. Then they create a connection and click **Add to agent**. Guide: https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent
+- **Slackbot:** a developer adds the server to a Slack app under **Features → MCP Servers**, with dynamic client registration, and an admin installs the app. Each user then turns it on from **Apps** in the Slackbot toolbar and signs in. Guides: https://docs.slack.dev/ai/slackbot-mcp-client/ and, for users, https://slack.com/help/articles/52414744085139-Connect-Slackbot-to-other-apps-with-MCP
+
+Gemini Enterprise and Microsoft 365 Copilot don't register themselves, so the admin first registers their product with TollBit with one command, then adds TollBit with the values it returns. The admin runs the command in a terminal, with their company's name and their product's redirect URL below, and keeps the `client_id` and `client_secret` it returns. The secret is like a password: they don't email or share it.
+
+```bash
+curl -s https://oauth.tollbit.com/oauth2/register -H 'Content-Type: application/json' -d '{"client_name": "<product> - <company>", "redirect_uris": ["<redirect URL>"], "token_endpoint_auth_method": "client_secret_basic"}'
+```
+
+Then they add TollBit in their product with these values:
+
+- **Authorization URL:** `https://oauth.tollbit.com/oauth2/auth`
+- **Token URL:** `https://oauth.tollbit.com/oauth2/token`
+- **Client ID** and **Client Secret:** from the command.
+- **Scopes:** `openid offline_access tollbit:discover tollbit:analytics tollbit:spend`
+
+If signing in fails with `invalid_client`, they run the command again with `client_secret_post` in place of `client_secret_basic`, and use the new values.
+
+- **Gemini Enterprise:** the redirect URL is `https://vertexaisearch.cloud.google.com/oauth-redirect`. At `https://business.gemini.google`, the admin goes to **Settings & help → their team → Manage team → Connected apps → Add MCP Server**, enters the URL above and the name TollBit, and chooses **OAuth 2.0** with the values above. They click **Verify Auth**, then **Continue**, choose a location and click **Add**, and then turn the connection on: it's off by default. Guide: https://support.google.com/g/answer/17106276
+- **Microsoft 365 Copilot:** the redirect URL is `https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect`. In the Teams Developer Portal, the admin goes to **Tools → OAuth client registration → New**, enters the URL above as the base URL and the values above, with the token URL as the refresh URL too, leaves PKCE on, and allows **Any Teams app**. Then a Global Administrator or AI Administrator goes to the Microsoft 365 admin center, **Copilot → Connectors → Connect to MCP server**, enters the URL above and the registration ID, and turns it on for their users. Each user then connects TollBit from **Sources** in Copilot Chat's settings. Users need a Microsoft 365 Copilot license. Guide: https://learn.microsoft.com/en-us/microsoft-365/copilot/connectors/set-up-custom-federated-connectors
 
 ### Install: not supported
 
-You can't run shell commands here, so you can't install the TollBit CLI. Tell the user that, and that TollBit works in agents that can run commands, such as Claude Code, Claude chat, Codex, Cursor and GitHub Copilot CLI.
+You can't run shell commands here, so you can't install the TollBit CLI, and the user can't add TollBit as an MCP server in this product. Tell the user that, and that TollBit works in agents that can run commands, such as Claude Code, Codex, Cursor and GitHub Copilot CLI, and connects to Claude, ChatGPT, Gemini, Perplexity, Grok and Mistral Vibe as an MCP server.
 
 ## After installing
 
@@ -228,7 +318,7 @@ These are the hosts installing needs:
 | `raw.githubusercontent.com` | older install commands that fetch `install.sh` or `install.ps1` from GitHub | https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh |
 | `api.github.com` | the scripts, when `tollbit.com` fails, to find the latest version (not needed when a version is given) | https://api.github.com/repos/tollbit/cli/releases/latest |
 | `github.com` | release downloads when `tollbit.com` fails, and Claude Code's `/plugin marketplace add` | https://github.com/tollbit/cli/releases |
-| `release-assets.githubusercontent.com` | release downloads when `tollbit.com` fails: GitHub redirects them here | https://github.com/tollbit/cli/releases/download/v0.5.2/tollbit_0.5.2_checksums.txt (follows the redirect) |
+| `release-assets.githubusercontent.com` | release downloads when `tollbit.com` fails: GitHub redirects them here | https://github.com/tollbit/cli/releases/download/v0.5.3/tollbit_0.5.3_checksums.txt (follows the redirect) |
 | `registry.npmjs.org` | npm | https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest |
 
 `release-assets.githubusercontent.com` has no probe of its own: rate it by the release download line, after the redirect. If `github.com` passes and the release download fails, `release-assets.githubusercontent.com` is the blocked host.
@@ -239,7 +329,7 @@ for url in \
   https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh \
   https://api.github.com/repos/tollbit/cli/releases/latest \
   https://github.com/tollbit/cli/releases \
-  https://github.com/tollbit/cli/releases/download/v0.5.2/tollbit_0.5.2_checksums.txt \
+  https://github.com/tollbit/cli/releases/download/v0.5.3/tollbit_0.5.3_checksums.txt \
   https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest
 do
   echo "== $url"
@@ -254,7 +344,7 @@ $urls = @(
   'https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh',
   'https://api.github.com/repos/tollbit/cli/releases/latest',
   'https://github.com/tollbit/cli/releases',
-  'https://github.com/tollbit/cli/releases/download/v0.5.2/tollbit_0.5.2_checksums.txt',
+  'https://github.com/tollbit/cli/releases/download/v0.5.3/tollbit_0.5.3_checksums.txt',
   'https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest'
 )
 foreach ($u in $urls) {
@@ -340,12 +430,12 @@ Get-Item "$env:LOCALAPPDATA\Programs\tollbit\bin\tollbit.exe", "$p\node_modules\
 
 Run each binary you find by its full path, with `version`.
 
-If none exists and `tollbit.com` or the GitHub release download was **ok** in step 3, test a fresh copy in a temporary directory. If only GitHub was ok, set `base` to `https://github.com/tollbit/cli/releases/download/v0.5.2` instead. This checks the binary on its own, apart from any installer. The `<os>_<arch>` part is `darwin_arm64`, `linux_amd64`, `windows_amd64` and so on.
+If none exists and `tollbit.com` or the GitHub release download was **ok** in step 3, test a fresh copy in a temporary directory. If only GitHub was ok, set `base` to `https://github.com/tollbit/cli/releases/download/v0.5.3` instead. This checks the binary on its own, apart from any installer. The `<os>_<arch>` part is `darwin_arm64`, `linux_amd64`, `windows_amd64` and so on.
 
 ```bash
 t="$(mktemp -d)"; cd "$t"
-base=https://tollbit.com/.agents/cli/v0.5.2
-curl -fsSLO "$base/tollbit_0.5.2_checksums.txt"
+base=https://tollbit.com/.agents/cli/v0.5.3
+curl -fsSLO "$base/tollbit_0.5.3_checksums.txt"
 a="$(grep -o 'tollbit_[^ ]*_<os>_<arch>.tar.gz' tollbit_*_checksums.txt)"
 curl -fsSLO "$base/$a" && grep " $a\$" tollbit_*_checksums.txt | (shasum -a 256 -c 2>/dev/null || sha256sum -c) \
   && tar -xzf "$a" && ./tollbit version
@@ -354,8 +444,8 @@ cd - >/dev/null; rm -rf "$t"
 
 ```powershell
 $t = Join-Path $env:TEMP "tollbit-test-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory $t | Out-Null
-$base = 'https://tollbit.com/.agents/cli/v0.5.2'
-Invoke-WebRequest "$base/tollbit_0.5.2_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
+$base = 'https://tollbit.com/.agents/cli/v0.5.3'
+Invoke-WebRequest "$base/tollbit_0.5.3_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
 $line = Select-String -Path "$t\sums.txt" -Pattern '_windows_<arch>\.zip$' | Select-Object -First 1
 $sum, $a = $line.Line -split '\s+'
 Invoke-WebRequest "$base/$a" -OutFile "$t\$a" -UseBasicParsing
@@ -421,4 +511,6 @@ For **Likely cause**, name the first thing that breaks the install method the us
 
 Fill in **Fix likely needs** from the **Who** column. On a managed work computer that is often the user's IT administrators, since only they can change the network, the proxy or what programs may run. Tell the user so, and that TollBit support will bring in their IT administrators where needed. The user sends the report to TollBit support only, not to their IT administrators.
 
-After the report, stop. Don't try the install again, and don't carry on with any other setup steps, unless the user asks you to.
+After the report, stop. Don't try the install again, and don't carry on with any other setup steps, unless the user or the instructions that sent you here ask you to.
+
+Once the user has the report, follow "Install: MCP instead".

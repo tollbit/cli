@@ -21,7 +21,7 @@ curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --version v0.5.2
+curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --version v0.5.3
 curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --install-dir "$HOME/bin" --force
 ```
 
@@ -37,7 +37,7 @@ Pin a version or skip `PATH` changes (useful in CI):
 
 ```powershell
 irm "https://tollbit.com/.agents/cli/install.ps1" | iex
-Install-Tollbit -Version v0.5.2 -Force
+Install-Tollbit -Version v0.5.3 -Force
 Install-Tollbit -NoModifyPath -PrintPathInstructions
 ```
 
@@ -211,7 +211,7 @@ Installer channel updates:
 curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash
 
 # Pinned
-curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --version v0.5.2 --force
+curl -fsSL "https://tollbit.com/.agents/cli/install.sh" | bash -s -- --version v0.5.3 --force
 ```
 
 ```powershell

@@ -275,4 +275,4 @@ For **Likely cause**, name the first thing that breaks the install method the us
 
 Fill in **Fix likely needs** from the **Who** column. On a managed work computer that is often the user's IT administrators, since only they can change the network, the proxy or what programs may run. Tell the user so, and that TollBit support will bring in their IT administrators where needed. The user sends the report to TollBit support only, not to their IT administrators.
 
-After the report, stop. Don't try the install again, and don't carry on with any other setup steps, unless the user asks you to.
+After the report, stop. Don't try the install again, and don't carry on with any other setup steps, unless the user or the instructions that sent you here ask you to.

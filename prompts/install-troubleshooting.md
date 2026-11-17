@@ -82,7 +82,7 @@ These are the hosts installing needs:
 | `raw.githubusercontent.com` | older install commands that fetch `install.sh` or `install.ps1` from GitHub | https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh |
 | `api.github.com` | the scripts, when `tollbit.com` fails, to find the latest version (not needed when a version is given) | https://api.github.com/repos/tollbit/cli/releases/latest |
 | `github.com` | release downloads when `tollbit.com` fails, and Claude Code's `/plugin marketplace add` | https://github.com/tollbit/cli/releases |
-| `release-assets.githubusercontent.com` | release downloads when `tollbit.com` fails: GitHub redirects them here | https://github.com/tollbit/cli/releases/download/v0.5.2/tollbit_0.5.2_checksums.txt (follows the redirect) |
+| `release-assets.githubusercontent.com` | release downloads when `tollbit.com` fails: GitHub redirects them here | https://github.com/tollbit/cli/releases/download/v0.5.3/tollbit_0.5.3_checksums.txt (follows the redirect) |
 | `registry.npmjs.org` | npm | https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest |
 
 `release-assets.githubusercontent.com` has no probe of its own: rate it by the release download line, after the redirect. If `github.com` passes and the release download fails, `release-assets.githubusercontent.com` is the blocked host.
@@ -93,7 +93,7 @@ for url in \
   https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh \
   https://api.github.com/repos/tollbit/cli/releases/latest \
   https://github.com/tollbit/cli/releases \
-  https://github.com/tollbit/cli/releases/download/v0.5.2/tollbit_0.5.2_checksums.txt \
+  https://github.com/tollbit/cli/releases/download/v0.5.3/tollbit_0.5.3_checksums.txt \
   https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest
 do
   echo "== $url"
@@ -108,7 +108,7 @@ $urls = @(
   'https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh',
   'https://api.github.com/repos/tollbit/cli/releases/latest',
   'https://github.com/tollbit/cli/releases',
-  'https://github.com/tollbit/cli/releases/download/v0.5.2/tollbit_0.5.2_checksums.txt',
+  'https://github.com/tollbit/cli/releases/download/v0.5.3/tollbit_0.5.3_checksums.txt',
   'https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest'
 )
 foreach ($u in $urls) {
@@ -194,12 +194,12 @@ Get-Item "$env:LOCALAPPDATA\Programs\tollbit\bin\tollbit.exe", "$p\node_modules\
 
 Run each binary you find by its full path, with `version`.
 
-If none exists and `tollbit.com` or the GitHub release download was **ok** in step 3, test a fresh copy in a temporary directory. If only GitHub was ok, set `base` to `https://github.com/tollbit/cli/releases/download/v0.5.2` instead. This checks the binary on its own, apart from any installer. The `<os>_<arch>` part is `darwin_arm64`, `linux_amd64`, `windows_amd64` and so on.
+If none exists and `tollbit.com` or the GitHub release download was **ok** in step 3, test a fresh copy in a temporary directory. If only GitHub was ok, set `base` to `https://github.com/tollbit/cli/releases/download/v0.5.3` instead. This checks the binary on its own, apart from any installer. The `<os>_<arch>` part is `darwin_arm64`, `linux_amd64`, `windows_amd64` and so on.
 
 ```bash
 t="$(mktemp -d)"; cd "$t"
-base=https://tollbit.com/.agents/cli/v0.5.2
-curl -fsSLO "$base/tollbit_0.5.2_checksums.txt"
+base=https://tollbit.com/.agents/cli/v0.5.3
+curl -fsSLO "$base/tollbit_0.5.3_checksums.txt"
 a="$(grep -o 'tollbit_[^ ]*_<os>_<arch>.tar.gz' tollbit_*_checksums.txt)"
 curl -fsSLO "$base/$a" && grep " $a\$" tollbit_*_checksums.txt | (shasum -a 256 -c 2>/dev/null || sha256sum -c) \
   && tar -xzf "$a" && ./tollbit version
@@ -208,8 +208,8 @@ cd - >/dev/null; rm -rf "$t"
 
 ```powershell
 $t = Join-Path $env:TEMP "tollbit-test-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory $t | Out-Null
-$base = 'https://tollbit.com/.agents/cli/v0.5.2'
-Invoke-WebRequest "$base/tollbit_0.5.2_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
+$base = 'https://tollbit.com/.agents/cli/v0.5.3'
+Invoke-WebRequest "$base/tollbit_0.5.3_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
 $line = Select-String -Path "$t\sums.txt" -Pattern '_windows_<arch>\.zip$' | Select-Object -First 1
 $sum, $a = $line.Line -split '\s+'
 Invoke-WebRequest "$base/$a" -OutFile "$t\$a" -UseBasicParsing
@@ -275,4 +275,4 @@ For **Likely cause**, name the first thing that breaks the install method the us
 
 Fill in **Fix likely needs** from the **Who** column. On a managed work computer that is often the user's IT administrators, since only they can change the network, the proxy or what programs may run. Tell the user so, and that TollBit support will bring in their IT administrators where needed. The user sends the report to TollBit support only, not to their IT administrators.
 
-After the report, stop. Don't try the install again, and don't carry on with any other setup steps, unless the user asks you to.
+After the report, stop. Don't try the install again, and don't carry on with any other setup steps, unless the user or the instructions that sent you here ask you to.

@@ -15,9 +15,11 @@ const testTemplate = `Intro.
 
 ### Install: Codex
 
-### Install: Claude plugin
+### Install: MCP
 
-### Install: MCP (coming soon)
+### Install: MCP instead
+
+### Install: MCP through an admin
 
 ### Install: not supported
 
@@ -48,10 +50,10 @@ Work out where it breaks.
 
 func TestRenderMergesPlatformsWithTheSameHint(t *testing.T) {
 	m := platformList{Platforms: []platform{
-		{Name: "Chat (desktop)", Detection: "`X=1`", Install: "claude-plugin"},
-		{Name: "Chat (web)", Detection: "`X=1`", Install: "claude-plugin"},
-		{Name: "Terminal", Detection: "`Y=1`", Install: "script"},
-		{Name: "Untested", Install: "script"},
+		{Name: "Chat (desktop)", Detection: "`X=1`", Install: "mcp"},
+		{Name: "Chat (web)", Detection: "`X=1`", Install: "mcp"},
+		{Name: "Terminal", Detection: "`Y=1`", Install: "script", Fallback: "mcp-instead"},
+		{Name: "No detection", Install: "script"},
 	}}
 	files, err := render([]byte(testTemplate), []byte(testTroubleshoot), m, "1.2.3")
 	if err != nil {
@@ -59,9 +61,9 @@ func TestRenderMergesPlatformsWithTheSameHint(t *testing.T) {
 	}
 	prompt := string(files[PromptPath])
 	for _, want := range []string{
-		"   | Chat (desktop) or Chat (web) | `X=1` | Install: Claude plugin |\n",
-		"   | Terminal | `Y=1` | Install: script |\n",
-		"   | Any other agent with no shell | only your instructions | Install: not supported |",
+		"   | Chat (desktop) or Chat (web) | `X=1` | Install: MCP |\n",
+		"   | Terminal | `Y=1` | Install: script, then Install: MCP instead |\n",
+		"   | Any other agent with no shell | only your instructions | Install: MCP if the user can add a custom MCP server there, otherwise Install: not supported |",
 		"raw.githubusercontent.com/tollbit/cli/v1.2.3/scripts/install.sh",
 		"--version v1.2.3",
 	} {
@@ -69,7 +71,7 @@ func TestRenderMergesPlatformsWithTheSameHint(t *testing.T) {
 			t.Errorf("prompt is missing %q:\n%s", want, prompt)
 		}
 	}
-	for _, unwanted := range []string{"Untested", "## TODO", "Not published.", "{{"} {
+	for _, unwanted := range []string{"No detection", "## TODO", "Not published.", "{{"} {
 		if strings.Contains(prompt, unwanted) {
 			t.Errorf("prompt has %q:\n%s", unwanted, prompt)
 		}
@@ -83,9 +85,16 @@ func TestRenderRejectsAnUnknownInstallValue(t *testing.T) {
 	}
 }
 
+func TestRenderRejectsAnUnknownFallbackValue(t *testing.T) {
+	m := platformList{Platforms: []platform{{Name: "Agent", Detection: "`Z=1`", Install: "script", Fallback: "brew"}}}
+	if _, err := render([]byte(testTemplate), []byte(testTroubleshoot), m, "1.2.3"); err == nil || !strings.Contains(err.Error(), `fallback "brew"`) {
+		t.Fatalf("render error = %v, want an unknown fallback error", err)
+	}
+}
+
 func TestRenderRejectsATemplateWithoutAnInstallSection(t *testing.T) {
-	template := strings.Replace(testTemplate, "### Install: MCP (coming soon)\n", "", 1)
-	if _, err := render([]byte(template), []byte(testTroubleshoot), platformList{}, "1.2.3"); err == nil || !strings.Contains(err.Error(), "MCP (coming soon)") {
+	template := strings.Replace(testTemplate, "### Install: MCP through an admin\n", "", 1)
+	if _, err := render([]byte(template), []byte(testTroubleshoot), platformList{}, "1.2.3"); err == nil || !strings.Contains(err.Error(), "MCP through an admin") {
 		t.Fatalf("render error = %v, want a missing section error", err)
 	}
 }

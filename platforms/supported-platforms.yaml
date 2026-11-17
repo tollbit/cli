@@ -9,78 +9,111 @@
 #
 #   name:      the platform, as its users call it
 #   detection: one line for the hints table: what the agent sees on this
-#              platform. Only from recorded runs, or marked "untested:".
-#              Platforms with the same detection and install share a row; a
-#              platform without detection gets no row.
+#              platform. Platforms with the same detection and install
+#              share a row; a platform without detection gets no row.
 #   install:   the install section it follows:
 #                script         "Install: script", install.sh or install.ps1
 #                codex          "Install: Codex", the installer and a sandbox
 #                               rule for tollbit, in the Codex CLI and app
-#                claude-plugin  "Install: Claude plugin", the plugin and its
-#                               install skill, in Claude chat
-#                mcp            "Install: MCP (coming soon)"
+#                mcp            "Install: MCP", the user adds the MCP server
+#                               as a custom connector
+#                mcp-admin      "Install: MCP through an admin", only an admin
+#                               or the agent's builder can add the MCP server
+#                mcp-instead    "Install: MCP instead", the agent adds the MCP
+#                               server itself, or shows the user how
 #                not-supported  "Install: not supported", no shell and no MCP
+#   fallback:  optional, the install section to follow if the install
+#              section's steps can't get the CLI working, such as mcp-instead.
+#              The hints table shows it after install
 
 platforms:
   - name: Antigravity (desktop app and IDE)
     detection: '`ANTIGRAVITY_*` variables, `__CFBundleIdentifier=com.google.antigravity`, no `TERM_PROGRAM`'
     install: script
+    fallback: mcp-instead
   - name: Antigravity CLI
     detection: '`ANTIGRAVITY_*` variables, and `TERM_PROGRAM` set'
     install: script
+    fallback: mcp-instead
+  - name: ChatGPT
+    detection: 'your instructions name ChatGPT'
+    install: mcp
   - name: ChatGPT Work
-    detection: 'untested: your instructions name ChatGPT Work'
+    detection: 'your instructions name ChatGPT Work'
     install: mcp
   - name: Claude chat (desktop app)
     detection: '`CLAUDE_CODE_ENTRYPOINT=remote_cowork`, in a cloud Linux container'
-    install: claude-plugin
+    install: mcp
   - name: Claude chat (web)
     detection: '`CLAUDE_CODE_ENTRYPOINT=remote_cowork`, in a cloud Linux container'
-    install: claude-plugin
+    install: mcp
   - name: Claude Code (desktop app)
     detection: '`CLAUDE_CODE_ENTRYPOINT=claude-desktop`'
     install: script
+    fallback: mcp-instead
   - name: Claude Code (terminal)
     detection: '`CLAUDE_CODE_ENTRYPOINT=cli`'
     install: script
+    fallback: mcp-instead
   - name: Claude Code on the web
     detection: '`CLAUDE_CODE_ENTRYPOINT=remote`, in a cloud Linux container'
     install: script
+    fallback: mcp-instead
   - name: Claude Cowork
-    install: claude-plugin
+    install: mcp
   - name: Claude Duet
-    detection: 'untested: your instructions name Claude Duet'
+    detection: 'your instructions name Claude Duet'
+    install: mcp
+  - name: Claude mobile apps
+    detection: 'your instructions name the Claude iOS or Android app'
     install: mcp
   - name: Codex (ChatGPT desktop app)
     detection: '`CODEX_SANDBOX`, plus `CODEX_APP_RUNTIME_CLI_PATH` and `CODEX_APP_TOOLS_PIPE_PATH`'
     install: codex
+    fallback: mcp-instead
   - name: Codex CLI
     detection: '`CODEX_SANDBOX`, without any `CODEX_APP_*` variables'
     install: codex
+    fallback: mcp-instead
   - name: Cursor
     detection: '`CURSOR_AGENT=1`, plus `CURSOR_LAYOUT` and `VSCODE_*` variables'
     install: script
+    fallback: mcp-instead
   - name: Cursor CLI
     detection: '`CURSOR_AGENT=1`, without `CURSOR_LAYOUT` or `VSCODE_*` variables'
     install: script
+    fallback: mcp-instead
   - name: Gemini app
     detection: 'no shell; your instructions say "You are Gemini"'
     install: mcp
   - name: Gemini Enterprise
-    detection: 'untested: your instructions name Gemini Enterprise'
-    install: mcp
+    detection: 'your instructions name Gemini Enterprise'
+    install: mcp-admin
   - name: Gemini Spark
-    detection: 'untested: your instructions name Gemini Spark'
+    detection: 'your instructions name Gemini Spark'
     install: mcp
   - name: GitHub Copilot CLI
     detection: '`COPILOT_CLI`'
     install: script
+    fallback: mcp-instead
+  - name: Grok
+    detection: 'your instructions name Grok, the chat app (not Grok Bot)'
+    install: mcp
   - name: Microsoft 365 Copilot
-    detection: 'untested: your instructions name Microsoft 365 Copilot'
+    detection: 'your instructions name Microsoft 365 Copilot'
+    install: mcp-admin
+  - name: Microsoft Copilot Studio
+    detection: 'your instructions name Microsoft Copilot Studio'
+    install: mcp-admin
+  - name: Mistral Vibe
+    detection: 'your instructions name Mistral Vibe'
     install: mcp
   - name: Perplexity
-    detection: 'untested: your instructions name Perplexity'
+    detection: 'your instructions name Perplexity'
     install: mcp
   - name: Perplexity Computer
-    detection: 'untested: your instructions name Perplexity Computer'
+    detection: 'your instructions name Perplexity Computer'
     install: mcp
+  - name: Slackbot
+    detection: 'your instructions name Slackbot'
+    install: mcp-admin

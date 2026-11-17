@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-17
+
+### Changed
+
+- The install prompt now walks Gemini Enterprise and Microsoft 365 Copilot
+  admins through registering with TollBit using one command and adding TollBit
+  as an MCP server, instead of saying TollBit can't connect there yet.
+- The install prompt now walks users through adding TollBit as an MCP server
+  (a custom connector) in Claude, ChatGPT, Gemini and Perplexity, with each
+  product's own guide, in place of "Install: MCP (coming soon)". Gemini
+  Enterprise and Microsoft 365 Copilot get an admin hand-off section. The
+  Claude plugin install section is removed.
+- When an agent that can run commands can't install the TollBit CLI, the
+  install prompt now has it connect TollBit as an MCP server instead, with
+  steps for Claude Code, Codex, Cursor, Antigravity and GitHub Copilot CLI.
+- The install prompt now also covers ChatGPT, the Claude mobile apps, Grok and
+  Mistral Vibe as MCP products, and gives admin steps for Microsoft Copilot
+  Studio and Slackbot. A product without a shell that isn't listed follows the
+  MCP steps if the user can add a custom MCP server there. The MCP fallback
+  now also covers any other agent, and a failed `tollbit doctor` check leads
+  to it after the troubleshooting report.
+
 ## [0.5.2] - 2026-11-16
 
 ### Added
