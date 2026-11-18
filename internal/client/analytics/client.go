@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tollbit/cli/internal/client"
 	"github.com/tollbit/cli/internal/errorsx"
 	"github.com/tollbit/cli/internal/tokens/agent"
 )
@@ -30,7 +31,7 @@ type (
 		Schema(context.Context, agent.Token) (SchemaResponse, error)
 	}
 
-	client struct {
+	apiClient struct {
 		baseURL *url.URL
 		http    *http.Client
 	}
@@ -86,9 +87,7 @@ type (
 	}
 )
 
-var _ Client = (*client)(nil)
-
-func NewClient(cfg Config) (Client, error) {
+func NewClient(cfg Config, transport http.RoundTripper) (Client, error) {
 	baseURL := strings.TrimSpace(cfg.BaseURL)
 	if baseURL == "" {
 		return nil, errors.New("analytics base URL is required")
@@ -97,13 +96,13 @@ func NewClient(cfg Config) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &client{
+	return &apiClient{
 		baseURL: parsed,
-		http:    &http.Client{Timeout: 90 * time.Second},
+		http:    client.New(90*time.Second, transport),
 	}, nil
 }
 
-func (c *client) Query(ctx context.Context, request QueryRequest, token agent.Token) (QueryResponse, error) {
+func (c *apiClient) Query(ctx context.Context, request QueryRequest, token agent.Token) (QueryResponse, error) {
 	if strings.TrimSpace(token.RawToken) == "" {
 		return QueryResponse{}, errors.New("agent token is required")
 	}
@@ -142,7 +141,7 @@ func (c *client) Query(ctx context.Context, request QueryRequest, token agent.To
 	return result, nil
 }
 
-func (c *client) Schema(ctx context.Context, token agent.Token) (SchemaResponse, error) {
+func (c *apiClient) Schema(ctx context.Context, token agent.Token) (SchemaResponse, error) {
 	if strings.TrimSpace(token.RawToken) == "" {
 		return SchemaResponse{}, errors.New("agent token is required")
 	}

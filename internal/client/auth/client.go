@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/tollbit/cli/internal/client"
 	"github.com/tollbit/cli/internal/errorsx/problemjson"
 	"github.com/tollbit/cli/internal/logging"
 	"github.com/tollbit/cli/internal/tokens/agent"
-	"github.com/tollbit/cli/internal/version"
 )
 
 type (
@@ -230,7 +230,7 @@ func New(cfg ClientConfig) (*Client, error) {
 	}
 	return &Client{
 		baseURL: parsed,
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http:    client.New(30*time.Second, nil),
 	}, nil
 }
 
@@ -555,8 +555,6 @@ func (c *Client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 		return err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Tollbit-Client", version.ClientHeader())
-	req.Header.Set("User-Agent", version.HTTPUserAgent())
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -624,9 +622,6 @@ func logRequest(ctx context.Context, req *http.Request, body []byte) {
 		Str("url", req.URL.String()).
 		Str("accept", req.Header.Get("Accept")).
 		Str("content_type", req.Header.Get("Content-Type"))
-	if userAgent := req.Header.Get("User-Agent"); userAgent != "" {
-		e = e.Str("user_agent", userAgent)
-	}
 	if token := req.Header.Get("Authorization"); token != "" {
 		e = e.Str("authorization", redactSecret(token))
 	}

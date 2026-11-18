@@ -20,11 +20,10 @@ const (
 )
 
 // The template's placeholders for the hints table and the troubleshooting
-// steps, and the heading where the published prompt ends.
+// steps.
 const (
 	hintsPlaceholder        = "{{hints_table}}"
 	troubleshootPlaceholder = "{{troubleshooting}}"
-	todoHeading             = "\n## TODO\n"
 )
 
 type (
@@ -73,9 +72,9 @@ func installFiles(root string) (map[string][]byte, error) {
 	return render(template, troubleshoot, m, version.Version)
 }
 
-// render builds the published prompt: the template up to its TODO section,
-// with the hints table filled in from the platforms file, the troubleshooting
-// template embedded, and {{version}} set to the release.
+// render builds the published prompt: the template with the hints table
+// filled in from the platforms file, the troubleshooting template embedded,
+// and {{version}} set to the release.
 func render(template, troubleshoot []byte, m platformList, release string) (map[string][]byte, error) {
 	if err := check(template, m); err != nil {
 		return nil, err
@@ -84,11 +83,7 @@ func render(template, troubleshoot []byte, m platformList, release string) (map[
 	if err != nil {
 		return nil, err
 	}
-	body, _, found := bytes.Cut(template, []byte(todoHeading))
-	if !found {
-		return nil, fmt.Errorf("%s has no %q heading", TemplatePath, strings.TrimSpace(todoHeading))
-	}
-	prompt := strings.TrimRight(string(body), "\n") + "\n"
+	prompt := strings.TrimRight(string(template), "\n") + "\n"
 	prompt = strings.Replace(prompt, hintsPlaceholder, hintsTable(m), 1)
 	prompt = strings.Replace(prompt, troubleshootPlaceholder, steps, 1)
 	filled, err := fill(TemplatePath, prompt, release)

@@ -15,6 +15,7 @@ import (
 
 	"github.com/tollbit/cli/internal/selfinstall"
 	"github.com/tollbit/cli/internal/selfinstall/selfinstalltest"
+	"github.com/tollbit/cli/internal/version"
 )
 
 // On macOS and Linux, the Windows steps also run here with goos set to
@@ -174,6 +175,26 @@ func TestInstallFallsBackToNextBaseURLWhenDownloadFails(t *testing.T) {
 		t.Fatalf("unexpected result %+v", result)
 	}
 	selfinstalltest.AssertBinary(t, env.exe, "0.2.0")
+}
+
+func TestInstallDownloadIdentifiesCLI(t *testing.T) {
+	env := newInstallEnv(t, "0.1.0", selfinstalltest.Release{Version: "0.2.0"})
+	var userAgent, client string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent, client = r.Header.Get("User-Agent"), r.Header.Get("X-Tollbit-Client")
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	env.installer.BaseURLs = []string{srv.URL}
+
+	_, _ = env.installer.Install(context.Background(), "0.1.0", "0.2.0")
+
+	if userAgent != version.HTTPUserAgent() {
+		t.Errorf("User-Agent = %q, want %q", userAgent, version.HTTPUserAgent())
+	}
+	if client != version.ClientHeader() {
+		t.Errorf("X-Tollbit-Client = %q, want %q", client, version.ClientHeader())
+	}
 }
 
 func TestInstallDoesNotFallBackOnChecksumMismatch(t *testing.T) {

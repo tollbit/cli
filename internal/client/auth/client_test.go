@@ -31,8 +31,11 @@ func TestClientCreatesAgentToken(t *testing.T) {
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Fatalf("expected Content-Type application/json, got %q", r.Header.Get("Content-Type"))
 		}
-		if r.Header.Get("User-Agent") != version.HTTPUserAgent() {
-			t.Fatalf("expected User-Agent %q, got %q", version.HTTPUserAgent(), r.Header.Get("User-Agent"))
+		if got := r.Header.Get("User-Agent"); got != version.HTTPUserAgent() {
+			t.Errorf("User-Agent = %q, want %q", got, version.HTTPUserAgent())
+		}
+		if got := r.Header.Get("X-Tollbit-Client"); got != version.ClientHeader() {
+			t.Errorf("X-Tollbit-Client = %q, want %q", got, version.ClientHeader())
 		}
 
 		var body AgentTokenRequest

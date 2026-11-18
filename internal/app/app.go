@@ -80,7 +80,7 @@ func (a *App) buildAnalytics() (analytics.Client, error) {
 	if a.deps.Analytics != nil {
 		return a.deps.Analytics, nil
 	}
-	client, err := analytics.NewClient(analytics.Config{BaseURL: a.config.Analytics.BaseURL})
+	client, err := analytics.NewClient(analytics.Config{BaseURL: a.config.Analytics.BaseURL}, a.apiTransport())
 	if err != nil {
 		return nil, fmt.Errorf("build analytics client: %w", err)
 	}

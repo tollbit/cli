@@ -40,7 +40,7 @@ type Installer struct {
 	// Executable is the binary to replace; os.Executable() when empty.
 	// Symlinks are followed so the real file is replaced.
 	Executable string
-	// HTTPClient downloads the release; http.DefaultClient when nil.
+	// HTTPClient downloads the release; client.New(0, nil) when nil.
 	HTTPClient *http.Client
 
 	goos   string

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-18
+
+### Changed
+
+- The install prompt now opens with a plain "Install the TollBit CLI." in
+  place of a bold label, which showed as raw asterisks when pasted.
+- The install prompt's Perplexity steps now say that custom connectors need a
+  Pro, Max or Enterprise plan, and that on Free connecting fails with "Failed
+  to enable connector".
+- The install prompt's Perplexity steps now say to choose Sign in on first
+  connect for buying content or analytics, and to remove the guest account
+  after signing in, because Perplexity keeps it as the default account.
+- Every request the CLI sends now identifies it with the `Tollbit-CLI/v<version>`
+  User-Agent and the `X-Tollbit-Client` header. Analytics queries and schema
+  calls, and release downloads during self-update, sent neither before.
+
 ## [0.5.3] - 2026-11-17
 
 ### Changed

@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/tollbit/cli/internal/errorsx/problemjson"
 	"github.com/tollbit/cli/internal/tokens/agent"
+	"github.com/tollbit/cli/internal/version"
 )
 
 func TestQuery(t *testing.T) {
@@ -23,6 +24,12 @@ func TestQuery(t *testing.T) {
 		}
 		if r.Header.Get("Accept") != "application/json" || r.Header.Get("Content-Type") != "application/json" {
 			t.Fatalf("unexpected content headers: %#v", r.Header)
+		}
+		if got := r.Header.Get("User-Agent"); got != version.HTTPUserAgent() {
+			t.Errorf("User-Agent = %q, want %q", got, version.HTTPUserAgent())
+		}
+		if got := r.Header.Get("X-Tollbit-Client"); got != version.ClientHeader() {
+			t.Errorf("X-Tollbit-Client = %q, want %q", got, version.ClientHeader())
 		}
 		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
 			t.Fatal("unexpected authorization header")
@@ -38,7 +45,7 @@ func TestQuery(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client, err := NewClient(Config{BaseURL: " " + srv.URL + "/prefix "})
+	client, err := NewClient(Config{BaseURL: " " + srv.URL + "/prefix "}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +69,7 @@ func TestQueryWithoutMeta(t *testing.T) {
 		_, _ = w.Write([]byte(`{"columns":[{"name":"n","type":"INT64"}],"rows":[[1]]}`))
 	}))
 	defer srv.Close()
-	client, err := NewClient(Config{BaseURL: srv.URL})
+	client, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,6 +91,12 @@ func TestSchema(t *testing.T) {
 		if r.Header.Get("Accept") != "application/json" {
 			t.Fatalf("unexpected accept header: %q", r.Header.Get("Accept"))
 		}
+		if got := r.Header.Get("User-Agent"); got != version.HTTPUserAgent() {
+			t.Errorf("User-Agent = %q, want %q", got, version.HTTPUserAgent())
+		}
+		if got := r.Header.Get("X-Tollbit-Client"); got != version.ClientHeader() {
+			t.Errorf("X-Tollbit-Client = %q, want %q", got, version.ClientHeader())
+		}
 		if r.Header.Get("Authorization") != "Bearer "+token.RawToken {
 			t.Fatal("unexpected authorization header")
 		}
@@ -98,7 +111,7 @@ func TestSchema(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client, err := NewClient(Config{BaseURL: " " + srv.URL + "/prefix "})
+	client, err := NewClient(Config{BaseURL: " " + srv.URL + "/prefix "}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +142,7 @@ func TestSchemaAcceptsLegacyArray(t *testing.T) {
 		_, _ = w.Write([]byte(` [{"name":"agent_logs_by_page","columns":[{"name":"host","type":"STRING"}]}]`))
 	}))
 	defer srv.Close()
-	client, err := NewClient(Config{BaseURL: srv.URL})
+	client, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +166,7 @@ func TestQueryParsesProblemJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client, err := NewClient(Config{BaseURL: srv.URL})
+	client, err := NewClient(Config{BaseURL: srv.URL}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +181,7 @@ func TestQueryParsesProblemJSON(t *testing.T) {
 }
 
 func TestQueryRejectsMissingToken(t *testing.T) {
-	client, err := NewClient(Config{BaseURL: "https://analytics.example"})
+	client, err := NewClient(Config{BaseURL: "https://analytics.example"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +191,7 @@ func TestQueryRejectsMissingToken(t *testing.T) {
 }
 
 func TestNewClientRequiresBaseURL(t *testing.T) {
-	if _, err := NewClient(Config{}); err == nil {
+	if _, err := NewClient(Config{}, nil); err == nil {
 		t.Fatal("expected missing base URL error")
 	}
 }

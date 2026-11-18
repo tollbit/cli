@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tollbit/cli/internal/client"
 	"github.com/tollbit/cli/internal/version"
 )
 
@@ -182,7 +183,6 @@ func probeHost(ctx context.Context, opts Options, t target) Check {
 	if err != nil {
 		return failed(c, KindOther, "bad URL "+t.url+": "+err.Error(), "")
 	}
-	req.Header.Set("User-Agent", version.HTTPUserAgent())
 	proxyURL, err := opts.Proxy(req)
 	if err != nil {
 		return failed(c, KindProxyUnreachable, "invalid proxy setting: "+err.Error(), "check HTTPS_PROXY")
@@ -204,26 +204,24 @@ func probeHost(ctx context.Context, opts Options, t target) Check {
 		return nil
 	}
 	var hops []string
-	client := &http.Client{
-		Transport: transport,
-		CheckRedirect: func(next *http.Request, via []*http.Request) error {
-			if !t.followRedirects {
-				return http.ErrUseLastResponse
-			}
-			// Keep http.Client's default limit, so a redirect loop fails
-			// fast instead of reading as a timeout.
-			if len(via) >= 10 {
-				return errors.New("stopped after 10 redirects")
-			}
-			if next.URL.Host != via[len(via)-1].URL.Host {
-				hops = append(hops, next.URL.Host)
-			}
-			return nil
-		},
+	httpClient := client.New(0, transport)
+	httpClient.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if !t.followRedirects {
+			return http.ErrUseLastResponse
+		}
+		// Keep http.Client's default limit, so a redirect loop fails
+		// fast instead of reading as a timeout.
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if next.URL.Host != via[len(via)-1].URL.Host {
+			hops = append(hops, next.URL.Host)
+		}
+		return nil
 	}
 
 	start := time.Now()
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	elapsed := time.Since(start).Round(time.Millisecond)
 	if err != nil {
 		kind, detail, hint := classify(err, int(connectStatus.Load()), proxyURL, t.host, opts.HostTimeout)

@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/tollbit/cli/internal/client"
 	"github.com/tollbit/cli/internal/errorsx"
-	"github.com/tollbit/cli/internal/version"
 )
 
 const (
@@ -43,13 +43,11 @@ type (
 		Latest  string `json:"latest"`
 	}
 
-	client struct {
+	apiClient struct {
 		baseURL *url.URL
 		http    *http.Client
 	}
 )
-
-var _ Client = (*client)(nil)
 
 func NewClient(cfg Config) (Client, error) {
 	baseURL := strings.TrimSpace(cfg.BaseURL)
@@ -60,13 +58,13 @@ func NewClient(cfg Config) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &client{
+	return &apiClient{
 		baseURL: parsed,
-		http:    &http.Client{Timeout: requestTimeout},
+		http:    client.New(requestTimeout, nil),
 	}, nil
 }
 
-func (c *client) Get(ctx context.Context) (Policy, error) {
+func (c *apiClient) Get(ctx context.Context) (Policy, error) {
 	u := *c.baseURL
 	u.Path = strings.TrimRight(c.baseURL.Path, "/") + policyPath
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -74,8 +72,6 @@ func (c *client) Get(ctx context.Context) (Policy, error) {
 		return Policy{}, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Tollbit-Client", version.ClientHeader())
-	req.Header.Set("User-Agent", version.HTTPUserAgent())
 	zerolog.Ctx(ctx).Debug().
 		Str("method", req.Method).
 		Str("url", req.URL.String()).

@@ -305,11 +305,16 @@ func TestGetContent(t *testing.T) {
 		if r.Header.Get("Tollbit-Token") != "content-jwt" {
 			t.Fatalf("unexpected tollbit token: %q", r.Header.Get("Tollbit-Token"))
 		}
+		// The agent's own user agent travels in Tollbit-User-Agent; the
+		// CLI's identity headers are the same as on every other request.
 		if r.Header.Get("Tollbit-User-Agent") != "MyAgent-User" {
 			t.Fatalf("unexpected tollbit user agent: %q", r.Header.Get("Tollbit-User-Agent"))
 		}
-		if r.Header.Get("User-Agent") != version.HTTPUserAgent() {
-			t.Fatalf("unexpected user agent: %q", r.Header.Get("User-Agent"))
+		if got := r.Header.Get("User-Agent"); got != version.HTTPUserAgent() {
+			t.Errorf("User-Agent = %q, want %q", got, version.HTTPUserAgent())
+		}
+		if got := r.Header.Get("X-Tollbit-Client"); got != version.ClientHeader() {
+			t.Errorf("X-Tollbit-Client = %q, want %q", got, version.ClientHeader())
 		}
 		_ = json.NewEncoder(w).Encode(GetContentResponse{
 			Content: PageContent{Body: "article body"},

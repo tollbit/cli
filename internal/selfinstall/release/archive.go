@@ -16,6 +16,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/tollbit/cli/internal/client"
 )
 
 const (
@@ -51,11 +53,11 @@ func (i Installer) asset(version string) releaseAsset {
 	return a
 }
 
-func (i Installer) client() *http.Client {
+func (i Installer) httpClient() *http.Client {
 	if i.HTTPClient != nil {
 		return i.HTTPClient
 	}
-	return http.DefaultClient
+	return client.New(0, nil)
 }
 
 func (i Installer) get(ctx context.Context, url string) (io.ReadCloser, error) {
@@ -63,7 +65,7 @@ func (i Installer) get(ctx context.Context, url string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := i.client().Do(req)
+	resp, err := i.httpClient().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download %s: %w", url, err)
 	}

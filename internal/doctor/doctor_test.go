@@ -16,6 +16,7 @@ import (
 
 	"github.com/tollbit/cli/internal/configuration"
 	"github.com/tollbit/cli/internal/installmethod"
+	"github.com/tollbit/cli/internal/version"
 )
 
 // testOptions returns Options for a machine where the binary is on PATH,
@@ -95,6 +96,25 @@ func TestRunPassesWhenEverythingWorks(t *testing.T) {
 		if c := findCheck(t, report, name); c.Status != StatusPass {
 			t.Fatalf("expected %s to pass, got %+v", name, c)
 		}
+	}
+}
+
+func TestHostProbeIdentifiesCLI(t *testing.T) {
+	var userAgent, client string
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent, client = r.Header.Get("User-Agent"), r.Header.Get("X-Tollbit-Client")
+	}))
+	defer srv.Close()
+	opts := testOptions(t, srv.URL)
+	opts.Transport = trusting(srv)
+
+	Run(context.Background(), opts)
+
+	if userAgent != version.HTTPUserAgent() {
+		t.Errorf("User-Agent = %q, want %q", userAgent, version.HTTPUserAgent())
+	}
+	if client != version.ClientHeader() {
+		t.Errorf("X-Tollbit-Client = %q, want %q", client, version.ClientHeader())
 	}
 }
 

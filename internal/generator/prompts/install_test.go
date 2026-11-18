@@ -28,10 +28,6 @@ Use https://raw.githubusercontent.com/tollbit/cli/v{{version}}/scripts/install.s
 ## Troubleshoot a failed install
 
 {{troubleshooting}}
-
-## TODO
-
-Not published.
 `
 
 const testTroubleshoot = `# Diagnose a failed install
@@ -71,7 +67,7 @@ func TestRenderMergesPlatformsWithTheSameHint(t *testing.T) {
 			t.Errorf("prompt is missing %q:\n%s", want, prompt)
 		}
 	}
-	for _, unwanted := range []string{"No detection", "## TODO", "Not published.", "{{"} {
+	for _, unwanted := range []string{"No detection", "{{"} {
 		if strings.Contains(prompt, unwanted) {
 			t.Errorf("prompt has %q:\n%s", unwanted, prompt)
 		}

@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/tollbit/cli/internal/client"
 	"github.com/tollbit/cli/internal/errorsx"
 	"github.com/tollbit/cli/internal/tokens/agent"
-	"github.com/tollbit/cli/internal/version"
 )
 
 type (
@@ -31,7 +31,7 @@ type (
 		SubmitFeedback(ctx context.Context, req SubmitFeedbackRequest, token agent.Token) (SubmitFeedbackResponse, error)
 	}
 
-	client struct {
+	apiClient struct {
 		baseURL *url.URL
 		http    *http.Client
 	}
@@ -154,8 +154,6 @@ type (
 	requestOption func(*http.Request)
 )
 
-var _ Client = (*client)(nil)
-
 // NewClient sends requests through transport (http.DefaultTransport when nil),
 // so callers can observe every response without the client knowing.
 func NewClient(cfg Config, transport http.RoundTripper) (Client, error) {
@@ -167,9 +165,9 @@ func NewClient(cfg Config, transport http.RoundTripper) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &client{
+	return &apiClient{
 		baseURL: parsed,
-		http:    &http.Client{Timeout: 30 * time.Second, Transport: transport},
+		http:    client.New(30*time.Second, transport),
 	}, nil
 }
 
@@ -177,7 +175,7 @@ func (c *Config) Normalize() {
 	c.BaseURL = strings.TrimSpace(c.BaseURL)
 }
 
-func (c *client) Search(ctx context.Context, params SearchParams, token agent.Token) (PagedSearchResultResponse, error) {
+func (c *apiClient) Search(ctx context.Context, params SearchParams, token agent.Token) (PagedSearchResultResponse, error) {
 	query := strings.TrimSpace(params.Query)
 	if query == "" {
 		return PagedSearchResultResponse{}, errors.New("search query is required")
@@ -206,7 +204,7 @@ func (c *client) Search(ctx context.Context, params SearchParams, token agent.To
 	return out, c.doJSON(ctx, http.MethodGet, u.String(), nil, &out, withBearerToken(token.RawToken))
 }
 
-func (c *client) BatchGetRates(ctx context.Context, urls []string, token agent.Token) ([]BatchRateResponseV2, error) {
+func (c *apiClient) BatchGetRates(ctx context.Context, urls []string, token agent.Token) ([]BatchRateResponseV2, error) {
 	if len(urls) == 0 {
 		return nil, errors.New("at least one URL is required")
 	}
@@ -221,7 +219,7 @@ func (c *client) BatchGetRates(ctx context.Context, urls []string, token agent.T
 	)
 }
 
-func (c *client) CreateContentAccessToken(ctx context.Context, req CreateContentAccessTokenRequest, token agent.Token) (CreateContentAccessTokenResponse, error) {
+func (c *apiClient) CreateContentAccessToken(ctx context.Context, req CreateContentAccessTokenRequest, token agent.Token) (CreateContentAccessTokenResponse, error) {
 	if err := requireAgentToken(token); err != nil {
 		return CreateContentAccessTokenResponse{}, err
 	}
@@ -236,7 +234,7 @@ func (c *client) CreateContentAccessToken(ctx context.Context, req CreateContent
 	)
 }
 
-func (c *client) GetContent(ctx context.Context, articleURL, contentToken, userAgent string, token agent.Token) (GetContentResponse, error) {
+func (c *apiClient) GetContent(ctx context.Context, articleURL, contentToken, userAgent string, token agent.Token) (GetContentResponse, error) {
 	if err := requireAgentToken(token); err != nil {
 		return GetContentResponse{}, err
 	}
@@ -261,7 +259,7 @@ func (c *client) GetContent(ctx context.Context, articleURL, contentToken, userA
 	)
 }
 
-func (c *client) SubmitFeedback(ctx context.Context, req SubmitFeedbackRequest, token agent.Token) (SubmitFeedbackResponse, error) {
+func (c *apiClient) SubmitFeedback(ctx context.Context, req SubmitFeedbackRequest, token agent.Token) (SubmitFeedbackResponse, error) {
 	if err := requireAgentToken(token); err != nil {
 		return SubmitFeedbackResponse{}, err
 	}
@@ -341,7 +339,7 @@ func withTollbitToken(token string) requestOption {
 	}
 }
 
-func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, out any, opts ...requestOption) error {
+func (c *apiClient) doJSON(ctx context.Context, method, rawURL string, body any, out any, opts ...requestOption) error {
 	bodyBytes, err := encodeBody(body)
 	if err != nil {
 		return err
@@ -355,8 +353,6 @@ func (c *client) doJSON(ctx context.Context, method, rawURL string, body any, ou
 		return err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Tollbit-Client", version.ClientHeader())
-	req.Header.Set("User-Agent", version.HTTPUserAgent())
 	if bodyBytes != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -397,7 +393,7 @@ func encodeBody(body any) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (c *client) resolve(p string) *url.URL {
+func (c *apiClient) resolve(p string) *url.URL {
 	u := *c.baseURL
 	u.Path = strings.TrimRight(c.baseURL.Path, "/") + p
 	return &u
@@ -408,8 +404,7 @@ func logRequest(ctx context.Context, req *http.Request, body []byte) {
 		Str("method", req.Method).
 		Str("url", req.URL.String()).
 		Str("accept", req.Header.Get("Accept")).
-		Str("content_type", req.Header.Get("Content-Type")).
-		Str("user_agent", req.Header.Get("User-Agent"))
+		Str("content_type", req.Header.Get("Content-Type"))
 	if token := req.Header.Get("Authorization"); token != "" {
 		e = e.Str("authorization", redactSecret(token))
 	}
