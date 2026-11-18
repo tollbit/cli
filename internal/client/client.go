@@ -11,12 +11,16 @@ import (
 )
 
 const (
-	clientHeaderName    = "X-Tollbit-Client"
-	userAgentHeaderName = "User-Agent"
+	accessMethodHeaderName = "X-Tollbit-Access-Method"
+	accessMethod           = "cli"
+	clientHeaderName       = "X-Tollbit-Client"
+	userAgentHeaderName    = "User-Agent"
 )
 
-// identifyingTransport always sets X-Tollbit-Client (the gateway's update
-// check reads it), and sets User-Agent unless the request already set its own.
+// identifyingTransport always sets X-Tollbit-Access-Method (backends read it
+// first to tell TollBit clients apart) and X-Tollbit-Client (the gateway's
+// update check reads it), and sets User-Agent unless the request already set
+// its own.
 type identifyingTransport struct {
 	base http.RoundTripper
 }
@@ -37,6 +41,7 @@ func (t identifyingTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
+	req.Header.Set(accessMethodHeaderName, accessMethod)
 	req.Header.Set(clientHeaderName, version.ClientHeader())
 	if req.Header.Get(userAgentHeaderName) == "" {
 		req.Header.Set(userAgentHeaderName, version.HTTPUserAgent())

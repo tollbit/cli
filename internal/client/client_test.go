@@ -16,7 +16,7 @@ func (r *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error
 	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Request: req}, nil
 }
 
-func TestClientSetsBothHeaders(t *testing.T) {
+func TestClientSetsIdentityHeaders(t *testing.T) {
 	base := &recordingTransport{}
 	req, err := http.NewRequest(http.MethodGet, "https://example.test", nil)
 	if err != nil {
@@ -32,6 +32,9 @@ func TestClientSetsBothHeaders(t *testing.T) {
 	}
 	if got := base.got.Header.Get("X-Tollbit-Client"); got != version.ClientHeader() {
 		t.Errorf("X-Tollbit-Client = %q, want %q", got, version.ClientHeader())
+	}
+	if got := base.got.Header.Get("X-Tollbit-Access-Method"); got != "cli" {
+		t.Errorf("X-Tollbit-Access-Method = %q, want %q", got, "cli")
 	}
 	if req.Header.Get("X-Tollbit-Client") != "" {
 		t.Error("client modified the caller's request")
@@ -55,5 +58,8 @@ func TestClientKeepsUserAgentTheRequestSet(t *testing.T) {
 	}
 	if got := base.got.Header.Get("X-Tollbit-Client"); got != version.ClientHeader() {
 		t.Errorf("X-Tollbit-Client = %q, want %q", got, version.ClientHeader())
+	}
+	if got := base.got.Header.Get("X-Tollbit-Access-Method"); got != "cli" {
+		t.Errorf("X-Tollbit-Access-Method = %q, want %q", got, "cli")
 	}
 }

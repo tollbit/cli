@@ -73,21 +73,21 @@ Tell the user you're installing the TollBit CLI, then run the installer. The dow
 On macOS or Linux:
 
 ```bash
-installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.4; rc=$?; rm -f "$installer"; (exit $rc)
+installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.5; rc=$?; rm -f "$installer"; (exit $rc)
 ```
 
 On Windows (PowerShell):
 
 ```powershell
-& ([scriptblock]::Create((irm -TimeoutSec 120 "https://tollbit.com/.agents/cli/install.ps1"))) -Version v0.5.4
+& ([scriptblock]::Create((irm -TimeoutSec 120 "https://tollbit.com/.agents/cli/install.ps1"))) -Version v0.5.5
 ```
 
 - **Approvals.** Many agents ask the user before running a command. If yours does, tell the user what the command does and ask them to approve it.
 - **Network.** The installer downloads from `tollbit.com`, or from GitHub if that fails, and `tollbit` commands need network access too. Some agents run commands without network access. If yours does, ask the user to allow it. The fallbacks below need network access too, so don't try them. If you can't get access, give the user the command to run in their own terminal. In a cloud sandbox with an allowlist, allow `tollbit.com` and `*.tollbit.com`: the installer needs `tollbit.com`, and `tollbit` commands need its subdomains.
 - **A hang is a failure.** If the installer times out, or prints nothing for two minutes, stop it and go to the fallbacks below. Don't wait, and don't retry the same command.
 - **If the installer fails,** use the first of these that works:
-  1. **npm, but only if it's already installed** (`npm --version` works): `npm install -g @tollbit/tollbit-cli@0.5.4`. Don't install Node.js or Git to get it: on a managed work computer, those installers can wait for an administrator prompt the user never sees.
-  2. **The release, downloaded directly.** Download `tollbit_0.5.4_<os>_<arch>.tar.gz` (`.zip` on Windows; `<os>` is `darwin`, `linux` or `windows`, and `<arch>` is `amd64` or `arm64`) and `tollbit_0.5.4_checksums.txt` from `https://tollbit.com/.agents/cli/v0.5.4/`, or from `https://github.com/tollbit/cli/releases/download/v0.5.4/` if that fails, with the same two-minute limit. Take both files from the same place. Check the archive's SHA-256 against the checksums file, unpack it, and put `tollbit` (`tollbit.exe` on Windows) in a directory on the user's PATH, such as `~/.local/bin`.
+  1. **npm, but only if it's already installed** (`npm --version` works): `npm install -g @tollbit/tollbit-cli@0.5.5`. Don't install Node.js or Git to get it: on a managed work computer, those installers can wait for an administrator prompt the user never sees.
+  2. **The release, downloaded directly.** Download `tollbit_0.5.5_<os>_<arch>.tar.gz` (`.zip` on Windows; `<os>` is `darwin`, `linux` or `windows`, and `<arch>` is `amd64` or `arm64`) and `tollbit_0.5.5_checksums.txt` from `https://tollbit.com/.agents/cli/v0.5.5/`, or from `https://github.com/tollbit/cli/releases/download/v0.5.5/` if that fails, with the same two-minute limit. Take both files from the same place. Check the archive's SHA-256 against the checksums file, unpack it, and put `tollbit` (`tollbit.exe` on Windows) in a directory on the user's PATH, such as `~/.local/bin`.
 - **Once the installer or a fallback has installed it, check it** with `tollbit doctor`, which exits 1 if a check fails. If `tollbit` isn't found, the installer put it in `~/.local/bin`: run it from there, or start a new shell.
 - **If nothing installed,** don't try other sources. Follow "Install: MCP instead".
 - **If `tollbit` installed but `tollbit doctor` fails,** follow "Troubleshoot a failed install" at the end of these instructions: it finds where the install breaks and writes a report for TollBit support. Once the user has the report, follow "Install: MCP instead".
@@ -102,14 +102,14 @@ Don't run the installer to see what happens, and don't try npm, a release downlo
 2. **Install from here.** Make one `request_permissions` call for network access and write access to the full paths of `~/.local/bin` and `~/.config/tollbit`. Ask for nothing else, and never for a shell profile such as `~/.zshrc`: Codex can't grant a symlink, and asking for one can break your shell tool until the user starts a new chat. Ask the user to approve it for the whole session if Codex offers that. Once it's granted, run this in your shell tool, not a Node REPL or any other tool, because their sandboxes differ:
 
    ```bash
-   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.4 --no-modify-path; rc=$?; rm -f "$installer"; (exit $rc)
+   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.5 --no-modify-path; rc=$?; rm -f "$installer"; (exit $rc)
    ```
 
    Then run `tollbit doctor` and follow "After installing" straight away, because the access may end with this turn. If `tollbit` isn't found, the installer put it in `~/.local/bin`: run it from there, and give the user the PATH line the installer printed. If anything here fails, go to step 3.
 3. **Hand it to the user.** Tell them the Codex sandbox stops you doing this, and show them both of these commands in full, to run in their own terminal, not in Codex. The first installs TollBit. The second adds a Codex rule that lets `tollbit` commands, and nothing else, run outside the sandbox without asking. Tell them that includes paid commands such as `tollbit content`.
 
    ```bash
-   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.4; rc=$?; rm -f "$installer"; (exit $rc)
+   installer="$(mktemp)" && curl -fsSL --connect-timeout 20 --max-time 120 -o "$installer" "https://tollbit.com/.agents/cli/install.sh" && bash "$installer" --version v0.5.5; rc=$?; rm -f "$installer"; (exit $rc)
    ```
 
    ```bash
@@ -318,7 +318,7 @@ These are the hosts installing needs:
 | `raw.githubusercontent.com` | older install commands that fetch `install.sh` or `install.ps1` from GitHub | https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh |
 | `api.github.com` | the scripts, when `tollbit.com` fails, to find the latest version (not needed when a version is given) | https://api.github.com/repos/tollbit/cli/releases/latest |
 | `github.com` | release downloads when `tollbit.com` fails, and Claude Code's `/plugin marketplace add` | https://github.com/tollbit/cli/releases |
-| `release-assets.githubusercontent.com` | release downloads when `tollbit.com` fails: GitHub redirects them here | https://github.com/tollbit/cli/releases/download/v0.5.4/tollbit_0.5.4_checksums.txt (follows the redirect) |
+| `release-assets.githubusercontent.com` | release downloads when `tollbit.com` fails: GitHub redirects them here | https://github.com/tollbit/cli/releases/download/v0.5.5/tollbit_0.5.5_checksums.txt (follows the redirect) |
 | `registry.npmjs.org` | npm | https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest |
 
 `release-assets.githubusercontent.com` has no probe of its own: rate it by the release download line, after the redirect. If `github.com` passes and the release download fails, `release-assets.githubusercontent.com` is the blocked host.
@@ -329,7 +329,7 @@ for url in \
   https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh \
   https://api.github.com/repos/tollbit/cli/releases/latest \
   https://github.com/tollbit/cli/releases \
-  https://github.com/tollbit/cli/releases/download/v0.5.4/tollbit_0.5.4_checksums.txt \
+  https://github.com/tollbit/cli/releases/download/v0.5.5/tollbit_0.5.5_checksums.txt \
   https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest
 do
   echo "== $url"
@@ -344,7 +344,7 @@ $urls = @(
   'https://raw.githubusercontent.com/tollbit/cli/main/scripts/install.sh',
   'https://api.github.com/repos/tollbit/cli/releases/latest',
   'https://github.com/tollbit/cli/releases',
-  'https://github.com/tollbit/cli/releases/download/v0.5.4/tollbit_0.5.4_checksums.txt',
+  'https://github.com/tollbit/cli/releases/download/v0.5.5/tollbit_0.5.5_checksums.txt',
   'https://registry.npmjs.org/@tollbit%2ftollbit-cli/latest'
 )
 foreach ($u in $urls) {
@@ -430,12 +430,12 @@ Get-Item "$env:LOCALAPPDATA\Programs\tollbit\bin\tollbit.exe", "$p\node_modules\
 
 Run each binary you find by its full path, with `version`.
 
-If none exists and `tollbit.com` or the GitHub release download was **ok** in step 3, test a fresh copy in a temporary directory. If only GitHub was ok, set `base` to `https://github.com/tollbit/cli/releases/download/v0.5.4` instead. This checks the binary on its own, apart from any installer. The `<os>_<arch>` part is `darwin_arm64`, `linux_amd64`, `windows_amd64` and so on.
+If none exists and `tollbit.com` or the GitHub release download was **ok** in step 3, test a fresh copy in a temporary directory. If only GitHub was ok, set `base` to `https://github.com/tollbit/cli/releases/download/v0.5.5` instead. This checks the binary on its own, apart from any installer. The `<os>_<arch>` part is `darwin_arm64`, `linux_amd64`, `windows_amd64` and so on.
 
 ```bash
 t="$(mktemp -d)"; cd "$t"
-base=https://tollbit.com/.agents/cli/v0.5.4
-curl -fsSLO "$base/tollbit_0.5.4_checksums.txt"
+base=https://tollbit.com/.agents/cli/v0.5.5
+curl -fsSLO "$base/tollbit_0.5.5_checksums.txt"
 a="$(grep -o 'tollbit_[^ ]*_<os>_<arch>.tar.gz' tollbit_*_checksums.txt)"
 curl -fsSLO "$base/$a" && grep " $a\$" tollbit_*_checksums.txt | (shasum -a 256 -c 2>/dev/null || sha256sum -c) \
   && tar -xzf "$a" && ./tollbit version
@@ -444,8 +444,8 @@ cd - >/dev/null; rm -rf "$t"
 
 ```powershell
 $t = Join-Path $env:TEMP "tollbit-test-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory $t | Out-Null
-$base = 'https://tollbit.com/.agents/cli/v0.5.4'
-Invoke-WebRequest "$base/tollbit_0.5.4_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
+$base = 'https://tollbit.com/.agents/cli/v0.5.5'
+Invoke-WebRequest "$base/tollbit_0.5.5_checksums.txt" -OutFile "$t\sums.txt" -UseBasicParsing
 $line = Select-String -Path "$t\sums.txt" -Pattern '_windows_<arch>\.zip$' | Select-Object -First 1
 $sum, $a = $line.Line -split '\s+'
 Invoke-WebRequest "$base/$a" -OutFile "$t\$a" -UseBasicParsing

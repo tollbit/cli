@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-18
+
+### Changed
+
+- Every request the CLI sends now also carries the `X-Tollbit-Access-Method: cli`
+  header, which TollBit services use to tell the CLI apart from other TollBit
+  clients.
+
 ## [0.5.4] - 2026-11-18
 
 ### Changed
